@@ -1,0 +1,18 @@
+{
+    "compilerOptions": {
+        "target": "ES2015",
+        "sourceMap": false,
+        "module": "ES2020",
+        "lib": [
+            "ESNext",
+            "DOM",
+            "ES2020"
+        ],
+    },
+    "exclude": [
+        "src/**/*.js"
+    ],
+    "include": [
+        "src/**/*.ts"
+    ]
+}

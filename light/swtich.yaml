@@ -1,0 +1,23 @@
+- platform: switch
+  name: Kitchen Tract Lights
+  entity_id: switch.jasco_products_unknown_type_4952_id_3137_switch
+
+- platform: switch
+  name: Butterfly Light
+  entity_id: switch.0720034284f3eb8523f2_1
+
+- platform: switch
+  name: Office Light
+  entity_id: switch.0720034284f3eb85221f_2
+
+- platform: switch
+  name: Entryway Light
+  entity_id: switch.jasco_products_unknown_type_4952_id_3137_switch_5
+
+- platform: switch
+  name: Bathroom Light
+  entity_id: switch.jasco_products_unknown_type_4952_id_3137_switch_6
+
+- platform: switch
+  name: Standing Mirror Light
+  entity_id: switch.jasco_products_unknown_type_4952_id_3137_switch_7

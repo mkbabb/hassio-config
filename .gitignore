@@ -1,0 +1,31 @@
+# Databases.
+*.sqlite
+*.db
+*.db-shm
+*.db-wal
+
+# General log file
+*.log
+
+# hassio folders.
+.cloud/
+.storage/
+custom_components/
+deps/
+themes/
+tts/
+www/
+
+# script dependencies.
+node_modules/
+my_venv/
+__pycache__
+
+# secrets
+secrets.yaml
+
+# hassio specific files, such as zwave configs.
+OZW_Log.txt
+zwcfg_*
+zwscene.xml
+options.xml

@@ -1,0 +1,12 @@
+govee_strip:
+  min: 0
+  max: 255
+govee_temperature_input:
+  min: 0
+  max: 500
+govee_h_input:
+  min: 0
+  max: 360
+govee_s_input:
+  min: 0
+  max: 360

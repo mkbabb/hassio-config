@@ -1,0 +1,5 @@
+office:
+  name: Office
+  icon: mdi:chair-rolling
+  entities:
+    - switch.0720034284f3eb85221f_2
