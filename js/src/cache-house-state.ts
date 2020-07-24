@@ -8,8 +8,8 @@ interface DomainServices {
     };
 }
 
-const switchServices = [];
-const lightServices = [
+const switchParams = [];
+const lightParams = [
     "transition",
     "rgb_color",
     "color_name",
@@ -25,24 +25,30 @@ const lightServices = [
     "flash",
     "effect"
 ];
-const fanServices = ["speed"];
+const fanParams = ["speed"];
 
-const domainServices: DomainServices = {
+const domainServiceParams: DomainServices = {
     switch: {
-        turn_on: switchServices,
-        turn_off: switchServices
+        turn_on: switchParams,
+        turn_off: switchParams
     },
     light: {
-        turn_on: lightServices,
-        turn_off: lightServices
+        turn_on: lightParams,
+        turn_off: lightParams
     },
     fan: {
-        turn_on: fanServices,
-        turn_off: fanServices
+        turn_on: fanParams,
+        turn_off: fanParams
     },
     climate: {
         set_temperature: ["temperature", "hvac_mode"],
         set_preset_mode: ["preset_mode"]
+    },
+    media_player: {
+        turn_on: [],
+        turn_off: [],
+        media_play: [],
+        media_pause: []
     }
 };
 
@@ -52,7 +58,7 @@ const filterAttributes = function (
     attributes: Hass.Attribute
 ) {
     let data = {};
-    const allowedAttributes = domainServices[domain][service];
+    const allowedAttributes = domainServiceParams?.domain?.service ?? [];
 
     Object.keys(attributes).forEach((key) => {
         if (allowedAttributes.indexOf(key) !== -1) {
@@ -63,14 +69,40 @@ const filterAttributes = function (
     return data;
 };
 
+const mapDomainToService = function (entity: Hass.State, domain: string) {
+    switch (domain) {
+        case "switch":
+        case "light":
+        case "fan": {
+            return `turn_${entity.state}`;
+        }
+        case "media_player": {
+            switch (entity.state) {
+                case "standby":
+                case "off":
+                    return "turn_off";
+                case "on":
+                    return "turn_on";
+                case "playing":
+                    return "media_play";
+                case "paused":
+                    return "media_pause";
+                default:
+                    return "turn_off";
+            }
+        }
+        case "climate": {
+            return "set_temperature";
+        }
+        default: {
+            return "turn_off";
+        }
+    }
+};
+
 const cachedStates: Partial<Hass.Service>[] = entities.map((e) => {
     const domain = e.entity_id.split(".")[0];
-    const service =
-        domain === "switch" || domain === "light" || domain === "fan"
-            ? `turn_${e.state}`
-            : domain === "climate"
-            ? "set_temperature"
-            : null;
+    const service = mapDomainToService(e, domain);
 
     const state: Partial<Hass.Service> = {
         domain: domain,
@@ -90,15 +122,28 @@ const awayPayload: Partial<Hass.Service>[] = cachedStates.map((state) => {
 
     const payload = { domain, data: { entity_id } };
 
-    if (domain === "switch" || domain === "light") {
-        payload["service"] = "turn_off";
-    } else if (domain === "fan") {
-        payload["service"] = "turn_on";
-        payload.data["speed"] = "high";
-    } else if (domain === "climate") {
-        payload["service"] = "set_preset_mode";
-        payload.data["preset_mode"] = "away";
+    switch (domain) {
+        case "switch":
+        case "light":
+        case "media_player": {
+            payload["service"] = "turn_off";
+            break;
+        }
+        case "fan": {
+            payload["service"] = "turn_on";
+            payload.data["speed"] = "low";
+            break;
+        }
+        case "climate": {
+            payload["service"] = "set_preset_mode";
+            payload.data["preset_mode"] = "away";
+            break;
+        }
+        default: {
+            break;
+        }
     }
+
     return payload;
 });
 

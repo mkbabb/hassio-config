@@ -1,8 +1,8 @@
 //@ts-expect-error
 const message = msg;
 const entities = message.payload;
-const switchServices = [];
-const lightServices = [
+const switchParams = [];
+const lightParams = [
     "transition",
     "rgb_color",
     "color_name",
@@ -18,28 +18,35 @@ const lightServices = [
     "flash",
     "effect"
 ];
-const fanServices = ["speed"];
-const domainServices = {
+const fanParams = ["speed"];
+const domainServiceParams = {
     switch: {
-        turn_on: switchServices,
-        turn_off: switchServices
+        turn_on: switchParams,
+        turn_off: switchParams
     },
     light: {
-        turn_on: lightServices,
-        turn_off: lightServices
+        turn_on: lightParams,
+        turn_off: lightParams
     },
     fan: {
-        turn_on: fanServices,
-        turn_off: fanServices
+        turn_on: fanParams,
+        turn_off: fanParams
     },
     climate: {
         set_temperature: ["temperature", "hvac_mode"],
         set_preset_mode: ["preset_mode"]
+    },
+    media_player: {
+        turn_on: [],
+        turn_off: [],
+        media_play: [],
+        media_pause: []
     }
 };
 const filterAttributes = function (domain, service, attributes) {
+    var _a, _b;
     let data = {};
-    const allowedAttributes = domainServices[domain][service];
+    const allowedAttributes = (_b = (_a = domainServiceParams === null || domainServiceParams === void 0 ? void 0 : domainServiceParams.domain) === null || _a === void 0 ? void 0 : _a.service) !== null && _b !== void 0 ? _b : [];
     Object.keys(attributes).forEach((key) => {
         if (allowedAttributes.indexOf(key) !== -1) {
             data[key] = attributes[key];
@@ -47,13 +54,39 @@ const filterAttributes = function (domain, service, attributes) {
     });
     return data;
 };
+const mapDomainToService = function (entity, domain) {
+    switch (domain) {
+        case "switch":
+        case "light":
+        case "fan": {
+            return `turn_${entity.state}`;
+        }
+        case "media_player": {
+            switch (entity.state) {
+                case "standby":
+                case "off":
+                    return "turn_off";
+                case "on":
+                    return "turn_on";
+                case "playing":
+                    return "media_play";
+                case "paused":
+                    return "media_pause";
+                default:
+                    return "turn_off";
+            }
+        }
+        case "climate": {
+            return "set_temperature";
+        }
+        default: {
+            return "turn_off";
+        }
+    }
+};
 const cachedStates = entities.map((e) => {
     const domain = e.entity_id.split(".")[0];
-    const service = domain === "switch" || domain === "light" || domain === "fan"
-        ? `turn_${e.state}`
-        : domain === "climate"
-            ? "set_temperature"
-            : null;
+    const service = mapDomainToService(e, domain);
     const state = {
         domain: domain,
         service: service,
@@ -65,16 +98,26 @@ const awayPayload = cachedStates.map((state) => {
     const { domain } = state;
     const { entity_id } = state.data;
     const payload = { domain, data: { entity_id } };
-    if (domain === "switch" || domain === "light") {
-        payload["service"] = "turn_off";
-    }
-    else if (domain === "fan") {
-        payload["service"] = "turn_on";
-        payload.data["speed"] = "high";
-    }
-    else if (domain === "climate") {
-        payload["service"] = "set_preset_mode";
-        payload.data["preset_mode"] = "away";
+    switch (domain) {
+        case "switch":
+        case "light":
+        case "media_player": {
+            payload["service"] = "turn_off";
+            break;
+        }
+        case "fan": {
+            payload["service"] = "turn_on";
+            payload.data["speed"] = "low";
+            break;
+        }
+        case "climate": {
+            payload["service"] = "set_preset_mode";
+            payload.data["preset_mode"] = "away";
+            break;
+        }
+        default: {
+            break;
+        }
     }
     return payload;
 });
