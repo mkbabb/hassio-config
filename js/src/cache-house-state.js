@@ -4,10 +4,10 @@ const entities = message.payload;
 const switchParams = [];
 const lightParams = [
     "transition",
-    "rgb_color",
-    "color_name",
+    // "rgb_color",
+    // "color_name",
     "hs_color",
-    "xy_color",
+    // "xy_color",
     "color_temp",
     "kelvin",
     "white_value",
@@ -44,9 +44,9 @@ const domainServiceParams = {
     }
 };
 const filterAttributes = function (domain, service, attributes) {
-    var _a, _b;
+    var _a;
     let data = {};
-    const allowedAttributes = (_b = (_a = domainServiceParams === null || domainServiceParams === void 0 ? void 0 : domainServiceParams.domain) === null || _a === void 0 ? void 0 : _a.service) !== null && _b !== void 0 ? _b : [];
+    const allowedAttributes = (_a = domainServiceParams[domain][service]) !== null && _a !== void 0 ? _a : [];
     Object.keys(attributes).forEach((key) => {
         if (allowedAttributes.indexOf(key) !== -1) {
             data[key] = attributes[key];

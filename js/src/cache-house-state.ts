@@ -11,10 +11,10 @@ interface DomainServices {
 const switchParams = [];
 const lightParams = [
     "transition",
-    "rgb_color",
-    "color_name",
+    // "rgb_color",
+    // "color_name",
     "hs_color",
-    "xy_color",
+    // "xy_color",
     "color_temp",
     "kelvin",
     "white_value",
@@ -58,7 +58,7 @@ const filterAttributes = function (
     attributes: Hass.Attribute
 ) {
     let data = {};
-    const allowedAttributes = domainServiceParams?.domain?.service ?? [];
+    const allowedAttributes = domainServiceParams[domain][service] ?? [];
 
     Object.keys(attributes).forEach((key) => {
         if (allowedAttributes.indexOf(key) !== -1) {
