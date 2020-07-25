@@ -26,7 +26,7 @@ const time = getTimeString();
 const payload = Object.assign({ data: {
         title: `${doorName} was ${doorState}`,
         message: `The ${doorName} was ${doorState} at ${time}`
-    } }, { doorName, doorState, time });
+    } }, { doorName, doorState, time, entity_id: entityId });
 message.payload = payload;
 //@ts-ignore
 return message;

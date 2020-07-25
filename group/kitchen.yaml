@@ -5,3 +5,4 @@ kitchen:
     - switch.jasco_products_unknown_type_4952_id_3137_switch
     - switch.jasco_products_unknown_type_4952_id_3137_switch_2
     - light.kitchen_island_lights
+
