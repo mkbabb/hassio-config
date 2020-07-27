@@ -1,4 +1,7 @@
 declare namespace Hass {
+    /**
+     * Template of attributes for various hass devices.
+     */
     export namespace Attributes {
         interface Switch {
             friendly_name: string;
@@ -49,6 +52,10 @@ declare namespace Hass {
         | Attributes.Switch
         | Attributes.Climate;
 
+    /**
+     * Template state for a hass entity.
+     * Usually found in msg.payload within NodeRed.
+     */
     interface State {
         entity_id: string;
         state: string;
@@ -64,6 +71,11 @@ declare namespace Hass {
         timeSinceChangedMs: number;
     }
 
+    /**
+     * NodeRed message object template.
+     * payload and data attributes are normally here,
+     * but the message object can contain anything.
+     */
     interface Message<T> {
         payload: T;
 
@@ -72,6 +84,8 @@ declare namespace Hass {
             old_state: State;
             new_state: State;
         };
+
+        [s: string]: any;
     }
 
     interface Service {
