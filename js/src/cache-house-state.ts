@@ -8,6 +8,7 @@ interface DomainServices {
     };
 }
 
+// Valid parameters for the entity attributes; states that shall be saved.
 const switchParams = [];
 const lightParams = [
     "transition",
@@ -27,6 +28,7 @@ const lightParams = [
 ];
 const fanParams = ["speed"];
 
+// Maps domains to services, which map services to valid param attributes.
 const domainServiceParams: DomainServices = {
     switch: {
         turn_on: switchParams,
@@ -52,6 +54,14 @@ const domainServiceParams: DomainServices = {
     }
 };
 
+/**
+ * Filters a list of attributes based on valid state attributes of a given entity.
+ * These are the states that we'll save when caching.
+ *
+ * @param domain entity domain.
+ * @param service entity service.
+ * @param attributes entity attributes to cache.
+ */
 const filterAttributes = function (
     domain: string,
     service: string,
@@ -69,6 +79,15 @@ const filterAttributes = function (
     return data;
 };
 
+/**
+ * Maps an input entity's domain to an appropriate service for
+ * later caching.
+ *
+ * light -> turn_[on, off], for example.
+ *
+ * @param entity input hass entity.
+ * @param domain domain thereof.
+ */
 const mapDomainToService = function (entity: Hass.State, domain: string) {
     switch (domain) {
         case "switch":
@@ -100,6 +119,7 @@ const mapDomainToService = function (entity: Hass.State, domain: string) {
     }
 };
 
+// create the cached state object that will be saved to the global flow.
 const cachedStates: Partial<Hass.Service>[] = entities.map((e) => {
     const domain = e.entity_id.split(".")[0];
     const service = mapDomainToService(e, domain);
@@ -116,6 +136,9 @@ const cachedStates: Partial<Hass.Service>[] = entities.map((e) => {
     return state;
 });
 
+/* creates a set of away states that we'll entry once our away condition is met within hass.
+ * For example, we turn off all of the cached lights and switches, and turn on all the fans to low.
+ */
 const awayPayload: Partial<Hass.Service>[] = cachedStates.map((state) => {
     const { domain } = state;
     const { entity_id } = state.data;
@@ -148,7 +171,9 @@ const awayPayload: Partial<Hass.Service>[] = cachedStates.map((state) => {
 });
 
 //@ts-ignore
+// cache the states!
 flow.set("cachedStates", cachedStates);
+// the next node will execute this payload.
 message.payload = awayPayload;
 //@ts-ignore
 return message;
