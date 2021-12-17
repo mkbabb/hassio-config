@@ -8,6 +8,9 @@
 *.log
 *.log*
 
+*.august.conf
+*.backup
+
 # hassio folders.
 .cloud/
 .storage/
@@ -30,6 +33,3 @@ OZW_Log.txt
 zwcfg_*
 zwscene.xml
 options.xml
-
-*.august.conf
-*.backup

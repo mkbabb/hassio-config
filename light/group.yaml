@@ -5,14 +5,14 @@
       - light.hanging_light_2
       - light.hanging_light_3
 
-# - platform: group
-#   name: Kitchen Island Lights
-#   entities:
-#       - light.lifx_a19_2fef68
-#       - light.kitchen_2
+- platform: group
+  name: Kitchen Island Lights
+  entities:
+      - light.lifx_a19_2fef68
+      - light.kitchen_2
       
-# - platform: group
-#   name: Cabinet Lights
-#   entities:
-#       - light.cabinet_lights_butlers_pantry
-#       - light.cabinet_lights_kitchen
+- platform: group
+  name: Cabinet Lights
+  entities:
+      - light.cabinet_lights_butlers_pantry
+      - light.cabinet_lights_kitchen
