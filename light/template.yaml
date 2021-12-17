@@ -1,33 +1,33 @@
-# Templates
-- platform: template
-  lights:
-    govee_strip:
-      friendly_name: "Govee Strip"
-      turn_on:
-        service: input_boolean.turn_on
-        entity_id: input_boolean.govee_strip
-      turn_off:
-        service: input_boolean.turn_off
-        entity_id: input_boolean.govee_strip
-      set_level:
-        service: input_number.set_value
-        data_template:
-          value: "{{ brightness }}"
-          entity_id: input_number.govee_strip
-      temperature_template: "{{states('input_number.govee_temperature_input') | int}}"
-      set_temperature:
-        service: input_number.set_value
-        data_template:
-          value: "{{ color_temp }}"
-          entity_id: input_number.govee_temperature_input
-      color_template: "({{states('input_number.govee_h_input') | int}},
-        {{states('input_number.govee_s_input') | int}})"
-      set_color:
-        - service: input_number.set_value
-          data_template:
-            value: "{{ h }}"
-            entity_id: input_number.govee_h_input
-        - service: input_number.set_value
-          data_template:
-            value: "{{ s }}"
-            entity_id: input_number.govee_s_input
+# # Templates
+# - platform: template
+#   lights:
+#     govee_strip:
+#       friendly_name: "Govee Strip"
+#       turn_on:
+#         service: input_boolean.turn_on
+#         entity_id: input_boolean.govee_strip
+#       turn_off:
+#         service: input_boolean.turn_off
+#         entity_id: input_boolean.govee_strip
+#       set_level:
+#         service: input_number.set_value
+#         data_template:
+#           value: "{{ brightness }}"
+#           entity_id: input_number.govee_strip
+#       temperature_template: "{{states('input_number.govee_temperature_input') | int}}"
+#       set_temperature:
+#         service: input_number.set_value
+#         data_template:
+#           value: "{{ color_temp }}"
+#           entity_id: input_number.govee_temperature_input
+#       color_template: "({{states('input_number.govee_h_input') | int}},
+#         {{states('input_number.govee_s_input') | int}})"
+#       set_color:
+#         - service: input_number.set_value
+#           data_template:
+#             value: "{{ h }}"
+#             entity_id: input_number.govee_h_input
+#         - service: input_number.set_value
+#           data_template:
+#             value: "{{ s }}"
+#             entity_id: input_number.govee_s_input

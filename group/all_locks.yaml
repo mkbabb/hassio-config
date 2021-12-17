@@ -1,0 +1,6 @@
+office:
+  name: All Locks
+  icon: mdi:lock
+  entities:
+    - lock.back_door
+    - lock.front_door

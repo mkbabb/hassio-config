@@ -1,0 +1,5 @@
+- platform: group
+  name: All Locks
+  entities:
+      - lock.back_door
+      - lock.front_door

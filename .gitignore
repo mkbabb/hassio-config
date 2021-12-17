@@ -29,3 +29,5 @@ OZW_Log.txt
 zwcfg_*
 zwscene.xml
 options.xml
+
+*.august.conf
