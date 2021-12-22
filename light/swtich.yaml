@@ -1,24 +1,36 @@
+# Living Room
+- platform: switch
+  name: Butterfly Light
+  entity_id: switch.gxd_america_double_socket_2_switch_1
+
+- platform: switch
+  name: Christmas Tree Light
+  entity_id: switch.gxd_america_double_socket_switch_1
+
+- platform: switch
+  name: Living Room Ceiling Fan Light
+  entity_id: switch.ge_enbrighten_z_wave_plus_smart_switch_3
+
+# Kitchen
+
 - platform: switch
   name: Kitchen Tract Lights
   entity_id: switch.ge_enbrighten_z_wave_plus_smart_switch
 
-# - platform: switch
-#   name: Office Light
-#   entity_id: switch.0720034284f3eb8523f2_1
-
-# - platform: switch
-#   name: Butterfly Light
-#   entity_id: switch.0720034284f3eb85221f_2
-
-
 - platform: switch
   name: Butler's Pantry Light
   entity_id: switch.ge_enbrighten_z_wave_plus_smart_switch_5
-  
+
 - platform: switch
   name: "Cabinet Lights - Kitchen"
   entity_id: switch.ge_enbrighten_z_wave_plus_smart_switch_4
-  
+
 - platform: switch
   name: "Cabinet Lights - Butler's Pantry"
   entity_id: switch.ge_enbrighten_z_wave_plus_smart_switch_2
+
+# Dining Room
+
+- platform: switch
+  name: Entry Way Light
+  entity_id: switch.ge_enbrighten_z_wave_plus_smart_switch_6

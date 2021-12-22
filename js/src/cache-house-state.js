@@ -1,59 +1,15 @@
 //@ts-expect-error
 const message = msg;
 const entities = message.payload;
-const switchParams = [];
-const lightParams = [
-    "transition",
-    // "rgb_color",
-    // "color_name",
-    "hs_color",
-    // "xy_color",
-    "color_temp",
-    "kelvin",
-    "white_value",
-    "brightness",
-    "brightness_step",
-    "brightness_step_pct",
-    "profile",
-    "flash",
-    "effect"
-];
-const fanParams = ["speed"];
-const domainServiceParams = {
-    switch: {
-        turn_on: switchParams,
-        turn_off: switchParams
-    },
-    light: {
-        turn_on: lightParams,
-        turn_off: lightParams
-    },
-    fan: {
-        turn_on: fanParams,
-        turn_off: fanParams
-    },
-    climate: {
-        set_temperature: ["temperature", "hvac_mode"],
-        set_preset_mode: ["preset_mode"]
-    },
-    media_player: {
-        turn_on: [],
-        turn_off: [],
-        media_play: [],
-        media_pause: []
-    }
-};
-const filterAttributes = function (domain, service, attributes) {
-    var _a;
-    let data = {};
-    const allowedAttributes = (_a = domainServiceParams[domain][service]) !== null && _a !== void 0 ? _a : [];
-    Object.keys(attributes).forEach((key) => {
-        if (allowedAttributes.indexOf(key) !== -1) {
-            data[key] = attributes[key];
-        }
-    });
-    return data;
-};
+/**
+ * Maps an input entity's domain to an appropriate service for
+ * later caching.
+ *
+ * light -> turn_[on, off], for example.
+ *
+ * @param entity input hass entity.
+ * @param domain domain thereof.
+ */
 const mapDomainToService = function (entity, domain) {
     switch (domain) {
         case "switch":
@@ -79,29 +35,50 @@ const mapDomainToService = function (entity, domain) {
         case "climate": {
             return "set_temperature";
         }
+        case "lock": {
+            switch (entity.state) {
+                case "locked":
+                    return "lock";
+                case "unlocked":
+                    return "unlock";
+            }
+        }
+        case "lock": {
+            switch (entity.state) {
+                case "closed":
+                    return "close";
+                case "unlocked":
+                    return "unlock";
+            }
+        }
         default: {
             return "turn_off";
         }
     }
 };
+// create the cached state object that will be saved to the global flow.
 const cachedStates = entities.map((e) => {
     const domain = e.entity_id.split(".")[0];
     const service = mapDomainToService(e, domain);
     const state = {
         domain: domain,
         service: service,
-        data: Object.assign({ entity_id: e.entity_id }, filterAttributes(domain, service, e.attributes))
+        data: {
+            entity_id: e.entity_id
+        }
     };
     return state;
 });
+/* creates a set of away states that we'll entry once our away condition is met within hass.
+ * For example, we turn off all of the cached lights and switches, and turn on all the fans to low.
+ */
 const awayPayload = cachedStates.map((state) => {
     const { domain } = state;
     const { entity_id } = state.data;
     const payload = { domain, data: { entity_id } };
     switch (domain) {
         case "switch":
-        case "light":
-        case "media_player": {
+        case "light": {
             payload["service"] = "turn_off";
             break;
         }
@@ -115,6 +92,10 @@ const awayPayload = cachedStates.map((state) => {
             payload.data["preset_mode"] = "away";
             break;
         }
+        case "lock": {
+            payload["service"] = "lock";
+            break;
+        }
         default: {
             break;
         }
@@ -122,7 +103,9 @@ const awayPayload = cachedStates.map((state) => {
     return payload;
 });
 //@ts-ignore
+// cache the states!
 flow.set("cachedStates", cachedStates);
+// the next node will execute this payload.
 message.payload = awayPayload;
 //@ts-ignore
 return message;

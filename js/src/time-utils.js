@@ -1,3 +1,6 @@
+/**
+ * Gets the current time string relative to my time zone, EST.
+ */
 const getTimeString = function () {
     const timeObject = new Date(Date.now());
     const options = {

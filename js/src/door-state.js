@@ -1,9 +1,12 @@
 //@ts-expect-error
 const message = msg;
 const { entity_id: entityId, attributes, state } = message.data.new_state;
+// Open and close sensors are of the form: $sensor_name sensor,
+// so we strip the latter.
 const trimSensorName = function (sensorName) {
     return sensorName.replace(new RegExp("sensor", "i"), "").trim().toLowerCase();
 };
+// gets the current local time in string form.
 const getTimeString = function () {
     const timeObject = new Date(Date.now());
     const options = {
@@ -30,3 +33,4 @@ const payload = Object.assign({ data: {
 message.payload = payload;
 //@ts-ignore
 return message;
+export {};

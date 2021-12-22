@@ -8,11 +8,11 @@
 - platform: group
   name: Kitchen Island Lights
   entities:
-      - light.lifx_a19_2fef68
+      - light.lifx_d0_73_d5_67_6b_6a
       - light.kitchen_2
       
 - platform: group
   name: Cabinet Lights
   entities:
-      - light.cabinet_lights_butlers_pantry
+      - light.cabinet_lights_butler_s_pantry
       - light.cabinet_lights_kitchen
