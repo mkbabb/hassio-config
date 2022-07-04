@@ -1,0 +1,7 @@
+climate:
+  - platform: climate_group
+    name: 'Master Thermostat'
+    temperature_unit: C
+    entities:
+    - climate.upstairs
+    - climate.downstairs

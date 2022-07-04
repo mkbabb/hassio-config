@@ -11,6 +11,14 @@
   name: Living Room Ceiling Fan Light
   entity_id: switch.ge_enbrighten_z_wave_plus_smart_switch_3
 
+- platform: switch
+  name: Stairwell Light
+  entity_id: switch.in_wall_smart_switch_120_277vac
+
+- platform: switch
+  name: Stairwell Christmas Lights
+  entity_id: switch.stairwell_christmas_lights_switch_on_off
+
 # Kitchen
 
 - platform: switch
@@ -34,3 +42,9 @@
 - platform: switch
   name: Entry Way Light
   entity_id: switch.ge_enbrighten_z_wave_plus_smart_switch_6
+
+# Master Bedroom
+
+- platform: switch
+  name: Tiffany Light
+  entity_id: switch.master_bedroom_tiffany_light_switch_on_off
