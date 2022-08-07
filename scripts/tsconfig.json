@@ -8,11 +8,12 @@
             "DOM",
             "ES2020"
         ],
+        "outDir": "dist/"
     },
     "exclude": [
         "src/**/*.js"
     ],
     "include": [
         "src/**/*.ts"
-    ]
+    ],
 }

@@ -3,7 +3,7 @@
     "tasks": [
         {
             "type": "typescript",
-            "tsconfig": "js/tsconfig.json",
+            "tsconfig": "scripts/tsconfig.json",
             "option": "watch",
             "problemMatcher": [
                 "$tsc-watch"

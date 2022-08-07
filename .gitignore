@@ -27,6 +27,7 @@ __pycache__
 
 # secrets
 secrets.yaml
+secrets.json
 
 # hassio specific files, such as zwave configs.
 OZW_Log.txt

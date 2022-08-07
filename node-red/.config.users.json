@@ -23,10 +23,14 @@
                 ]
             },
             "tours": {
-                "welcome": "2.2.2"
+                "welcome": "3.0.2"
             }
         },
         "menu-menu-item-sidebar": true,
-        "menu-menu-item-palette": true
+        "menu-menu-item-palette": true,
+        "debug": {
+            "clearType": "all",
+            "filter": "filterAll"
+        }
     }
 }
