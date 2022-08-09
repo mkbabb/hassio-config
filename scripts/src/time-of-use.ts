@@ -87,11 +87,11 @@ class Schedule {
             let interval = this.off.find(pred);
 
             if (interval !== undefined) {
-                return { status: "off", interval };
+                return { status: false, interval };
             } else {
                 interval = this.on.find(pred);
                 if (interval !== undefined) {
-                    return { status: "on", interval };
+                    return { status: true, interval };
                 }
             }
         }
@@ -117,8 +117,11 @@ const findDateInSchedules = (date: Date, schedules: Record<string, Schedule>) =>
 const createPayload = (date: Date, schedules: Record<string, Schedule>) => {
     const { scheduleName, status } = findDateInSchedules(date, schedules) ?? {};
     if (scheduleName === undefined) {
-        return {};
+        return { status: undefined };
     }
+
+    //@ts-ignore
+    const prevStatus = flow.get("status");
 
     const secondsUntilEnd = status.interval.secondsUntilEnd(date);
     date.setTime(status.interval.end.getTime());
@@ -127,7 +130,8 @@ const createPayload = (date: Date, schedules: Record<string, Schedule>) => {
         scheduleName,
         status: status.status,
         timestamp: date.getTime(),
-        delay: secondsUntilEnd * 1000
+        delay: secondsUntilEnd * 1000,
+        changed: status.status !== prevStatus
     };
     return payload;
 };

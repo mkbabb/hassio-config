@@ -94,10 +94,15 @@ const mapDomainToService = function (entity, domain) {
                     return "close_cover";
             }
         }
-        default: {
-            return "turn_off";
+        case "climate": {
+            switch (String(entity.attributes["preset_mode"]).toLowerCase()) {
+                case "away":
+                case "home":
+                    return "set_preset_mode";
+            }
         }
     }
+    return undefined;
 };
 // create the cached state object that will be saved to the global flow.
 const cachedStates = entities.map((e) => {
@@ -173,8 +178,9 @@ const awayPayload = activeStates
     .flat(); // we may need to support multiple payload returns per state.
 //@ts-ignore
 flow.set("cachedStates", cachedStates);
-// the next node will execute this payload.
+message.cachedStates = cachedStates;
 message.entities = message.payload;
+// the next node will execute this payload.
 message.payload = awayPayload;
 //@ts-ignore
 return message;

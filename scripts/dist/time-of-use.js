@@ -53,12 +53,12 @@ class Schedule {
         if (inDateRange) {
             let interval = this.off.find(pred);
             if (interval !== undefined) {
-                return { status: "off", interval };
+                return { status: false, interval };
             }
             else {
                 interval = this.on.find(pred);
                 if (interval !== undefined) {
-                    return { status: "on", interval };
+                    return { status: true, interval };
                 }
             }
         }
@@ -81,15 +81,18 @@ const createPayload = (date, schedules) => {
     var _a;
     const { scheduleName, status } = (_a = findDateInSchedules(date, schedules)) !== null && _a !== void 0 ? _a : {};
     if (scheduleName === undefined) {
-        return {};
+        return { status: undefined };
     }
+    //@ts-ignore
+    const prevStatus = flow.get("status");
     const secondsUntilEnd = status.interval.secondsUntilEnd(date);
     date.setTime(status.interval.end.getTime());
     const payload = {
         scheduleName,
         status: status.status,
         timestamp: date.getTime(),
-        delay: secondsUntilEnd * 1000
+        delay: secondsUntilEnd * 1000,
+        changed: status.status !== prevStatus
     };
     return payload;
 };
