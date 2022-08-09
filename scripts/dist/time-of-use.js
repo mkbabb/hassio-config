@@ -66,9 +66,32 @@ class Schedule {
     }
 }
 const findDateInSchedules = (date, schedules) => {
-    return schedules
-        .map((v) => v.findDateInInterval(date))
-        .find((v) => v !== undefined);
+    for (const [scheduleName, schedule] of Object.entries(schedules)) {
+        const status = schedule.findDateInInterval(date);
+        if (status !== undefined) {
+            return {
+                scheduleName,
+                status
+            };
+        }
+    }
+    return undefined;
+};
+const createPayload = (date, schedules) => {
+    var _a;
+    const { scheduleName, status } = (_a = findDateInSchedules(date, schedules)) !== null && _a !== void 0 ? _a : {};
+    if (scheduleName === undefined) {
+        return {};
+    }
+    const secondsUntilEnd = status.interval.secondsUntilEnd(date);
+    date.setTime(status.interval.end.getTime());
+    const payload = {
+        scheduleName,
+        status: status.status,
+        timestamp: date.getTime(),
+        delay: secondsUntilEnd * 1000
+    };
+    return payload;
 };
 const summer = new Schedule({
     dates: new DateInterval("May 1", "Oct 31"),
@@ -86,24 +109,11 @@ const winter = new Schedule({
         new ElectricInterval("10:00 PM", "6:00 AM", 0.05)
     ]
 });
-const schedules = [summer, winter];
+const schedules = { summer, winter };
 //@ts-ignore
 const message = msg;
-const date = new Date(message.time);
-const electricInterval = findDateInSchedules(date, schedules);
-if (electricInterval != undefined) {
-    const secondsUntilEnd = electricInterval.interval.secondsUntilEnd(date);
-    date.setSeconds(date.getSeconds() + secondsUntilEnd);
-    message.payload = {
-        cache: electricInterval.status,
-        delay: secondsUntilEnd * 1000,
-        timestamp: date.getTime()
-    };
-}
-else {
-    message.payload = {
-        cache: "none"
-    };
-}
+const date = new Date(message.timestamp);
+message.payload = createPayload(date, schedules);
 //@ts-ignore
 return message;
+export {};

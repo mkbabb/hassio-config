@@ -205,6 +205,7 @@ const awayPayload: Partial<Hass.Service>[] = activeStates
 //@ts-ignore
 flow.set("cachedStates", cachedStates);
 // the next node will execute this payload.
+message.entities = message.payload;
 message.payload = awayPayload;
 //@ts-ignore
 return message;
