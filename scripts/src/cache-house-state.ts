@@ -29,6 +29,7 @@ const entities = <Hass.State[]>message.payload.filter((e) => {
 
 const lightAttributes = ["brightness"];
 const fanAttributes = ["percentage"];
+const climateAttributes = ["preset_mode"];
 
 const domains = ["light", "switch", "fan", "climate", "lock", "cover"];
 
@@ -54,9 +55,15 @@ const filterAttributes = function (
                 data[colorMode] = attributes[colorMode];
             }
             lightAttributes.forEach((x) => setIfExists(data, attributes, x));
+            break;
         }
         case "fan": {
             fanAttributes.forEach((x) => setIfExists(data, attributes, x));
+            break;
+        }
+        case "climate": {
+            climateAttributes.forEach((x) => setIfExists(data, attributes, x));
+            break;
         }
     }
 
@@ -122,31 +129,33 @@ const mapDomainToService = function (entity: Hass.State, domain: string) {
 };
 
 // create the cached state object that will be saved to the global flow.
-const cachedStates: Partial<Hass.Service>[] = entities.map((e) => {
-    const domain = e.entity_id.split(".")[0];
-    const service = mapDomainToService(e, domain);
+const cachedStates: Partial<Hass.Service>[] = entities
+    .map((e) => {
+        const domain = e.entity_id.split(".")[0];
+        const service = mapDomainToService(e, domain);
 
-    const serviceCall: Partial<Hass.Service> = {
-        domain: domain,
-        service: service,
-        data: {
-            entity_id: e.entity_id,
-            state: e.state,
-            ...filterAttributes(domain, service, e.attributes)
+        if (!domains.includes(domain) || service === undefined) {
+            return undefined;
         }
-    };
 
-    return serviceCall;
-});
+        const serviceCall: Partial<Hass.Service> = {
+            domain: domain,
+            service: service,
+            data: {
+                entity_id: e.entity_id,
+                state: e.state,
+                ...filterAttributes(domain, service, e.attributes)
+            }
+        };
+
+        return serviceCall;
+    })
+    .filter((x) => x !== undefined);
 
 // We only cache the states we need to - currently active entities, or states.
 const activeStates = cachedStates.filter((serviceCall) => {
     const { domain } = serviceCall;
     const { state } = serviceCall.data;
-
-    if (!domains.includes(domain)) {
-        return false;
-    }
 
     switch (domain) {
         case "switch":
