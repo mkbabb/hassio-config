@@ -1,9 +1,10 @@
-const now = new Date();
+const PRECOOL_TIME = 2 * 60 * 60 * 1000;
+const NOW = new Date();
 const monthDayToDate = (monthDay) => {
-    return new Date(`${monthDay}, ${now.getFullYear()}`);
+    return new Date(`${monthDay}, ${NOW.getFullYear()}`);
 };
 const hourToDate = (hour) => {
-    return new Date(`Jan 1 ${hour}, ${now.getFullYear()}`);
+    return new Date(`Jan 1 ${hour}, ${NOW.getFullYear()}`);
 };
 const inRange = (date, start, end) => {
     return date > start && date < end;
@@ -23,13 +24,19 @@ class ElectricInterval {
     normalize(date) {
         const month = date.getMonth();
         const day = date.getDate();
+        const time = date.getTime();
         if (this.end.getMonth() === month) {
             return;
         }
         this.start.setMonth(month, day);
         this.end.setMonth(month, day);
-        if (this.end.getTime() - this.start.getTime() < 0) {
-            this.start.setDate(day - 1);
+        if (this.end.getTime() < this.start.getTime()) {
+            if (this.start.getTime() <= date.getTime()) {
+                this.end.setDate(day + 1);
+            }
+            else {
+                this.start.setDate(day - 1);
+            }
         }
     }
     inRange(date) {
@@ -42,10 +49,12 @@ class ElectricInterval {
     }
 }
 class Schedule {
-    constructor({ dates, on, off }) {
+    constructor({ name, dates, on, off, precoolTemp }) {
+        this.name = name;
         this.dates = dates;
         this.on = on;
         this.off = off;
+        this.precoolTemp = precoolTemp;
     }
     findDateInInterval(date) {
         const pred = (v) => v.inRange(date);
@@ -70,47 +79,63 @@ const findDateInSchedules = (date, schedules) => {
         const status = schedule.findDateInInterval(date);
         if (status !== undefined) {
             return {
-                scheduleName,
+                schedule,
                 status
             };
         }
     }
     return undefined;
 };
+const createPrecoolPayload = (schedule, status, delay) => {
+    const precool = !status && delay <= PRECOOL_TIME;
+    const precoolTemp = precool ? schedule.precoolTemp : undefined;
+    return {
+        precool,
+        precoolTemp
+    };
+};
 const createPayload = (date, schedules) => {
     var _a;
-    const { scheduleName, status } = (_a = findDateInSchedules(date, schedules)) !== null && _a !== void 0 ? _a : {};
-    if (scheduleName === undefined) {
+    const pack = (arr) => {
+        return arr.map((x) => String(Number(x))).join("");
+    };
+    const { schedule, status } = (_a = findDateInSchedules(date, schedules)) !== null && _a !== void 0 ? _a : {};
+    if (schedule === undefined) {
         return { status: undefined };
     }
-    //@ts-ignore
-    const prevStatus = flow.get("status");
-    const secondsUntilEnd = status.interval.secondsUntilEnd(date);
+    const delay = status.interval.secondsUntilEnd(date) * 1000;
     date.setTime(status.interval.end.getTime());
+    const timestamp = date.getTime();
+    const { precool, precoolTemp } = createPrecoolPayload(schedule, status.status, delay);
+    const action = pack([status.status, precool]);
     const payload = {
-        scheduleName,
         status: status.status,
-        timestamp: date.getTime(),
-        delay: secondsUntilEnd * 1000,
-        changed: status.status !== prevStatus
+        timestamp,
+        delay,
+        action,
+        precoolTemp
     };
     return payload;
 };
 const summer = new Schedule({
+    name: "summer",
     dates: new DateInterval("May 1", "Oct 31"),
     on: [new ElectricInterval("5:00 PM", "7:00 PM", 0.4)],
     off: [
         new ElectricInterval("6:00 AM", "5:00 PM", 0.08),
         new ElectricInterval("10:00 PM", "6:00 AM", 0.05)
-    ]
+    ],
+    precoolTemp: 21
 });
 const winter = new Schedule({
+    name: "winter",
     dates: new DateInterval("Nov 1", "April 30"),
     on: [new ElectricInterval("6:00 AM", "8:00 AM", 0.4)],
     off: [
         new ElectricInterval("8:00 AM", "10:00 PM", 0.08),
         new ElectricInterval("10:00 PM", "6:00 AM", 0.05)
-    ]
+    ],
+    precoolTemp: 21
 });
 const schedules = { summer, winter };
 //@ts-ignore

@@ -1,3 +1,7 @@
+const pack = (arr: Array<Boolean>) => {
+    return arr.map((x) => String(Number(x))).join("");
+};
+
 const scheduleTemperatures = {
     summer: 21,
     winter: 21
@@ -15,9 +19,12 @@ const scheduleName = message.scheduleName;
 const precool = !status && delay <= precoolTime;
 const temperature = scheduleTemperatures[scheduleName];
 
+const action = pack([status, precool]);
+
 message.payload = {
     precool,
-    temperature
+    temperature,
+    action
 };
 //@ts-ignore
 return message;

@@ -1,11 +1,13 @@
-const now = new Date();
+const PRECOOL_TIME = 2 * 60 * 60 * 1000;
+
+const NOW = new Date();
 
 const monthDayToDate = (monthDay: String) => {
-    return new Date(`${monthDay}, ${now.getFullYear()}`);
+    return new Date(`${monthDay}, ${NOW.getFullYear()}`);
 };
 
 const hourToDate = (hour: String) => {
-    return new Date(`Jan 1 ${hour}, ${now.getFullYear()}`);
+    return new Date(`Jan 1 ${hour}, ${NOW.getFullYear()}`);
 };
 
 const inRange = (date: Date | number, start: Date | number, end: Date | number) => {
@@ -36,16 +38,20 @@ class ElectricInterval {
     normalize(date: Date) {
         const month = date.getMonth();
         const day = date.getDate();
+        const time = date.getTime();
 
         if (this.end.getMonth() === month) {
             return;
         }
-
         this.start.setMonth(month, day);
         this.end.setMonth(month, day);
 
-        if (this.end.getTime() - this.start.getTime() < 0) {
-            this.start.setDate(day - 1);
+        if (this.end.getTime() < this.start.getTime()) {
+            if (this.start.getTime() <= date.getTime()) {
+                this.end.setDate(day + 1);
+            } else {
+                this.start.setDate(day - 1);
+            }
         }
     }
 
@@ -61,21 +67,30 @@ class ElectricInterval {
 }
 
 interface ScheduleObj {
+    name: string;
     dates: DateInterval;
-    on: Array<ElectricInterval>;
-    off: Array<ElectricInterval>;
+    on: ElectricInterval[];
+    off: ElectricInterval[];
+    precoolTemp: number;
 }
 
 class Schedule {
+    name: string;
+
     dates: DateInterval;
     on: ElectricInterval[];
     off: ElectricInterval[];
 
-    constructor({ dates, on, off }: ScheduleObj) {
+    precoolTemp: number;
+
+    constructor({ name, dates, on, off, precoolTemp }: ScheduleObj) {
+        this.name = name;
         this.dates = dates;
 
         this.on = on;
         this.off = off;
+
+        this.precoolTemp = precoolTemp;
     }
 
     findDateInInterval(date: Date) {
@@ -106,7 +121,7 @@ const findDateInSchedules = (date: Date, schedules: Record<string, Schedule>) =>
 
         if (status !== undefined) {
             return {
-                scheduleName,
+                schedule,
                 status
             };
         }
@@ -114,44 +129,68 @@ const findDateInSchedules = (date: Date, schedules: Record<string, Schedule>) =>
     return undefined;
 };
 
+const createPrecoolPayload = (schedule: Schedule, status: boolean, delay: number) => {
+    const precool = !status && delay <= PRECOOL_TIME;
+    const precoolTemp = precool ? schedule.precoolTemp : undefined;
+
+    return {
+        precool,
+        precoolTemp
+    };
+};
+
 const createPayload = (date: Date, schedules: Record<string, Schedule>) => {
-    const { scheduleName, status } = findDateInSchedules(date, schedules) ?? {};
-    if (scheduleName === undefined) {
+    const pack = (arr: Array<Boolean>) => {
+        return arr.map((x) => String(Number(x))).join("");
+    };
+
+    const { schedule, status } = findDateInSchedules(date, schedules) ?? {};
+    if (schedule === undefined) {
         return { status: undefined };
     }
 
-    //@ts-ignore
-    const prevStatus = flow.get("status");
-
-    const secondsUntilEnd = status.interval.secondsUntilEnd(date);
+    const delay = status.interval.secondsUntilEnd(date) * 1000;
     date.setTime(status.interval.end.getTime());
+    const timestamp = date.getTime();
+
+    const { precool, precoolTemp } = createPrecoolPayload(
+        schedule,
+        status.status,
+        delay
+    );
+
+    const action = pack([status.status, precool]);
 
     const payload = {
-        scheduleName,
         status: status.status,
-        timestamp: date.getTime(),
-        delay: secondsUntilEnd * 1000,
-        changed: status.status !== prevStatus
+        timestamp,
+        delay,
+        action,
+        precoolTemp
     };
     return payload;
 };
 
 const summer = new Schedule({
+    name: "summer",
     dates: new DateInterval("May 1", "Oct 31"),
     on: [new ElectricInterval("5:00 PM", "7:00 PM", 0.4)],
     off: [
         new ElectricInterval("6:00 AM", "5:00 PM", 0.08),
         new ElectricInterval("10:00 PM", "6:00 AM", 0.05)
-    ]
+    ],
+    precoolTemp: 21
 });
 
 const winter = new Schedule({
+    name: "winter",
     dates: new DateInterval("Nov 1", "April 30"),
     on: [new ElectricInterval("6:00 AM", "8:00 AM", 0.4)],
     off: [
         new ElectricInterval("8:00 AM", "10:00 PM", 0.08),
         new ElectricInterval("10:00 PM", "6:00 AM", 0.05)
-    ]
+    ],
+    precoolTemp: 21
 });
 
 const schedules = { summer, winter };
