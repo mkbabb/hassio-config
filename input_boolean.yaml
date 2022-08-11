@@ -1,6 +1,2 @@
-govee_strip:
-  initial: off
-debug_boolean:
-  initial: off
 home_away:
   initial: off

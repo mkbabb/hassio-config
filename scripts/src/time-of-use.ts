@@ -11,7 +11,7 @@ const hourToDate = (hour: String) => {
 };
 
 const inRange = (date: Date | number, start: Date | number, end: Date | number) => {
-    return date > start && date < end;
+    return date >= start && date <= end;
 };
 
 class DateInterval {
@@ -38,11 +38,7 @@ class ElectricInterval {
     normalize(date: Date) {
         const month = date.getMonth();
         const day = date.getDate();
-        const time = date.getTime();
 
-        if (this.end.getMonth() === month) {
-            return;
-        }
         this.start.setMonth(month, day);
         this.end.setMonth(month, day);
 
@@ -99,15 +95,16 @@ class Schedule {
         const inDateRange = inRange(date, this.dates.start, this.dates.end);
 
         if (inDateRange) {
-            let interval = this.off.find(pred);
-
-            if (interval !== undefined) {
+            let ix = this.off.findIndex(pred);
+            if (ix !== -1) {
+                const interval = this.off[ix];
                 return { status: false, interval };
-            } else {
-                interval = this.on.find(pred);
-                if (interval !== undefined) {
-                    return { status: true, interval };
-                }
+            }
+
+            ix = this.on.findIndex(pred);
+            if (ix !== -1) {
+                const interval = this.on[ix];
+                return { status: true, interval };
             }
         }
 
@@ -115,10 +112,11 @@ class Schedule {
     }
 }
 
-const findDateInSchedules = (date: Date, schedules: Record<string, Schedule>) => {
-    for (const [scheduleName, schedule] of Object.entries(schedules)) {
-        const status = schedule.findDateInInterval(date);
+const findDateInSchedules = (date: Date, schedules: Array<Schedule> | Schedule) => {
+    schedules = schedules instanceof Array ? schedules : [schedules];
 
+    for (const schedule of schedules) {
+        const status = schedule.findDateInInterval(date);
         if (status !== undefined) {
             return {
                 schedule,
@@ -129,8 +127,13 @@ const findDateInSchedules = (date: Date, schedules: Record<string, Schedule>) =>
     return undefined;
 };
 
-const createPrecoolPayload = (schedule: Schedule, status: boolean, delay: number) => {
-    const precool = !status && delay <= PRECOOL_TIME;
+const createPrecoolPayload = (
+    schedule: Schedule,
+    status: boolean,
+    nextIsOn: boolean,
+    delay: number
+) => {
+    const precool = !status && delay <= PRECOOL_TIME && nextIsOn;
     const precoolTemp = precool ? schedule.precoolTemp : undefined;
 
     return {
@@ -139,23 +142,23 @@ const createPrecoolPayload = (schedule: Schedule, status: boolean, delay: number
     };
 };
 
-const createPayload = (date: Date, schedules: Record<string, Schedule>) => {
+const createPayload = (date: Date, schedules: Array<Schedule>) => {
     const pack = (arr: Array<Boolean>) => {
         return arr.map((x) => String(Number(x))).join("");
     };
-
-    const { schedule, status } = findDateInSchedules(date, schedules) ?? {};
-    if (schedule === undefined) {
-        return { status: undefined };
-    }
+    const { schedule, status } = findDateInSchedules(date, schedules);
 
     const delay = status.interval.secondsUntilEnd(date) * 1000;
-    date.setTime(status.interval.end.getTime());
-    const timestamp = date.getTime();
+    date.setTime(status.interval.end.getTime() + 1);
+    const nextTimestamp = date.getTime();
+
+    const { status: nextStatus } = findDateInSchedules(date, schedule);
+    const nextIsOn = nextStatus.status;
 
     const { precool, precoolTemp } = createPrecoolPayload(
         schedule,
         status.status,
+        nextIsOn,
         delay
     );
 
@@ -163,9 +166,10 @@ const createPayload = (date: Date, schedules: Record<string, Schedule>) => {
 
     const payload = {
         status: status.status,
-        timestamp,
+        nextTimestamp,
         delay,
         action,
+
         precoolTemp
     };
     return payload;
@@ -177,6 +181,7 @@ const summer = new Schedule({
     on: [new ElectricInterval("5:00 PM", "7:00 PM", 0.4)],
     off: [
         new ElectricInterval("6:00 AM", "5:00 PM", 0.08),
+        new ElectricInterval("7:00 PM", "10:00 PM", 0.08),
         new ElectricInterval("10:00 PM", "6:00 AM", 0.05)
     ],
     precoolTemp: 21
@@ -193,7 +198,7 @@ const winter = new Schedule({
     precoolTemp: 21
 });
 
-const schedules = { summer, winter };
+const schedules = [summer, winter];
 
 //@ts-ignore
 const message: Hass.Message = msg;

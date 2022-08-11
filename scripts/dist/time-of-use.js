@@ -7,7 +7,7 @@ const hourToDate = (hour) => {
     return new Date(`Jan 1 ${hour}, ${NOW.getFullYear()}`);
 };
 const inRange = (date, start, end) => {
-    return date > start && date < end;
+    return date >= start && date <= end;
 };
 class DateInterval {
     constructor(start, end) {
@@ -24,10 +24,6 @@ class ElectricInterval {
     normalize(date) {
         const month = date.getMonth();
         const day = date.getDate();
-        const time = date.getTime();
-        if (this.end.getMonth() === month) {
-            return;
-        }
         this.start.setMonth(month, day);
         this.end.setMonth(month, day);
         if (this.end.getTime() < this.start.getTime()) {
@@ -60,22 +56,23 @@ class Schedule {
         const pred = (v) => v.inRange(date);
         const inDateRange = inRange(date, this.dates.start, this.dates.end);
         if (inDateRange) {
-            let interval = this.off.find(pred);
-            if (interval !== undefined) {
+            let ix = this.off.findIndex(pred);
+            if (ix !== -1) {
+                const interval = this.off[ix];
                 return { status: false, interval };
             }
-            else {
-                interval = this.on.find(pred);
-                if (interval !== undefined) {
-                    return { status: true, interval };
-                }
+            ix = this.on.findIndex(pred);
+            if (ix !== -1) {
+                const interval = this.on[ix];
+                return { status: true, interval };
             }
         }
         return undefined;
     }
 }
 const findDateInSchedules = (date, schedules) => {
-    for (const [scheduleName, schedule] of Object.entries(schedules)) {
+    schedules = schedules instanceof Array ? schedules : [schedules];
+    for (const schedule of schedules) {
         const status = schedule.findDateInInterval(date);
         if (status !== undefined) {
             return {
@@ -86,8 +83,8 @@ const findDateInSchedules = (date, schedules) => {
     }
     return undefined;
 };
-const createPrecoolPayload = (schedule, status, delay) => {
-    const precool = !status && delay <= PRECOOL_TIME;
+const createPrecoolPayload = (schedule, status, nextIsOn, delay) => {
+    const precool = !status && delay <= PRECOOL_TIME && nextIsOn;
     const precoolTemp = precool ? schedule.precoolTemp : undefined;
     return {
         precool,
@@ -95,22 +92,20 @@ const createPrecoolPayload = (schedule, status, delay) => {
     };
 };
 const createPayload = (date, schedules) => {
-    var _a;
     const pack = (arr) => {
         return arr.map((x) => String(Number(x))).join("");
     };
-    const { schedule, status } = (_a = findDateInSchedules(date, schedules)) !== null && _a !== void 0 ? _a : {};
-    if (schedule === undefined) {
-        return { status: undefined };
-    }
+    const { schedule, status } = findDateInSchedules(date, schedules);
     const delay = status.interval.secondsUntilEnd(date) * 1000;
-    date.setTime(status.interval.end.getTime());
-    const timestamp = date.getTime();
-    const { precool, precoolTemp } = createPrecoolPayload(schedule, status.status, delay);
+    date.setTime(status.interval.end.getTime() + 1);
+    const nextTimestamp = date.getTime();
+    const { status: nextStatus } = findDateInSchedules(date, schedule);
+    const nextIsOn = nextStatus.status;
+    const { precool, precoolTemp } = createPrecoolPayload(schedule, status.status, nextIsOn, delay);
     const action = pack([status.status, precool]);
     const payload = {
         status: status.status,
-        timestamp,
+        nextTimestamp,
         delay,
         action,
         precoolTemp
@@ -123,6 +118,7 @@ const summer = new Schedule({
     on: [new ElectricInterval("5:00 PM", "7:00 PM", 0.4)],
     off: [
         new ElectricInterval("6:00 AM", "5:00 PM", 0.08),
+        new ElectricInterval("7:00 PM", "10:00 PM", 0.08),
         new ElectricInterval("10:00 PM", "6:00 AM", 0.05)
     ],
     precoolTemp: 21
@@ -137,7 +133,7 @@ const winter = new Schedule({
     ],
     precoolTemp: 21
 });
-const schedules = { summer, winter };
+const schedules = [summer, winter];
 //@ts-ignore
 const message = msg;
 const date = new Date(message.timestamp);

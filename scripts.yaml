@@ -1,9 +1,0 @@
-all_lights_on:
-  sequence:
-    - service: homeassistant.turn_on
-      data:
-        entity_id:
-          - group.kitchen
-          - light.hanging_light
-          - switch.0720034284f3eb85221f_2
-          - switch.0720034284f3eb8523f2_1

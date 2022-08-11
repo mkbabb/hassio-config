@@ -108,6 +108,7 @@ const mapDomainToService = function (entity: Hass.State, domain: string) {
                 case "unlocked":
                     return "unlock";
             }
+            break;
         }
         case "cover": {
             switch (entity.state) {
@@ -116,13 +117,10 @@ const mapDomainToService = function (entity: Hass.State, domain: string) {
                 case "closed":
                     return "close_cover";
             }
+            break;
         }
         case "climate": {
-            switch (String(entity.attributes["preset_mode"]).toLowerCase()) {
-                case "away":
-                case "home":
-                    return "set_preset_mode";
-            }
+            return "set_preset_mode";
         }
     }
     return undefined;
