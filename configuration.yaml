@@ -7,11 +7,9 @@ tts:
 
 group: !include_dir_merge_list group
 automation: !include_dir_merge_list automation
-script: !include scripts.yaml
 scene: !include scenes.yaml
 light: !include_dir_merge_list light
 input_boolean: !include input_boolean.yaml
-input_number: !include input_number.yaml
 zone: !include zone.yaml
 
 frontend:
