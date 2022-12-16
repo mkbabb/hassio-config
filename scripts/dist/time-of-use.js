@@ -13,6 +13,9 @@ class DateInterval {
     constructor(start, end) {
         this.start = monthDayToDate(start);
         this.end = monthDayToDate(end);
+        if (this.end.getTime() < this.start.getTime()) {
+            this.end.setFullYear(this.end.getFullYear() + 1);
+        }
     }
 }
 class ElectricInterval {
@@ -131,7 +134,7 @@ const winter = new Schedule({
         new ElectricInterval("8:00 AM", "10:00 PM", 0.08),
         new ElectricInterval("10:00 PM", "6:00 AM", 0.05)
     ],
-    precoolTemp: 21
+    precoolTemp: 20
 });
 const schedules = [summer, winter];
 //@ts-ignore

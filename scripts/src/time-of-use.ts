@@ -21,6 +21,10 @@ class DateInterval {
     constructor(start: string, end: string) {
         this.start = monthDayToDate(start);
         this.end = monthDayToDate(end);
+
+        if (this.end.getTime() < this.start.getTime()) {
+            this.end.setFullYear(this.end.getFullYear() + 1);
+        }
     }
 }
 
@@ -124,6 +128,7 @@ const findDateInSchedules = (date: Date, schedules: Array<Schedule> | Schedule) 
             };
         }
     }
+
     return undefined;
 };
 
@@ -195,7 +200,7 @@ const winter = new Schedule({
         new ElectricInterval("8:00 AM", "10:00 PM", 0.08),
         new ElectricInterval("10:00 PM", "6:00 AM", 0.05)
     ],
-    precoolTemp: 21
+    precoolTemp: 20
 });
 
 const schedules = [summer, winter];

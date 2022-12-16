@@ -44,7 +44,7 @@
   entity_id: switch.ge_enbrighten_z_wave_plus_smart_switch_6
 
 - platform: switch
-  name: Dinging Room Christmas Lights
+  name: Dining Room Christmas Lights
   entity_id: switch.dining_room_christmas_lights_switch
 
 # Master Bedroom
