@@ -42,3 +42,6 @@ options.xml
 *.mov
 *.mpg
 *.mpeg
+
+# image
+image/
