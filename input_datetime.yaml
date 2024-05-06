@@ -1,0 +1,29 @@
+plant_schedule_start:
+    name: Plant Schedule Start
+    has_date: false
+    has_time: true
+    initial: "05:00"
+
+plant_schedule_end:
+    name: Plant Schedule End
+    has_date: false
+    has_time: true
+    initial: "23:00"
+
+plant_schedule_bedroom_start:
+    name: Plant Schedule Bedroom Start
+    has_date: false
+    has_time: true
+    initial: "09:00"
+
+weekday_wakeup:
+    name: "Weekday Wakeup Time"
+    has_date: false
+    has_time: true
+    initial: "09:00"
+
+weekend_wakeup:
+    name: "Weekend Wakeup Time"
+    has_date: false
+    has_time: true
+    initial: "11:00"

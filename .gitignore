@@ -34,3 +34,11 @@ OZW_Log.txt
 zwcfg_*
 zwscene.xml
 options.xml
+
+# media files
+*.mp4
+*.avi
+*.mkv
+*.mov
+*.mpg
+*.mpeg

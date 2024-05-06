@@ -1,7 +1,8 @@
-const blacklistedEntities = ["son_of_toast"];
+// Ignore the car, and all grow lights.
+const blacklistedEntities = ["son_of_toast", /.*grow.*/i];
 const setIfExists = (to, from, key) => {
     const value = from[key];
-    if (value != undefined) {
+    if (value !== undefined) {
         to[key] = value;
         return true;
     }
@@ -12,12 +13,21 @@ const setIfExists = (to, from, key) => {
 const normalizeIncludes = (s1, s2) => {
     return s1.toLowerCase().includes(s2.toLowerCase());
 };
+const isBlacklisted = (entity_id, blacklisted) => {
+    return blacklisted.some((blacklistItem) => {
+        if (typeof blacklistItem === "string") {
+            return normalizeIncludes(entity_id, blacklistItem);
+        }
+        else {
+            return blacklistItem.test(entity_id);
+        }
+    });
+};
 //@ts-expect-error
 const message = msg;
 const entities = message.payload.filter((e) => {
     const { entity_id, state } = e;
-    const whitelisted = blacklistedEntities.find((value) => normalizeIncludes(entity_id, value)) ==
-        undefined;
+    const whitelisted = !isBlacklisted(entity_id, blacklistedEntities);
     return whitelisted && state !== "unavailable";
 });
 const lightAttributes = ["brightness"];

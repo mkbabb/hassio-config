@@ -1,9 +1,10 @@
-const blacklistedEntities = ["son_of_toast"];
+// Ignore the car, and all grow lights.
+const blacklistedEntities = ["son_of_toast", /.*grow.*/i];
 
 const setIfExists = (to: object, from: object, key: string | number | symbol) => {
     const value = from[key];
 
-    if (value != undefined) {
+    if (value !== undefined) {
         to[key] = value;
         return true;
     } else {
@@ -15,14 +16,22 @@ const normalizeIncludes = (s1: string, s2: string) => {
     return s1.toLowerCase().includes(s2.toLowerCase());
 };
 
+const isBlacklisted = (entity_id: string, blacklisted: (string | RegExp)[]) => {
+    return blacklisted.some((blacklistItem) => {
+        if (typeof blacklistItem === "string") {
+            return normalizeIncludes(entity_id, blacklistItem);
+        } else {
+            return blacklistItem.test(entity_id);
+        }
+    });
+};
+
 //@ts-expect-error
 const message: Hass.Message = msg;
 const entities = <Hass.State[]>message.payload.filter((e) => {
     const { entity_id, state } = e;
 
-    const whitelisted =
-        blacklistedEntities.find((value) => normalizeIncludes(entity_id, value)) ==
-        undefined;
+    const whitelisted = !isBlacklisted(entity_id, blacklistedEntities);
 
     return whitelisted && state !== "unavailable";
 });

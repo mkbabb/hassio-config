@@ -6,13 +6,19 @@
       - light.hanging_light_3
 
 - platform: group
-  name: Kitchen Island Lights
+  name: Kitchen Pendants
   entities:
-      - light.lifx_d0_73_d5_67_6b_6a
-      - light.kitchen_2
+      - light.kitchen_pendant_1
+      - light.kitchen_pendant_2
       
 - platform: group
-  name: Cabinet Lights
+  name: Kitchen Cabinet Lights
   entities:
-      - light.cabinet_lights_butler_s_pantry
-      - light.cabinet_lights_kitchen
+      - light.under_cabinet_lights_1
+      - light.under_cabinet_lights_2
+      
+- platform: group
+  name: TV Lights
+  entities:
+      - light.philips_hue_tv_1_huelight
+      - light.philips_hue_tv_2_huelight_2
