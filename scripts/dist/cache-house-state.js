@@ -1,5 +1,10 @@
 // Ignore the car, and all grow lights.
-const blacklistedEntities = ["son_of_toast", /.*grow.*/i];
+const blacklistedEntities = [
+    "son_of_toast",
+    /.*grow.*/i,
+    "washer_power",
+    "dryer_power"
+];
 const setIfExists = (to, from, key) => {
     const value = from[key];
     if (value !== undefined) {

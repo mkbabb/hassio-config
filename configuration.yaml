@@ -6,28 +6,17 @@ tts:
     - platform: google_translate
 
 group: !include_dir_merge_list group
+
 automation: !include_dir_merge_list automation
 scene: !include scenes.yaml
 light: !include_dir_merge_list light
+
 input_boolean: !include input_boolean.yaml
 input_datetime: !include input_datetime.yaml
+
 zone: !include zone.yaml
+
+template: !include template_sensors.yaml
 
 frontend:
     themes: !include_dir_merge_named themes
-
-template:
-    - sensor:
-          - name: "Plant Schedule Duration"
-            unit_of_measurement: "hours"
-            state: >
-                {% set start = strptime(states('input_datetime.plant_schedule_start'),
-                '%H:%M:%S') %} {% set end =
-                strptime(states('input_datetime.plant_schedule_end'), '%H:%M:%S') %} {%
-                if end > start %}
-                  {{ ((end - start).seconds / 3600) | round(2) }}
-                {% elif end < start %}
-                  {{ ((end - start).seconds / 3600 + 24) | round(2) }}
-                {% else %}
-                  0
-                {% endif %}

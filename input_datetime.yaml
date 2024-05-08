@@ -10,12 +10,6 @@ plant_schedule_end:
     has_time: true
     initial: "23:00"
 
-plant_schedule_bedroom_start:
-    name: Plant Schedule Bedroom Start
-    has_date: false
-    has_time: true
-    initial: "09:00"
-
 weekday_wakeup:
     name: "Weekday Wakeup Time"
     has_date: false
