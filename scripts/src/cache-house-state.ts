@@ -9,7 +9,7 @@ const blacklistedEntities = [
 const setIfExists = (to: object, from: object, key: string | number | symbol) => {
     const value = from[key];
 
-    if (value !== undefined) {
+    if (value != null) {
         to[key] = value;
         return true;
     } else {
@@ -45,7 +45,7 @@ const lightAttributes = ["brightness"];
 const fanAttributes = ["percentage"];
 const climateAttributes = ["preset_mode"];
 
-const domains = ["light", "switch", "fan", "climate", "lock", "cover"];
+const domains = ["light", "switch", "fan", "climate", "lock", "cover", "media_player"];
 
 /**
  * Filters a list of attributes based on valid state attributes of a given entity.
@@ -183,6 +183,12 @@ const activeStates = cachedStates.filter((serviceCall) => {
         case "climate": {
             return state !== "off";
         }
+        case "fan": {
+            return state !== "off";
+        }
+        case "media_player": {
+            return state !== "off" || state !== "standby";
+        }
     }
     return true;
 });
@@ -222,6 +228,10 @@ const awayPayload: Partial<Hass.Service>[] = activeStates
             }
             case "cover": {
                 payload["service"] = "close_cover";
+                return payload;
+            }
+            case "media_player": {
+                payload["service"] = "turn_off";
                 return payload;
             }
         }
