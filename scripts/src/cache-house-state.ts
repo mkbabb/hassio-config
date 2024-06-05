@@ -1,7 +1,19 @@
 // Ignore the car, and all grow lights.
 const blacklistedEntities = [
+    // car
     "son_of_toast",
+    // grow lights
     /.*grow.*/i,
+    // blinds
+    /.*blinds.*/i,
+    // air purifiers
+    /.*air_purifier.*/i,
+    // garage door
+    /switch.ratgdov25i_4b1c3b.*/i,
+    "lock.ratgdov25i_4b1c3b_lock_remotes",
+    // sonos
+    /.*sonos_beam.*/i,
+    // washer/dryer
     "washer_power",
     "dryer_power"
 ];
@@ -31,7 +43,7 @@ const isBlacklisted = (entity_id: string, blacklisted: (string | RegExp)[]) => {
     });
 };
 
-//@ts-expect-error
+//@ts-ignore
 const message: Hass.Message = msg;
 const entities = <Hass.State[]>message.payload.filter((e) => {
     const { entity_id, state } = e;
@@ -240,10 +252,12 @@ const awayPayload: Partial<Hass.Service>[] = activeStates
 
 //@ts-ignore
 flow.set("cachedStates", cachedStates);
+
 message.cachedStates = cachedStates;
 message.entities = message.payload;
 
 // the next node will execute this payload.
 message.payload = awayPayload;
+
 //@ts-ignore
-return message;
+msg = message;

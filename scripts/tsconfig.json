@@ -1,19 +1,20 @@
 {
     "compilerOptions": {
         "target": "ES2015",
-        "sourceMap": false,
-        "module": "ES2020",
+        "esModuleInterop": true,
         "lib": [
             "ESNext",
-            "DOM",
-            "ES2020"
         ],
-        "outDir": "dist/"
+        "outDir": "./dist",
+        "moduleDetection": "force",
+        "moduleResolution": "Node",
+        "module": "ESNext"
     },
     "exclude": [
         "src/**/*.js"
     ],
     "include": [
-        "src/**/*.ts"
-    ],
+        "src/**/*.ts",
+        "build.ts"
+    ]
 }

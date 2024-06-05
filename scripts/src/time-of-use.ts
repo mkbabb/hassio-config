@@ -212,5 +212,6 @@ const date = new Date(message.timestamp);
 message.payload = createPayload(date, schedules);
 
 //@ts-ignore
-return message;
-export {};
+msg = message;
+
+

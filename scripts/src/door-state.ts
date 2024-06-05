@@ -1,3 +1,5 @@
+import { getTimeString } from "./utils";
+
 //@ts-expect-error
 const message: Hass.Message = msg;
 const { entity_id: entityId, attributes, state } = message.data.new_state;
@@ -6,26 +8,6 @@ const { entity_id: entityId, attributes, state } = message.data.new_state;
 // so we strip the latter.
 const trimSensorName = function (sensorName: string) {
     return sensorName.replace(new RegExp("sensor", "i"), "").trim().toLowerCase();
-};
-
-// gets the current local time in string form.
-const getTimeString = function () {
-    const timeObject = new Date(Date.now());
-    const options: Intl.DateTimeFormatOptions = {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        weekday: "long",
-        hour: "numeric",
-        minute: "numeric",
-        second: "numeric",
-        hour12: false,
-        timeZone: "America/New_York"
-    };
-
-    const locale = "en-US";
-
-    return timeObject.toLocaleString(locale, options);
 };
 
 const doorName = trimSensorName(attributes.friendly_name);
@@ -41,6 +23,6 @@ const payload = {
 };
 
 message.payload = payload;
+
 //@ts-ignore
-return message;
-export {};
+msg = message;

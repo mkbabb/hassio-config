@@ -1,6 +1,6 @@
 declare namespace Hass {
     /**
-     * Template of attributes for various hass devices.
+     * Template of attributes for various home assistant devices.
      */
     export namespace Attributes {
         interface Switch {
