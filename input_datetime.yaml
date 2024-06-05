@@ -16,8 +16,20 @@ weekday_wakeup:
     has_time: true
     initial: "09:00"
 
+weekday_sleep:
+    name: "Weekday Sleep Time"
+    has_date: false
+    has_time: true
+    initial: "00:00"
+
 weekend_wakeup:
     name: "Weekend Wakeup Time"
     has_date: false
     has_time: true
     initial: "11:00"
+
+weekend_sleep:
+    name: "Weekend Sleep Time"
+    has_date: false
+    has_time: true
+    initial: "01:00"

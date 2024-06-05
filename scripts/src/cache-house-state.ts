@@ -248,7 +248,7 @@ const awayPayload: Partial<Hass.Service>[] = activeStates
             }
         }
     })
-    .flat(); // we may need to support multiple payload returns per state.
+    .flat();
 
 //@ts-ignore
 flow.set("cachedStates", cachedStates);

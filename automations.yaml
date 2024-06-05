@@ -1,0 +1,25 @@
+- id: "1716506933201"
+  alias: Downstairs Chili Pepper Lights Gate
+  description: ""
+  trigger:
+      - platform: state
+        entity_id:
+            - light.downstairs_bathroom_chili_pepper_lights
+        from: "off"
+        to: "on"
+      - platform: state
+        entity_id:
+            - light.downstairs_bathroom_light
+        from: "off"
+        to: "on"
+  condition:
+      - condition: state
+        entity_id: light.downstairs_bathroom_light
+        state: "on"
+  action:
+      - service: light.turn_off
+        metadata: {}
+        data: {}
+        target:
+            entity_id: light.downstairs_bathroom_chili_pepper_lights
+  mode: single

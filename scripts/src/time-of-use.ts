@@ -213,5 +213,3 @@ message.payload = createPayload(date, schedules);
 
 //@ts-ignore
 msg = message;
-
-

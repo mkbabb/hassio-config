@@ -10,15 +10,21 @@
   entities:
       - light.kitchen_pendant_1
       - light.kitchen_pendant_2
-      
+
 - platform: group
   name: Kitchen Cabinet Lights
   entities:
       - light.under_cabinet_lights_1
       - light.under_cabinet_lights_2
-      
+
 - platform: group
   name: TV Lights
   entities:
       - light.philips_hue_tv_1_huelight
       - light.philips_hue_tv_2_huelight_2
+
+- platform: group
+  name: Rose Light
+  entities:
+      - light.rose_light_1
+      - light.rose_light_2

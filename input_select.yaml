@@ -1,0 +1,9 @@
+home_status:
+    name: Home Status
+    options:
+        - "home"
+        - "just left"
+        - "away"
+        - "vacation"
+    initial: "home"
+    icon: mdi:home

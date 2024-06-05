@@ -27,3 +27,15 @@
         attributes:
             friendly_name: "Dynamic Wakeup Time"
             icon: mdi:alarm
+
+      - name: "Sleep Time"
+        state: >
+            {% set weekday = now().weekday() %} {% if weekday < 5 %}
+            {{ states('input_datetime.weekday_sleep') }}
+            {% else %}
+            {{ states('input_datetime.weekend_sleep') }}
+            {% endif %}
+            
+        attributes:
+            friendly_name: "Dynamic Sleep Time"
+            icon: mdi:alarm

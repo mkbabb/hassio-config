@@ -1,7 +1,7 @@
 {
-    "name": "scripts",
-    "version": "1.0.0",
-    "description": "",
+    "name": "node-red-scripts",
+    "version": "1.0.1",
+    "description": "Collection of scripts for usage within Home Assistant's Node Red instance",
     "type": "module",
     "scripts": {
         "build": "tsx build.ts -i src -o dist -r"
@@ -17,7 +17,7 @@
         "yargs": "^17.7.2",
         "@types/node": "^20.14.1"
     },
-    "author": "",
+    "author": "Mike Babb <mike@babb.dev>",
     "license": "ISC",
     "devDependencies": {}
 }

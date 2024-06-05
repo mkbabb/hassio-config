@@ -1,2 +1,6 @@
-home_away:
-    initial: off
+nighttime:
+    name: "Nighttime"
+    icon: mdi:weather-night
+daytime:
+    name: "Daytime"
+    icon: mdi:weather-sunny

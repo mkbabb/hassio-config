@@ -22,6 +22,7 @@ function createWeekendCronEntry(time: string) {
 const payload = msg.payload;
 
 // @ts-ignore
+// offset in minutes
 const offset = msg.offset ?? 30;
 
 let schedules = {};

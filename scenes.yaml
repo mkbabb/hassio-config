@@ -1,451 +1,588 @@
-- id: '1700971576810'
+- id: "1700971576810"
   name: Nighttime
   entities:
-    light.kitchen_pendants:
-      min_color_temp_kelvin: 1500
-      max_color_temp_kelvin: 9000
-      min_mireds: 111
-      max_mireds: 666
-      effect_list:
-      - effect_colorloop
-      - effect_pulse
-      - effect_stop
-      supported_color_modes:
-      - color_temp
-      - hs
-      color_mode: color_temp
-      brightness: 191
-      color_temp_kelvin: 2500
-      color_temp: 400
-      hs_color:
-      - 28.874
-      - 72.522
-      rgb_color:
-      - 255
-      - 159
-      - 70
-      xy_color:
-      - 0.546
-      - 0.389
-      effect:
-      entity_id:
-      - light.kitchen_pendant_1
-      - light.kitchen_pendant_2
-      icon: mdi:lightbulb-group
-      friendly_name: Kitchen Pendants
-      supported_features: 36
-      state: 'on'
-    light.front_porch_lights:
-      supported_color_modes:
-      - onoff
-      color_mode: onoff
-      friendly_name: 'Front Porch Lights '
-      supported_features: 0
-      state: 'on'
-    light.hanging_light:
-      min_color_temp_kelvin: 1500
-      max_color_temp_kelvin: 9000
-      min_mireds: 111
-      max_mireds: 666
-      effect_list:
-      - effect_colorloop
-      - effect_pulse
-      - effect_stop
-      supported_color_modes:
-      - color_temp
-      - hs
-      color_mode: color_temp
-      brightness: 209
-      color_temp_kelvin: 1890
-      color_temp: 529
-      hs_color:
-      - 30.88
-      - 100
-      rgb_color:
-      - 255
-      - 131
-      - 0
-      xy_color:
-      - 0.607
-      - 0.378
-      effect:
-      entity_id:
-      - light.hanging_light_1
-      - light.hanging_light_2
-      - light.hanging_light_3
-      icon: mdi:lightbulb-group
-      friendly_name: Hanging Light
-      supported_features: 36
-      state: 'on'
-    light.butterfly_light:
-      supported_color_modes:
-      - onoff
-      color_mode: onoff
-      friendly_name: Butterfly Light
-      supported_features: 0
-      state: 'on'
-    light.couch_lights:
-      supported_color_modes:
-      - onoff
-      color_mode: onoff
-      friendly_name: Couch Lights
-      supported_features: 0
-      state: 'on'
-    light.butterfly_light_2:
-      supported_color_modes:
-      - onoff
-      color_mode: onoff
-      friendly_name: Butterfly Light 2
-      supported_features: 0
-      state: 'on'
-    light.tv_lights:
-      min_color_temp_kelvin: 2000
-      max_color_temp_kelvin: 6535
-      min_mireds: 153
-      max_mireds: 500
-      effect_list:
-      - colorloop
-      supported_color_modes:
-      - color_temp
-      - xy
-      color_mode: color_temp
-      brightness: 150
-      color_temp_kelvin: 2000
-      color_temp: 500
-      hs_color:
-      - 30.601
-      - 94.547
-      rgb_color:
-      - 255
-      - 136
-      - 13
-      xy_color:
-      - 0.599
-      - 0.382
-      effect:
-      entity_id:
-      - light.philips_hue_tv_1_huelight
-      - light.philips_hue_tv_2_huelight_2
-      icon: mdi:lightbulb-group
-      friendly_name: TV Lights
-      supported_features: 44
-      state: 'on'
-    light.skull_light:
-      supported_color_modes:
-      - onoff
-      color_mode: onoff
-      friendly_name: Skull Light
-      supported_features: 0
-      state: 'on'
-    light.laundry_room_light:
-      supported_color_modes:
-      - onoff
-      color_mode: onoff
-      friendly_name: 'Laundry Room Light '
-      supported_features: 0
-      state: 'on'
-    light.master_bedroom_ceiling_fan_light:
-      supported_color_modes:
-      - onoff
-      color_mode:
-      friendly_name: 'Master Bedroom Ceiling Fan Light '
-      supported_features: 0
-      state: 'off'
-    light.master_bathroom_light_1:
-      supported_color_modes:
-      - onoff
-      color_mode:
-      friendly_name: 'Master Bathroom Light 1 '
-      supported_features: 0
-      state: 'off'
-    light.master_bedroom_closet_light:
-      supported_color_modes:
-      - onoff
-      color_mode:
-      friendly_name: 'Master Bedroom Closet Light '
-      supported_features: 0
-      state: 'off'
-    light.master_bathroom_light_2:
-      supported_color_modes:
-      - onoff
-      color_mode: onoff
-      friendly_name: 'Master Bathroom Light 2 '
-      supported_features: 0
-      state: 'on'
-    light.upstairs_hallway_lights:
-      supported_color_modes:
-      - onoff
-      color_mode:
-      friendly_name: 'Upstairs Hallway Lights '
-      supported_features: 0
-      state: 'off'
-    light.bonus_room_ceiling_light:
-      supported_color_modes:
-      - onoff
-      color_mode:
-      friendly_name: 'Bonus Room Ceiling Light '
-      supported_features: 0
-      state: 'off'
-    light.guest_bedroom_ceiling_light:
-      supported_color_modes:
-      - onoff
-      color_mode:
-      friendly_name: 'Guest Bedroom Ceiling Light '
-      supported_features: 0
-      state: 'off'
-    light.entryway_light:
-      supported_color_modes:
-      - onoff
-      color_mode:
-      friendly_name: 'Entryway Light '
-      supported_features: 0
-      state: 'off'
-    light.couch_lamp:
-      min_color_temp_kelvin: 1500
-      max_color_temp_kelvin: 9000
-      min_mireds: 111
-      max_mireds: 666
-      effect_list:
-      - effect_colorloop
-      - effect_pulse
-      - effect_stop
-      supported_color_modes:
-      - color_temp
-      - hs
-      color_mode: color_temp
-      brightness: 255
-      color_temp_kelvin: 1501
-      color_temp: 666
-      hs_color:
-      - 25.487
-      - 100
-      rgb_color:
-      - 255
-      - 108
-      - 0
-      xy_color:
-      - 0.635
-      - 0.355
-      effect:
-      friendly_name: Couch Lamp
-      supported_features: 36
-      state: 'on'
-    light.goblet_light:
-      min_color_temp_kelvin: 1500
-      max_color_temp_kelvin: 9000
-      min_mireds: 111
-      max_mireds: 666
-      effect_list:
-      - effect_colorloop
-      - effect_pulse
-      - effect_stop
-      supported_color_modes:
-      - color_temp
-      - hs
-      color_mode: color_temp
-      brightness: 43
-      color_temp_kelvin: 1501
-      color_temp: 666
-      hs_color:
-      - 25.487
-      - 100
-      rgb_color:
-      - 255
-      - 108
-      - 0
-      xy_color:
-      - 0.635
-      - 0.355
-      effect:
-      friendly_name: Goblet Light
-      supported_features: 36
-      state: 'on'
-    light.office_ceiling_light:
-      supported_color_modes:
-      - brightness
-      color_mode: brightness
-      brightness: 46
-      friendly_name: 'Office Ceiling Light '
-      supported_features: 32
-      state: 'on'
-    light.guest_bathroom_light:
-      supported_color_modes:
-      - onoff
-      color_mode: onoff
-      friendly_name: 'Guest Bathroom Light '
-      supported_features: 0
-      state: 'on'
-    light.guest_bedroom_light_1:
-      supported_color_modes:
-      - onoff
-      color_mode: onoff
-      friendly_name: Guest Bedroom Light 1
-      supported_features: 0
-      state: 'on'
-    light.guest_bedroom_light_2:
-      supported_color_modes:
-      - onoff
-      color_mode:
-      friendly_name: Guest Bedroom Light 2
-      supported_features: 0
-      state: 'off'
-    light.pineapple_light:
-      min_color_temp_kelvin: 1500
-      max_color_temp_kelvin: 9000
-      min_mireds: 111
-      max_mireds: 666
-      effect_list:
-      - effect_colorloop
-      - effect_pulse
-      - effect_stop
-      supported_color_modes:
-      - color_temp
-      - hs
-      color_mode: color_temp
-      brightness: 99
-      color_temp_kelvin: 1501
-      color_temp: 666
-      hs_color:
-      - 25.487
-      - 100
-      rgb_color:
-      - 255
-      - 108
-      - 0
-      xy_color:
-      - 0.635
-      - 0.355
-      effect:
-      friendly_name: Pineapple Light
-      supported_features: 36
-      state: 'on'
-    light.master_bedroom_tiffany_light:
-      supported_color_modes:
-      - onoff
-      color_mode: onoff
-      friendly_name: Master Bedroom Tiffany Light
-      supported_features: 0
-      state: 'on'
-    light.kitchen_can_lights:
-      supported_color_modes:
-      - brightness
-      color_mode: brightness
-      brightness: 62
-      friendly_name: 'Kitchen Can Lights '
-      supported_features: 32
-      state: 'on'
-    light.dining_room_ceiling_light:
-      supported_color_modes:
-      - brightness
-      color_mode: brightness
-      brightness: 72
-      friendly_name: 'Dining Room Ceiling Light '
-      supported_features: 32
-      state: 'on'
-    light.dining_room_christmas_lights:
-      supported_color_modes:
-      - onoff
-      color_mode: onoff
-      friendly_name: Dining Room Christmas Lights
-      supported_features: 0
-      state: 'on'
-    light.desk_christmas_lights:
-      supported_color_modes:
-      - onoff
-      color_mode: onoff
-      friendly_name: Desk Christmas Lights
-      supported_features: 0
-      state: 'on'
-    light.downstairs_bathroom_light:
-      supported_color_modes:
-      - onoff
-      color_mode:
-      friendly_name: 'Downstairs Bathroom Light '
-      supported_features: 0
-      state: 'off'
-    lock.back_door:
-      changed_by: Mike Babb
-      battery_level: 61
-      friendly_name: Back Door
-      supported_features: 0
-      state: locked
-    lock.front_door:
-      changed_by: Mike Babb
-      battery_level: 87
-      friendly_name: Front Door
-      supported_features: 0
-      state: locked
-    lock.garage_entry_door:
-      changed_by: Mike Babb
-      battery_level: 98
-      friendly_name: Garage Entry Door
-      supported_features: 0
-      state: locked
+      light.kitchen_pendants:
+          min_color_temp_kelvin: 1500
+          max_color_temp_kelvin: 9000
+          min_mireds: 111
+          max_mireds: 666
+          effect_list:
+              - effect_colorloop
+              - effect_pulse
+              - effect_stop
+          supported_color_modes:
+              - color_temp
+              - hs
+          effect:
+          color_mode: color_temp
+          brightness: 56
+          color_temp_kelvin: 2604
+          color_temp: 384
+          hs_color:
+              - 28.614
+              - 68.881
+          rgb_color:
+              - 255
+              - 163
+              - 79
+          xy_color:
+              - 0.536
+              - 0.389
+          entity_id:
+              - light.kitchen_pendant_1
+              - light.kitchen_pendant_2
+          icon: mdi:lightbulb-group
+          friendly_name: Kitchen Pendants
+          supported_features: 36
+          state: "on"
+      light.front_porch_lights:
+          supported_color_modes:
+              - onoff
+          color_mode: onoff
+          friendly_name: "Front Porch Lights "
+          supported_features: 0
+          state: "on"
+      light.hanging_light:
+          min_color_temp_kelvin: 1500
+          max_color_temp_kelvin: 9000
+          min_mireds: 111
+          max_mireds: 666
+          effect_list:
+              - effect_colorloop
+              - effect_pulse
+              - effect_stop
+          supported_color_modes:
+              - color_temp
+              - hs
+          effect:
+          color_mode: color_temp
+          brightness: 99
+          color_temp_kelvin: 2217
+          color_temp: 451
+          hs_color:
+              - 29.737
+              - 83.879
+          rgb_color:
+              - 255
+              - 147
+              - 41
+          xy_color:
+              - 0.577
+              - 0.388
+          entity_id:
+              - light.hanging_light_1
+              - light.hanging_light_2
+              - light.hanging_light_3
+          icon: mdi:lightbulb-group
+          friendly_name: Hanging Light
+          supported_features: 36
+          state: "on"
+      light.couch_lights:
+          supported_color_modes:
+              - onoff
+          color_mode: onoff
+          friendly_name: Couch Lights
+          supported_features: 0
+          state: "on"
+      light.butterfly_light_2:
+          min_color_temp_kelvin: 1500
+          max_color_temp_kelvin: 9000
+          min_mireds: 111
+          max_mireds: 666
+          effect_list:
+              - effect_colorloop
+              - effect_flame
+              - effect_pulse
+              - effect_morph
+              - effect_stop
+          supported_color_modes:
+              - color_temp
+              - hs
+          effect:
+          color_mode: color_temp
+          brightness: 89
+          color_temp_kelvin: 1501
+          color_temp: 666
+          hs_color:
+              - 25.487
+              - 100
+          rgb_color:
+              - 255
+              - 108
+              - 0
+          xy_color:
+              - 0.635
+              - 0.355
+          friendly_name: Butterfly Light 2
+          supported_features: 36
+          state: "on"
+      light.tv_lights:
+          min_color_temp_kelvin: 2000
+          max_color_temp_kelvin: 6535
+          min_mireds: 153
+          max_mireds: 500
+          effect_list:
+              - colorloop
+          supported_color_modes:
+              - color_temp
+              - xy
+          effect:
+          color_mode: xy
+          brightness: 84
+          color_temp_kelvin:
+          color_temp:
+          hs_color:
+              - 7.125
+              - 62.745
+          rgb_color:
+              - 255
+              - 114
+              - 95
+          xy_color:
+              - 0.578
+              - 0.325
+          entity_id:
+              - light.philips_hue_tv_1_huelight
+              - light.philips_hue_tv_2_huelight_2
+          icon: mdi:lightbulb-group
+          friendly_name: TV Lights
+          supported_features: 44
+          state: "on"
+      light.skull_light:
+          supported_color_modes:
+              - onoff
+          color_mode:
+          friendly_name: Skull Light
+          supported_features: 0
+          state: "off"
+      light.laundry_room_light:
+          supported_color_modes:
+              - onoff
+          color_mode: onoff
+          friendly_name: "Laundry Room Light "
+          supported_features: 0
+          state: "on"
+      light.master_bedroom_ceiling_fan_light:
+          supported_color_modes:
+              - onoff
+          color_mode:
+          friendly_name: "Master Bedroom Ceiling Fan Light "
+          supported_features: 0
+          state: "off"
+      light.master_bathroom_light_1:
+          supported_color_modes:
+              - onoff
+          color_mode:
+          friendly_name: "Master Bathroom Light 1 "
+          supported_features: 0
+          state: "off"
+      light.master_bedroom_closet_light:
+          supported_color_modes:
+              - onoff
+          color_mode:
+          friendly_name: "Master Bedroom Closet Light "
+          supported_features: 0
+          state: "off"
+      light.master_bathroom_light_2:
+          supported_color_modes:
+              - onoff
+          color_mode: onoff
+          friendly_name: "Master Bathroom Light 2 "
+          supported_features: 0
+          state: "on"
+      light.upstairs_hallway_lights:
+          supported_color_modes:
+              - onoff
+          color_mode:
+          friendly_name: "Upstairs Hallway Lights "
+          supported_features: 0
+          state: "off"
+      light.bonus_room_ceiling_light:
+          supported_color_modes:
+              - onoff
+          color_mode:
+          friendly_name: "Bonus Room Ceiling Light "
+          supported_features: 0
+          state: "off"
+      light.guest_bedroom_ceiling_light:
+          supported_color_modes:
+              - onoff
+          color_mode:
+          friendly_name: "Guest Bedroom Ceiling Light "
+          supported_features: 0
+          state: "off"
+      light.entryway_light:
+          supported_color_modes:
+              - onoff
+          color_mode:
+          friendly_name: "Entryway Light "
+          supported_features: 0
+          state: "off"
+      light.couch_lamp:
+          min_color_temp_kelvin: 1500
+          max_color_temp_kelvin: 9000
+          min_mireds: 111
+          max_mireds: 666
+          effect_list:
+              - effect_colorloop
+              - effect_pulse
+              - effect_stop
+          supported_color_modes:
+              - color_temp
+              - hs
+          effect:
+          color_mode: color_temp
+          brightness: 64
+          color_temp_kelvin: 1501
+          color_temp: 666
+          hs_color:
+              - 25.487
+              - 100
+          rgb_color:
+              - 255
+              - 108
+              - 0
+          xy_color:
+              - 0.635
+              - 0.355
+          friendly_name: Couch Lamp
+          supported_features: 36
+          state: "on"
+      light.office_ceiling_light:
+          supported_color_modes:
+              - brightness
+          color_mode: brightness
+          brightness: 46
+          friendly_name: "Office Ceiling Light "
+          supported_features: 32
+          state: "on"
+      light.guest_bathroom_light:
+          supported_color_modes:
+              - onoff
+          color_mode: onoff
+          friendly_name: "Guest Bathroom Light "
+          supported_features: 0
+          state: "on"
+      light.guest_bedroom_light_1:
+          supported_color_modes:
+              - onoff
+          color_mode: onoff
+          friendly_name: Guest Bedroom Light 1
+          supported_features: 0
+          state: "on"
+      light.guest_bedroom_light_2:
+          supported_color_modes:
+              - onoff
+          color_mode:
+          friendly_name: Guest Bedroom Light 2
+          supported_features: 0
+          state: "off"
+      light.pineapple_light:
+          min_color_temp_kelvin: 1500
+          max_color_temp_kelvin: 9000
+          min_mireds: 111
+          max_mireds: 666
+          effect_list:
+              - effect_colorloop
+              - effect_pulse
+              - effect_stop
+          supported_color_modes:
+              - color_temp
+              - hs
+          effect:
+          color_mode: color_temp
+          brightness: 99
+          color_temp_kelvin: 1501
+          color_temp: 666
+          hs_color:
+              - 25.487
+              - 100
+          rgb_color:
+              - 255
+              - 108
+              - 0
+          xy_color:
+              - 0.635
+              - 0.355
+          friendly_name: Pineapple Light
+          supported_features: 36
+          state: "on"
+      light.kitchen_can_lights:
+          supported_color_modes:
+              - brightness
+          color_mode: brightness
+          brightness: 28
+          friendly_name: "Kitchen Can Lights "
+          supported_features: 32
+          state: "on"
+      light.dining_room_ceiling_light:
+          supported_color_modes:
+              - brightness
+          color_mode: brightness
+          brightness: 72
+          friendly_name: "Dining Room Ceiling Light "
+          supported_features: 32
+          state: "on"
+      light.dining_room_christmas_lights:
+          supported_color_modes:
+              - onoff
+          color_mode: onoff
+          friendly_name: Dining Room Christmas Lights
+          supported_features: 0
+          state: "on"
+      light.downstairs_bathroom_light:
+          supported_color_modes:
+              - onoff
+          color_mode:
+          friendly_name: "Downstairs Bathroom Light "
+          supported_features: 0
+          state: "off"
+      lock.back_door:
+          changed_by: Mike Babb
+          battery_level: 47
+          friendly_name: Back Door
+          supported_features: 0
+          state: locked
+      lock.front_door:
+          changed_by: Manual Lock
+          battery_level: 65
+          friendly_name: Front Door
+          supported_features: 0
+          state: locked
+      lock.garage_entry_door:
+          changed_by: Mike Babb
+          battery_level: 89
+          friendly_name: Garage Entry Door
+          supported_features: 0
+          state: locked
+      light.rose_light_1:
+          min_color_temp_kelvin: 1500
+          max_color_temp_kelvin: 9000
+          min_mireds: 111
+          max_mireds: 666
+          effect_list:
+              - effect_colorloop
+              - effect_pulse
+              - effect_stop
+          supported_color_modes:
+              - color_temp
+              - hs
+          effect:
+          color_mode:
+          brightness:
+          color_temp_kelvin:
+          color_temp:
+          hs_color:
+          rgb_color:
+          xy_color:
+          friendly_name: Rose Light 1
+          supported_features: 36
+          state: "off"
+      light.rose_light_2:
+          min_color_temp_kelvin: 1500
+          max_color_temp_kelvin: 9000
+          min_mireds: 111
+          max_mireds: 666
+          effect_list:
+              - effect_colorloop
+              - effect_pulse
+              - effect_stop
+          supported_color_modes:
+              - color_temp
+              - hs
+          effect:
+          color_mode: color_temp
+          brightness: 3
+          color_temp_kelvin: 1501
+          color_temp: 666
+          hs_color:
+              - 25.487
+              - 100
+          rgb_color:
+              - 255
+              - 108
+              - 0
+          xy_color:
+              - 0.635
+              - 0.355
+          friendly_name: Rose Light 2
+          supported_features: 36
+          state: "on"
+      light.plant_ceiling_light:
+          supported_color_modes:
+              - onoff
+          color_mode:
+          friendly_name: "Plant Ceiling Light "
+          supported_features: 0
+          state: "off"
+      light.master_bedroom_tiffany_light_2:
+          min_color_temp_kelvin: 1500
+          max_color_temp_kelvin: 9000
+          min_mireds: 111
+          max_mireds: 666
+          effect_list:
+              - effect_colorloop
+              - effect_pulse
+              - effect_stop
+          supported_color_modes:
+              - color_temp
+              - hs
+          effect:
+          color_mode: color_temp
+          brightness: 51
+          color_temp_kelvin: 1501
+          color_temp: 666
+          hs_color:
+              - 25.487
+              - 100
+          rgb_color:
+              - 255
+              - 108
+              - 0
+          xy_color:
+              - 0.635
+              - 0.355
+          friendly_name: Master Bedroom Tiffany Light
+          supported_features: 36
+          state: "on"
+      light.butterfly_light_1:
+          min_color_temp_kelvin: 1500
+          max_color_temp_kelvin: 9000
+          min_mireds: 111
+          max_mireds: 666
+          effect_list:
+              - effect_colorloop
+              - effect_flame
+              - effect_pulse
+              - effect_morph
+              - effect_stop
+          supported_color_modes:
+              - color_temp
+              - hs
+          effect:
+          color_mode: color_temp
+          brightness: 92
+          color_temp_kelvin: 1501
+          color_temp: 666
+          hs_color:
+              - 25.487
+              - 100
+          rgb_color:
+              - 255
+              - 108
+              - 0
+          xy_color:
+              - 0.635
+              - 0.355
+          friendly_name: Butterfly Light 1
+          supported_features: 36
+          state: "on"
+      cover.ratgdov25i_4b1c3b_door:
+          current_position: 0
+          device_class: garage
+          friendly_name: Garage Door
+          supported_features: 15
+          state: closed
   icon: mdi:weather-night
   metadata:
-    light.kitchen_pendants:
-      entity_only: true
-    light.front_porch_lights:
-      entity_only: true
-    light.hanging_light:
-      entity_only: true
-    light.butterfly_light:
-      entity_only: true
-    light.couch_lights:
-      entity_only: true
-    light.butterfly_light_2:
-      entity_only: true
-    light.tv_lights:
-      entity_only: true
-    light.skull_light:
-      entity_only: true
-    light.laundry_room_light:
-      entity_only: true
-    light.master_bedroom_ceiling_fan_light:
-      entity_only: true
-    light.master_bathroom_light_1:
-      entity_only: true
-    light.master_bedroom_closet_light:
-      entity_only: true
-    light.master_bathroom_light_2:
-      entity_only: true
-    light.upstairs_hallway_lights:
-      entity_only: true
-    light.bonus_room_ceiling_light:
-      entity_only: true
-    light.guest_bedroom_ceiling_light:
-      entity_only: true
-    light.entryway_light:
-      entity_only: true
-    light.couch_lamp:
-      entity_only: true
-    light.goblet_light:
-      entity_only: true
-    light.office_ceiling_light:
-      entity_only: true
-    light.guest_bathroom_light:
-      entity_only: true
-    light.guest_bedroom_light_1:
-      entity_only: true
-    light.guest_bedroom_light_2:
-      entity_only: true
-    light.pineapple_light:
-      entity_only: true
-    light.master_bedroom_tiffany_light:
-      entity_only: true
-    light.kitchen_can_lights:
-      entity_only: true
-    light.dining_room_ceiling_light:
-      entity_only: true
-    light.dining_room_christmas_lights:
-      entity_only: true
-    light.desk_christmas_lights:
-      entity_only: true
-    light.downstairs_bathroom_light:
-      entity_only: true
-    lock.back_door:
-      entity_only: true
-    lock.front_door:
-      entity_only: true
-    lock.garage_entry_door:
-      entity_only: true
+      light.kitchen_pendants:
+          entity_only: true
+      light.front_porch_lights:
+          entity_only: true
+      light.hanging_light:
+          entity_only: true
+      light.couch_lights:
+          entity_only: true
+      light.butterfly_light_2:
+          entity_only: true
+      light.tv_lights:
+          entity_only: true
+      light.skull_light:
+          entity_only: true
+      light.laundry_room_light:
+          entity_only: true
+      light.master_bedroom_ceiling_fan_light:
+          entity_only: true
+      light.master_bathroom_light_1:
+          entity_only: true
+      light.master_bedroom_closet_light:
+          entity_only: true
+      light.master_bathroom_light_2:
+          entity_only: true
+      light.upstairs_hallway_lights:
+          entity_only: true
+      light.bonus_room_ceiling_light:
+          entity_only: true
+      light.guest_bedroom_ceiling_light:
+          entity_only: true
+      light.entryway_light:
+          entity_only: true
+      light.couch_lamp:
+          entity_only: true
+      light.office_ceiling_light:
+          entity_only: true
+      light.guest_bathroom_light:
+          entity_only: true
+      light.guest_bedroom_light_1:
+          entity_only: true
+      light.guest_bedroom_light_2:
+          entity_only: true
+      light.pineapple_light:
+          entity_only: true
+      light.kitchen_can_lights:
+          entity_only: true
+      light.dining_room_ceiling_light:
+          entity_only: true
+      light.dining_room_christmas_lights:
+          entity_only: true
+      light.downstairs_bathroom_light:
+          entity_only: true
+      lock.back_door:
+          entity_only: true
+      lock.front_door:
+          entity_only: true
+      lock.garage_entry_door:
+          entity_only: true
+      light.butterfly_light_1:
+          entity_only: true
+      cover.ratgdov25i_4b1c3b_door:
+          entity_only: true
+- id: "1716614281095"
+  name: Daytime
+  entities:
+      light.butterfly_light_1:
+          min_color_temp_kelvin: 1500
+          max_color_temp_kelvin: 9000
+          min_mireds: 111
+          max_mireds: 666
+          effect_list:
+              - effect_colorloop
+              - effect_flame
+              - effect_pulse
+              - effect_morph
+              - effect_stop
+          supported_color_modes:
+              - color_temp
+              - hs
+          effect:
+          color_mode: color_temp
+          brightness: 255
+          color_temp_kelvin: 3000
+          color_temp: 333
+          hs_color:
+              - 27.825
+              - 56.895
+          rgb_color:
+              - 255
+              - 177
+              - 109
+          xy_color:
+              - 0.497
+              - 0.384
+          friendly_name: Butterfly Light 1
+          supported_features: 36
+          state: "on"
+  icon: mdi:weather-sunny
+  metadata:
+      light.butterfly_light_1:
+          entity_only: true
