@@ -4,20 +4,22 @@
     "description": "Collection of scripts for usage within Home Assistant's Node Red instance",
     "type": "module",
     "scripts": {
-        "build": "tsx build.ts -i src -o dist -r"
+        "build": "tsx build.ts -i src -o dist -r",
+        "watch": "tsx build.ts -i src -o dist -r -w"
     },
     "dependencies": {
         "@rollup/plugin-commonjs": "^25.0.8",
         "@rollup/plugin-node-resolve": "^15.2.3",
+        "@types/node": "^20.14.1",
         "@types/yargs": "^17.0.32",
         "chalk": "^5.3.0",
+        "chokidar": "^3.6.0",
+        "tsx": "^4.11.2",
         "typescript": "^5.4.5",
         "vite": "^5.2.12",
         "vite-plugin-commonjs": "^0.10.1",
-        "yargs": "^17.7.2",
-        "@types/node": "^20.14.1"
+        "yargs": "^17.7.2"
     },
     "author": "Mike Babb <mike@babb.dev>",
-    "license": "ISC",
-    "devDependencies": {}
+    "license": "ISC"
 }

@@ -5,14 +5,15 @@ import path from "path";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import chalk from "chalk";
-
-const RETURN_MSG = "\nreturn msg;";
-const DEFAULT_BLACKLIST = ["node_modules", /\.d\.ts$/];
+import chokidar from "chokidar";
 
 import url from "url";
 
 const __filename = url.fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const RETURN_MSG = "\nreturn msg;";
+const DEFAULT_BLACKLIST = ["node_modules", /\.d\.ts$/];
 
 const argv = yargs(hideBin(process.argv))
     .option("inputDir", {
@@ -38,6 +39,12 @@ const argv = yargs(hideBin(process.argv))
         default: false,
         describe: "Recursively search for files"
     })
+    .option("watch", {
+        alias: "w",
+        type: "boolean",
+        default: false,
+        describe: "Watch for file changes"
+    })
     .help()
     .alias("help", "h")
     .parseSync();
@@ -46,6 +53,7 @@ const inputDir = argv.inputDir;
 const outputDir = argv.outputDir;
 const emptyOutDir = argv.emptyOutDir;
 const recursive = argv.recursive;
+const watch = argv.watch;
 
 const BLACKLIST = [...DEFAULT_BLACKLIST];
 
@@ -82,8 +90,6 @@ function getFiles(dir: string, recursive: boolean): string[] {
     return files;
 }
 
-const files = getFiles(inputDir, recursive);
-
 function createViteConfig(inputFile: string) {
     const name = path.relative(inputDir, inputFile).replace(/\.ts$/, "");
 
@@ -111,22 +117,42 @@ function createViteConfig(inputFile: string) {
     });
 }
 
-if (emptyOutDir) {
-    console.log(chalk.red(`Emptying output directory: ${outputDir}`));
-    fs.rmdirSync(outputDir, { recursive: true });
+function buildFiles() {
+    if (emptyOutDir) {
+        console.log(chalk.red(`Emptying output directory: ${outputDir}`));
+        fs.rmdirSync(outputDir, { recursive: true });
+    }
+
+    const files = getFiles(inputDir, recursive);
+
+    files.forEach((inputFile) => {
+        const viteConfig = createViteConfig(inputFile);
+
+        console.log(chalk.blue("Building..."));
+
+        build(viteConfig)
+            .then(() => {
+                console.log(chalk.green("Build completed successfully"));
+            })
+            .catch((error) => {
+                console.error(chalk.red("Build failed"), error);
+                process.exit(1);
+            });
+    });
 }
 
-files.forEach((inputFile) => {
-    const viteConfig = createViteConfig(inputFile);
+if (watch) {
+    const watcher = chokidar.watch(inputDir, {
+        ignored: BLACKLIST,
+        persistent: true
+    });
 
-    console.log(chalk.blue("Building..."));
+    watcher.on("change", (path) => {
+        console.log(chalk.blue(`File changed: ${path}`));
+        buildFiles();
+    });
 
-    build(viteConfig)
-        .then(() => {
-            console.log(chalk.green("Build completed successfully"));
-        })
-        .catch((error) => {
-            console.error(chalk.red("Build failed"), error);
-            process.exit(1);
-        });
-});
+    console.log(chalk.cyan(`Watching for changes in ${inputDir}...`));
+} else {
+    buildFiles();
+}
