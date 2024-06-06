@@ -3,21 +3,26 @@ function getEntityBasename(entityId) {
   const match = entityId.match(/^.*\.(.*)$/);
   return match ? match[1] : entityId;
 }
+function getTimeComponents(time) {
+  let timeParts = time.split(":");
+  let [hours, mins, seconds] = timeParts.concat(Array(3 - timeParts.length).fill("00")).map((x) => parseInt(x));
+  return [hours, mins, seconds];
+}
+function normalizeTime(time) {
+  let [hours, mins, seconds] = getTimeComponents(time);
+  return `${hours}:${mins}:${seconds}`;
+}
 function extractTimeFromPayload(entityId, payload2) {
   const entity = payload2.find((item) => item.entity_id === entityId);
-  return entity ? entity.state : "00:00";
+  return entity ? normalizeTime(entity.state) : "00:00:00";
 }
 function subtractMinutes(time, minutes) {
-  let timeParts = time.split(":");
   let date = /* @__PURE__ */ new Date();
-  date.setHours(
-    parseInt(timeParts[0]),
-    parseInt(timeParts[1]) - minutes,
-    parseInt(timeParts[2])
-  );
-  let hours = date.getHours().toString().padStart(2, "0");
-  let mins = date.getMinutes().toString().padStart(2, "0");
-  return `${hours}:${mins}`;
+  let [hours, mins, seconds] = getTimeComponents(time);
+  date.setHours(hours);
+  date.setMinutes(mins - minutes);
+  date.setSeconds(seconds);
+  return date.toTimeString().split(" ")[0];
 }
 function createCronEntry(cronExpression) {
   return {
@@ -26,27 +31,27 @@ function createCronEntry(cronExpression) {
   };
 }
 function createWeekdayCronEntry(time) {
-  const [hours, minutes, seconds] = time.split(":");
-  return `0 ${minutes} ${hours} * * 1-5`;
+  const [hours, minutes, seconds] = getTimeComponents(time);
+  return `${seconds} ${minutes} ${hours} * * 1-5`;
 }
 function createWeekendCronEntry(time) {
-  const [hours, minutes, seconds] = time.split(":");
-  return `0 ${minutes} ${hours} * * 0,6`;
+  const [hours, minutes, seconds] = getTimeComponents(time);
+  return `${seconds} ${minutes} ${hours} * * 0,6`;
 }
-const payload = msg.payload;
+const payload = msg.payload.sort((a, b) => a.entity_id.localeCompare(b.entity_id));
 const offset = msg.offset ?? 30;
-let schedules = {};
+let schedules = /* @__PURE__ */ new Map();
 payload.forEach((entity) => {
   const basename = getEntityBasename(entity.entity_id);
   let time = extractTimeFromPayload(entity.entity_id, payload);
-  time = subtractMinutes(time, offset);
+  time = basename.includes("wakeup") ? subtractMinutes(time, offset) : time;
   const cron = basename.includes("weekday") ? createWeekdayCronEntry(time) : createWeekendCronEntry(time);
-  schedules[basename] = { time, cron };
+  schedules.set(basename, { time, cron });
 });
-msg.payload = Object.keys(schedules).map((key) => {
-  const { time, cron } = schedules[key];
+msg.payload = Array.from(schedules).map(([key, { time, cron }]) => {
+  key = `${key}_cron`;
   const cronEntry = createCronEntry(cron);
-  flow.set(`${key}_cron`, cronEntry);
+  flow.set(key, cronEntry);
   return cronEntry;
 });
 return msg;

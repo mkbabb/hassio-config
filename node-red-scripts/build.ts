@@ -120,7 +120,7 @@ function createViteConfig(inputFile: string) {
 function buildFiles() {
     if (emptyOutDir) {
         console.log(chalk.red(`Emptying output directory: ${outputDir}`));
-        fs.rmdirSync(outputDir, { recursive: true });
+        fs.rmSync(outputDir, { recursive: true, force: true });
     }
 
     const files = getFiles(inputDir, recursive);
@@ -140,6 +140,8 @@ function buildFiles() {
     });
 }
 
+buildFiles();
+
 if (watch) {
     const watcher = chokidar.watch(inputDir, {
         ignored: BLACKLIST,
@@ -152,6 +154,4 @@ if (watch) {
     });
 
     console.log(chalk.cyan(`Watching for changes in ${inputDir}...`));
-} else {
-    buildFiles();
 }

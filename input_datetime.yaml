@@ -32,4 +32,4 @@ weekend_sleep:
     name: "Weekend Sleep Time"
     has_date: false
     has_time: true
-    initial: "01:00"
+    initial: "00:00"

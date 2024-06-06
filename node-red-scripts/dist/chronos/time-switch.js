@@ -3,9 +3,18 @@ function getEntityBasename(entityId) {
   const match = entityId.match(/^.*\.(.*)$/);
   return match ? match[1] : entityId;
 }
+function getTimeComponents(time) {
+  let timeParts = time.split(":");
+  let [hours, mins, seconds] = timeParts.concat(Array(3 - timeParts.length).fill("00")).map((x) => parseInt(x));
+  return [hours, mins, seconds];
+}
+function normalizeTime(time) {
+  let [hours, mins, seconds] = getTimeComponents(time);
+  return `${hours}:${mins}:${seconds}`;
+}
 function extractTimeFromPayload(entityId, payload2) {
   const entity = payload2.find((item) => item.entity_id === entityId);
-  return entity ? entity.state : "00:00";
+  return entity ? normalizeTime(entity.state) : "00:00:00";
 }
 const payload = msg.payload;
 const wakeUpTime = payload.find((entity) => entity.entity_id.includes("wakeup_time"));

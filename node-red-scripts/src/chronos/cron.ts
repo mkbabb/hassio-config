@@ -1,4 +1,9 @@
-import { subtractMinutes, extractTimeFromPayload, getEntityBasename } from "../utils";
+import {
+    subtractMinutes,
+    extractTimeFromPayload,
+    getEntityBasename,
+    getTimeComponents
+} from "../utils";
 
 // Create and store cron expressions for scheduler node
 function createCronEntry(cronExpression: string) {
@@ -9,45 +14,45 @@ function createCronEntry(cronExpression: string) {
 }
 
 function createWeekdayCronEntry(time: string) {
-    const [hours, minutes, seconds] = time.split(":");
-    return `0 ${minutes} ${hours} * * 1-5`;
+    const [hours, minutes, seconds] = getTimeComponents(time);
+    return `${seconds} ${minutes} ${hours} * * 1-5`;
 }
 
 function createWeekendCronEntry(time: string) {
-    const [hours, minutes, seconds] = time.split(":");
-    return `0 ${minutes} ${hours} * * 0,6`;
+    const [hours, minutes, seconds] = getTimeComponents(time);
+    return `${seconds} ${minutes} ${hours} * * 0,6`;
 }
 
 // @ts-ignore
-const payload = msg.payload;
+const payload = msg.payload.sort((a, b) => a.entity_id.localeCompare(b.entity_id));
 
 // @ts-ignore
 // offset in minutes
 const offset = msg.offset ?? 30;
 
-let schedules = {};
+let schedules = new Map<string, { time: string; cron: string }>();
 
-// Extract times using the entity IDs
 payload.forEach((entity: Hass.State) => {
     const basename = getEntityBasename(entity.entity_id);
 
     let time = extractTimeFromPayload(entity.entity_id, payload);
-    time = subtractMinutes(time, offset);
+    // subtract offset minutes if it's a wakeup schedule
+    time = basename.includes("wakeup") ? subtractMinutes(time, offset) : time;
 
     const cron = basename.includes("weekday")
         ? createWeekdayCronEntry(time)
         : createWeekendCronEntry(time);
 
-    schedules[basename] = { time, cron };
+    schedules.set(basename, { time, cron });
 });
 
 // @ts-ignore
-msg.payload = Object.keys(schedules).map((key) => {
-    const { time, cron } = schedules[key];
-    const cronEntry = createCronEntry(cron);
+msg.payload = Array.from(schedules).map(([key, { time, cron }]) => {
+    key = `${key}_cron`;
 
+    const cronEntry = createCronEntry(cron);
     // @ts-ignore
-    flow.set(`${key}_cron`, cronEntry);
+    flow.set(key, cronEntry);
 
     return cronEntry;
 });

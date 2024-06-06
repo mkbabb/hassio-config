@@ -8,29 +8,40 @@ export function getEntityDomain(entityId: string): string {
     return match ? match[1] : entityId;
 }
 
+export function getTimeComponents(time: string): [number, number, number] {
+    let timeParts = time.split(":");
+
+    let [hours, mins, seconds] = timeParts
+        .concat(Array(3 - timeParts.length).fill("00"))
+        .map((x) => parseInt(x));
+
+    return [hours, mins, seconds];
+}
+
+export function normalizeTime(time: string): string {
+    let [hours, mins, seconds] = getTimeComponents(time);
+    return `${hours}:${mins}:${seconds}`;
+}
+
 export function extractTimeFromPayload(
     entityId: string,
     payload: Hass.State[]
 ): string {
     const entity = payload.find((item) => item.entity_id === entityId);
-    return entity ? entity.state : "00:00";
+    return entity ? normalizeTime(entity.state) : "00:00:00";
 }
 
 export function subtractMinutes(time: string, minutes: number): string {
-    let timeParts = time.split(":");
     let date = new Date();
 
-    date.setHours(
-        parseInt(timeParts[0]),
-        parseInt(timeParts[1]) - minutes,
-        parseInt(timeParts[2])
-    );
+    let [hours, mins, seconds] = getTimeComponents(time);
 
-    // Formatting to "HH:MM" for cron expression usage
-    let hours = date.getHours().toString().padStart(2, "0");
-    let mins = date.getMinutes().toString().padStart(2, "0");
+    // subtracting minutes
+    date.setHours(hours);
+    date.setMinutes(mins - minutes);
+    date.setSeconds(seconds);
 
-    return `${hours}:${mins}`;
+    return date.toTimeString().split(" ")[0];
 }
 
 export function getTimeString(): string {
@@ -192,12 +203,11 @@ export const createServiceCall = (entity: Hass.State) => {
         service: service,
         data: {
             entity_id: entity.entity_id,
-            
+
             ...filterAttributes(domain, service, entity.attributes)
         }
     };
 };
-
 
 export const createStatesMap = (
     states: Partial<Hass.Service>[]
