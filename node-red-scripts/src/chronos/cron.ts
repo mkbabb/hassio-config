@@ -1,4 +1,4 @@
-import { subtractMinutes, extractTimeFromPayload } from "../utils";
+import { subtractMinutes, extractTimeFromPayload, getEntityBasename } from "../utils";
 
 // Create and store cron expressions for scheduler node
 function createCronEntry(cronExpression: string) {
@@ -9,13 +9,13 @@ function createCronEntry(cronExpression: string) {
 }
 
 function createWeekdayCronEntry(time: string) {
-    const [start, end] = time.split(":");
-    return `${start} ${end} * * 1-5`;
+    const [hours, minutes, seconds] = time.split(":");
+    return `0 ${minutes} ${hours} * * 1-5`;
 }
 
 function createWeekendCronEntry(time: string) {
-    const [start, end] = time.split(":");
-    return `${start} ${end} * * 6-7`;
+    const [hours, minutes, seconds] = time.split(":");
+    return `0 ${minutes} ${hours} * * 0,6`;
 }
 
 // @ts-ignore
@@ -29,24 +29,25 @@ let schedules = {};
 
 // Extract times using the entity IDs
 payload.forEach((entity: Hass.State) => {
-    const match = entity.entity_id.match(/^.*\.(.*)$/);
-    const [_, baseName] = match;
+    const basename = getEntityBasename(entity.entity_id);
 
     let time = extractTimeFromPayload(entity.entity_id, payload);
     time = subtractMinutes(time, offset);
 
-    const cron = baseName.includes("weekday")
+    const cron = basename.includes("weekday")
         ? createWeekdayCronEntry(time)
         : createWeekendCronEntry(time);
 
-    schedules[baseName] = { time, cron };
+    schedules[basename] = { time, cron };
 });
 
 // @ts-ignore
 msg.payload = Object.keys(schedules).map((key) => {
     const { time, cron } = schedules[key];
+    const cronEntry = createCronEntry(cron);
+
     // @ts-ignore
-    flow.set(`${key}_cron`, time);
-    // @ts-ignore
-    return createCronEntry(cron);
+    flow.set(`${key}_cron`, cronEntry);
+
+    return cronEntry;
 });

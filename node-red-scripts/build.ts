@@ -136,7 +136,6 @@ function buildFiles() {
             })
             .catch((error) => {
                 console.error(chalk.red("Build failed"), error);
-                process.exit(1);
             });
     });
 }

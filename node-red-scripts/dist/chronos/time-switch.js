@@ -1,21 +1,31 @@
 "use strict";
+function getEntityBasename(entityId) {
+  const match = entityId.match(/^.*\.(.*)$/);
+  return match ? match[1] : entityId;
+}
 function extractTimeFromPayload(entityId, payload2) {
   const entity = payload2.find((item) => item.entity_id === entityId);
   return entity ? entity.state : "00:00";
 }
 const payload = msg.payload;
+const wakeUpTime = payload.find((entity) => entity.entity_id.includes("wakeup_time"));
+if (wakeUpTime) {
+  wakeUpTime.entity_id = "bedroom_schedule_start";
+}
+const sleepTime = payload.find((entity) => entity.entity_id.includes("sleep_time"));
+if (sleepTime) {
+  sleepTime.entity_id = "bedroom_schedule_end";
+}
 const schedules = {};
 payload.forEach((entity) => {
-  const match = entity.entity_id.match(/^(.*)_(start|end)$/);
+  const basename = getEntityBasename(entity.entity_id);
+  const match = basename.match(/^(.*)_(start|end)$/);
   if (match) {
-    const [_, baseName, timeType] = match;
-    if (!schedules[baseName]) {
-      schedules[baseName] = { start: "", end: "" };
+    const [_, name, timeType] = match;
+    if (!schedules[name]) {
+      schedules[name] = { start: "", end: "" };
     }
-    schedules[baseName][timeType] = extractTimeFromPayload(
-      entity.entity_id,
-      payload
-    );
+    schedules[name][timeType] = extractTimeFromPayload(entity.entity_id, payload);
   }
 });
 function createScheduleObject(start, end, operator) {

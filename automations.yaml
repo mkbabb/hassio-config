@@ -23,3 +23,36 @@
         target:
             entity_id: light.downstairs_bathroom_chili_pepper_lights
   mode: single
+
+- id: "nighttime_daytime_mutex"
+  alias: Nighttime and Daytime Mutex
+  description: Ensure Nighttime and Daytime don't overlap
+  trigger:
+      - platform: state
+        entity_id: input_boolean.nighttime
+        to: "on"
+      - platform: state
+        entity_id: input_boolean.daytime
+        to: "on"
+  condition: []
+  action:
+      - choose:
+            - conditions:
+                  - condition: state
+                    entity_id: input_boolean.nighttime
+                    state: "on"
+                    for: "00:00:01"
+              sequence:
+                  - service: input_boolean.turn_off
+                    target:
+                        entity_id: input_boolean.daytime
+            - conditions:
+                  - condition: state
+                    entity_id: input_boolean.daytime
+                    state: "on"
+                    for: "00:00:01"
+              sequence:
+                  - service: input_boolean.turn_off
+                    target:
+                        entity_id: input_boolean.nighttime
+  mode: single

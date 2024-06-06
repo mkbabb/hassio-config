@@ -1,24 +1,34 @@
-import { extractTimeFromPayload } from "../utils";
+import { extractTimeFromPayload, getEntityBasename } from "../utils";
 //@ts-ignore
 const payload: Entity[] = msg.payload;
+
+// Rename wakeup_time and sleep_time to bedroom_start and bedroom_end
+const wakeUpTime = payload.find((entity) => entity.entity_id.includes("wakeup_time"));
+if (wakeUpTime) {
+    wakeUpTime.entity_id = "bedroom_schedule_start";
+}
+
+const sleepTime = payload.find((entity) => entity.entity_id.includes("sleep_time"));
+if (sleepTime) {
+    sleepTime.entity_id = "bedroom_schedule_end";
+}
 
 // Extract times using the entity IDs
 const schedules = {};
 
 payload.forEach((entity) => {
-    const match = entity.entity_id.match(/^(.*)_(start|end)$/);
+    const basename = getEntityBasename(entity.entity_id);
+
+    const match = basename.match(/^(.*)_(start|end)$/);
 
     if (match) {
-        const [_, baseName, timeType] = match;
+        const [_, name, timeType] = match;
 
-        if (!schedules[baseName]) {
-            schedules[baseName] = { start: "", end: "" };
+        if (!schedules[name]) {
+            schedules[name] = { start: "", end: "" };
         }
 
-        schedules[baseName][timeType] = extractTimeFromPayload(
-            entity.entity_id,
-            payload
-        );
+        schedules[name][timeType] = extractTimeFromPayload(entity.entity_id, payload);
     }
 });
 

@@ -1,22 +1,8 @@
 "use strict";
-const blacklistedEntities = [
-  // car
-  "son_of_toast",
-  // grow lights
-  /.*grow.*/i,
-  // blinds
-  /.*blinds.*/i,
-  // air purifiers
-  /.*air_purifier.*/i,
-  // garage door
-  /switch.ratgdov25i_4b1c3b.*/i,
-  "lock.ratgdov25i_4b1c3b_lock_remotes",
-  // sonos
-  /.*sonos_beam.*/i,
-  // washer/dryer
-  "washer_power",
-  "dryer_power"
-];
+function getEntityDomain(entityId) {
+  const match = entityId.match(/^(.*)\..*$/);
+  return match ? match[1] : entityId;
+}
 const setIfExists = (to, from, key) => {
   const value = from[key];
   if (value != null) {
@@ -38,12 +24,6 @@ const isBlacklisted = (entity_id, blacklisted) => {
     }
   });
 };
-const message = msg;
-const entities = message.payload.filter((e) => {
-  const { entity_id, state } = e;
-  const whitelisted = !isBlacklisted(entity_id, blacklistedEntities);
-  return whitelisted && state !== "unavailable";
-});
 const lightAttributes = ["brightness"];
 const fanAttributes = ["percentage"];
 const climateAttributes = ["preset_mode"];
@@ -116,23 +96,46 @@ const mapDomainToService = function(entity, domain) {
   }
   return void 0;
 };
-const cachedStates = entities.map((e) => {
-  const domain = e.entity_id.split(".")[0];
-  const service = mapDomainToService(e, domain);
+const createServiceCall = (entity) => {
+  const domain = getEntityDomain(entity.entity_id);
+  const service = mapDomainToService(entity, domain);
   if (!domains.includes(domain) || service === void 0) {
     return void 0;
   }
-  const serviceCall = {
+  return {
     domain,
     service,
     data: {
-      entity_id: e.entity_id,
-      state: e.state,
-      ...filterAttributes(domain, service, e.attributes)
+      entity_id: entity.entity_id,
+      ...filterAttributes(domain, service, entity.attributes)
     }
   };
-  return serviceCall;
-}).filter((x) => x !== void 0);
+};
+const blacklistedEntities = [
+  // car
+  "son_of_toast",
+  // grow lights
+  /.*grow.*/i,
+  // blinds
+  /.*blinds.*/i,
+  // air purifiers
+  /.*air_purifier.*/i,
+  // garage door
+  /switch.ratgdov25i_4b1c3b.*/i,
+  "lock.ratgdov25i_4b1c3b_lock_remotes",
+  // sonos
+  /.*sonos_beam.*/i,
+  // washer/dryer
+  "washer_power",
+  "dryer_power"
+];
+const message = msg;
+const entities = message.payload.filter((e) => {
+  const { entity_id, state } = e;
+  const whitelisted = !isBlacklisted(entity_id, blacklistedEntities);
+  return whitelisted && state !== "unavailable";
+});
+const cachedStates = entities.map(createServiceCall).filter((x) => x !== void 0);
 const activeStates = cachedStates.filter((serviceCall) => {
   const { domain } = serviceCall;
   const { state } = serviceCall.data;
