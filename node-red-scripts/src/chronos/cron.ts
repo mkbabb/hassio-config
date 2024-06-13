@@ -1,9 +1,10 @@
 import {
-    subtractMinutes,
+    dateToTimeString,
     extractTimeFromPayload,
     getEntityBasename,
-    getTimeComponents
-} from "../utils";
+    getTimeComponents,
+    timeStringToDate
+} from "../utils/utils";
 
 // Create and store cron expressions for scheduler node
 function createCronEntry(cronExpression: string) {
@@ -23,12 +24,13 @@ function createWeekendCronEntry(time: string) {
     return `${seconds} ${minutes} ${hours} * * 0,6`;
 }
 
-// @ts-ignore
-const payload = msg.payload.sort((a, b) => a.entity_id.localeCompare(b.entity_id));
+const currentTime = new Date();
 
 // @ts-ignore
-// offset in minutes
-const offset = msg.offset ?? 30;
+const offset = msg.offset || 30;
+
+// @ts-ignore
+const payload = msg.payload.sort((a, b) => a.entity_id.localeCompare(b.entity_id));
 
 let schedules = new Map<string, { time: string; cron: string }>();
 
@@ -36,8 +38,19 @@ payload.forEach((entity: Hass.State) => {
     const basename = getEntityBasename(entity.entity_id);
 
     let time = extractTimeFromPayload(entity.entity_id, payload);
-    // subtract offset minutes if it's a wakeup schedule
-    time = basename.includes("wakeup") ? subtractMinutes(time, offset) : time;
+    const dateTime = timeStringToDate(time);
+
+    // if time contains "wakeup" then calculate the wakeup time based on the offset
+    if (basename.includes("wakeup")) {
+        const offsetTime = new Date(dateTime.getTime());
+        offsetTime.setMinutes(dateTime.getMinutes() - offset);
+
+        // if the offsetTime is in the past (relative to the currentTime), then set the wakeup time to the dateTime
+        const wakeupTime =
+            offsetTime.getTime() < currentTime.getTime() ? dateTime : offsetTime;
+
+        time = dateToTimeString(wakeupTime);
+    }
 
     const cron = basename.includes("weekday")
         ? createWeekdayCronEntry(time)

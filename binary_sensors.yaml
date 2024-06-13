@@ -1,0 +1,28 @@
+-   platform: bayesian
+    name: "Mike Presence"
+    prior: 0.5
+    probability_threshold: 0.9
+    observations:
+      - entity_id: device_tracker.fff
+        prob_given_true: 0.95
+        prob_given_false: 0.05
+        platform: state
+        to_state: 'home'
+    
+      - entity_id: sensor.fff_ssid
+        prob_given_true: 0.85
+        prob_given_false: 0.1
+        platform: state
+        to_state: 'Babber'
+      
+      - entity_id: device_tracker.fff2
+        prob_given_true: 0.75
+        prob_given_false: 0.25
+        platform: state
+        to_state: 'home'
+    
+      - entity_id: device_tracker.son_of_toast
+        prob_given_true: 0.8
+        prob_given_false: 0.2
+        platform: state
+        to_state: 'home'

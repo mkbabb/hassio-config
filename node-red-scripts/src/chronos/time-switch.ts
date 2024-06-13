@@ -1,4 +1,4 @@
-import { extractTimeFromPayload, getEntityBasename } from "../utils";
+import { extractTimeFromPayload, getEntityBasename } from "../utils/utils";
 //@ts-ignore
 const payload: Entity[] = msg.payload;
 

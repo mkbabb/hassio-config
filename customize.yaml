@@ -1,0 +1,5 @@
+customize:
+    zone.home:
+      radius: 40
+      persons:
+        - person.mike

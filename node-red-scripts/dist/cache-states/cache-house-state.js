@@ -107,6 +107,7 @@ const createServiceCall = (entity) => {
     service,
     data: {
       entity_id: entity.entity_id,
+      state: entity.state,
       ...filterAttributes(domain, service, entity.attributes)
     }
   };
@@ -127,7 +128,9 @@ const blacklistedEntities = [
   /.*sonos_beam.*/i,
   // washer/dryer
   "washer_power",
-  "dryer_power"
+  "dryer_power",
+  // water pump
+  "switch.plant_water_pump_switch"
 ];
 const message = msg;
 const entities = message.payload.filter((e) => {
@@ -136,38 +139,14 @@ const entities = message.payload.filter((e) => {
   return whitelisted && state !== "unavailable";
 });
 const cachedStates = entities.map(createServiceCall).filter((x) => x !== void 0);
-const activeStates = cachedStates.filter((serviceCall) => {
-  const { domain } = serviceCall;
-  const { state } = serviceCall.data;
-  switch (domain) {
-    case "switch":
-    case "light": {
-      return state === "on";
-    }
-    case "lock": {
-      return state === "unlocked";
-    }
-    case "cover": {
-      return state === "open";
-    }
-    case "climate": {
-      return state !== "off";
-    }
-    case "fan": {
-      return state !== "off";
-    }
-    case "media_player": {
-      return state !== "off" || state !== "standby";
-    }
-  }
-  return true;
-});
 cachedStates.forEach((x) => {
   delete x.data.state;
 });
-const awayPayload = activeStates.map((serviceCall) => {
-  const { domain } = serviceCall;
-  const { entity_id } = serviceCall.data;
+const awayPayload = cachedStates.map((serviceCall) => {
+  const {
+    domain,
+    data: { entity_id }
+  } = serviceCall;
   const payload = { domain, data: { entity_id } };
   switch (domain) {
     case "switch":

@@ -90,7 +90,7 @@ function getFiles(dir: string, recursive: boolean): string[] {
     return files;
 }
 
-function createViteConfig(inputFile: string) {
+function createViteConfig(inputFile: string, outputDir: string) {
     const name = path.relative(inputDir, inputFile).replace(/\.ts$/, "");
 
     console.log(chalk.magenta(`Building ${name} from ${inputFile}`));
@@ -120,13 +120,23 @@ function createViteConfig(inputFile: string) {
 function buildFiles() {
     if (emptyOutDir) {
         console.log(chalk.red(`Emptying output directory: ${outputDir}`));
-        fs.rmSync(outputDir, { recursive: true, force: true });
+
+        try {
+            fs.rmSync(outputDir, {
+                recursive: true,
+                force: true,
+                maxRetries: 3,
+                retryDelay: 100
+            });
+        } catch (error) {
+            console.error(chalk.red("Failed to empty output directory"), error);
+        }
     }
 
     const files = getFiles(inputDir, recursive);
 
     files.forEach((inputFile) => {
-        const viteConfig = createViteConfig(inputFile);
+        const viteConfig = createViteConfig(inputFile, outputDir);
 
         console.log(chalk.blue("Building..."));
 

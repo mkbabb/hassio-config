@@ -1,4 +1,4 @@
-import { createStatesMap } from "./utils";
+import { createStatesMap } from "../utils/utils";
 
 // @ts-ignore
 const cachedStates: Partial<Hass.Service>[] = global.get("cachedStates") || [];

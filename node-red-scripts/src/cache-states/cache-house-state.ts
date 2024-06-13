@@ -1,4 +1,4 @@
-import { createServiceCall, getEntityDomain, isBlacklisted } from "./utils";
+import { createServiceCall, isBlacklisted } from "../utils/utils";
 
 // Ignore the car, and all grow lights.
 const blacklistedEntities = [
@@ -17,7 +17,9 @@ const blacklistedEntities = [
     /.*sonos_beam.*/i,
     // washer/dryer
     "washer_power",
-    "dryer_power"
+    "dryer_power",
+    // water pump
+    "switch.plant_water_pump_switch"
 ];
 
 //@ts-ignore
@@ -34,46 +36,18 @@ const entities = <Hass.State[]>message.payload.filter((e) => {
 const cachedStates: Partial<Hass.Service>[] = entities
     .map(createServiceCall)
     .filter((x) => x !== undefined);
-
-// We only cache the states we need to - currently active entities, or states.
-const activeStates = cachedStates.filter((serviceCall) => {
-    const { domain } = serviceCall;
-    const { state } = serviceCall.data;
-
-    switch (domain) {
-        case "switch":
-        case "light": {
-            return state === "on";
-        }
-        case "lock": {
-            return state === "unlocked";
-        }
-        case "cover": {
-            return state === "open";
-        }
-        case "climate": {
-            return state !== "off";
-        }
-        case "fan": {
-            return state !== "off";
-        }
-        case "media_player": {
-            return state !== "off" || state !== "standby";
-        }
-    }
-    return true;
-});
-
 cachedStates.forEach((x) => {
     delete x.data.state;
 });
 
 // Creates a set of away states that we'll entry once our away condition is met within hass.
 // For example, we turn off all of the cached lights and switches, and turn on all the fans to low.
-const awayPayload: Partial<Hass.Service>[] = activeStates
+const awayPayload: Partial<Hass.Service>[] = cachedStates
     .map((serviceCall) => {
-        const { domain } = serviceCall;
-        const { entity_id } = serviceCall.data;
+        const {
+            domain,
+            data: { entity_id }
+        } = serviceCall;
 
         const payload = { domain, data: { entity_id } };
 

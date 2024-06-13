@@ -5,6 +5,7 @@ home_status:
         - "just left"
         - "away"
         - "vacation"
+        - "en route"
     initial: "home"
     icon: mdi:home
 

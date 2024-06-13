@@ -95,6 +95,7 @@ const createServiceCall = (entity) => {
     service,
     data: {
       entity_id: entity.entity_id,
+      state: entity.state,
       ...filterAttributes(domain, service, entity.attributes)
     }
   };

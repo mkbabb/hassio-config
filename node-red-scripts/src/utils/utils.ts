@@ -1,10 +1,12 @@
 export function getEntityBasename(entityId: string): string {
     const match = entityId.match(/^.*\.(.*)$/);
+
     return match ? match[1] : entityId;
 }
 
 export function getEntityDomain(entityId: string): string {
     const match = entityId.match(/^(.*)\..*$/);
+
     return match ? match[1] : entityId;
 }
 
@@ -23,25 +25,28 @@ export function normalizeTime(time: string): string {
     return `${hours}:${mins}:${seconds}`;
 }
 
+export function dateToTimeString(date: Date): string {
+    return date.toTimeString().split(" ")[0];
+}
+
+export function timeStringToDate(time: string): Date {
+    time = normalizeTime(time);
+    let [hours, mins, seconds] = getTimeComponents(time);
+
+    let date = new Date();
+    date.setHours(hours);
+    date.setMinutes(mins);
+    date.setSeconds(seconds);
+
+    return date;
+}
+
 export function extractTimeFromPayload(
     entityId: string,
     payload: Hass.State[]
 ): string {
     const entity = payload.find((item) => item.entity_id === entityId);
     return entity ? normalizeTime(entity.state) : "00:00:00";
-}
-
-export function subtractMinutes(time: string, minutes: number): string {
-    let date = new Date();
-
-    let [hours, mins, seconds] = getTimeComponents(time);
-
-    // subtracting minutes
-    date.setHours(hours);
-    date.setMinutes(mins - minutes);
-    date.setSeconds(seconds);
-
-    return date.toTimeString().split(" ")[0];
 }
 
 export function getTimeString(): string {
@@ -203,7 +208,7 @@ export const createServiceCall = (entity: Hass.State) => {
         service: service,
         data: {
             entity_id: entity.entity_id,
-
+            state: entity.state,
             ...filterAttributes(domain, service, entity.attributes)
         }
     };
