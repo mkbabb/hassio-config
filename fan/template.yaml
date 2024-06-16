@@ -1,0 +1,64 @@
+# - platform: template
+#   fans:
+#       guest_bedroom_dyson_fan:
+#       friendly_name: "Guest Bedroom Dyson Fan"
+#       unique_id: guest_bedroom_dyson_fan
+#       value_template:
+#           "{{ (states('input_text.guest_bedroom_dyson_fan_state') | from_json).state ==
+#           'on' }}"
+#       percentage_template:
+#           "{{ ((states('input_text.guest_bedroom_dyson_fan_state') | from_json).speed |
+#           int) * 10 }}"
+#       preset_mode_template:
+#           "{{ (states('input_text.guest_bedroom_dyson_fan_state') |
+#           from_json).preset_mode }}"
+#       oscillating_template:
+#           "{{ (states('input_text.guest_bedroom_dyson_fan_state') |
+#           from_json).oscillation == 'on' }}"
+#       turn_on:
+#           - service: rest_command.remote_fan_command
+#             data_template:
+#                 service: "turn_on"
+#                 controller_id: "remote.office_rm4_mini"
+#                 device: "Guest Bedroom Dyson Fan"
+#                 entity_id: "fan.guest_bedroom_dyson_fan"
+#                 state: "on"
+#       turn_off:
+#           - service: rest_command.remote_fan_command
+#             data_template:
+#                 service: "turn_off"
+#                 controller_id: "remote.office_rm4_mini"
+#                 device: "Guest Bedroom Dyson Fan"
+#                 entity_id: "fan.guest_bedroom_dyson_fan"
+#                 state: "off"
+#       set_percentage:
+#           - service: rest_command.remote_fan_command
+#             data_template:
+#                 service: "set_speed"
+#                 controller_id: "remote.office_rm4_mini"
+#                 device: "Guest Bedroom Dyson Fan"
+#                 entity_id: "fan.guest_bedroom_dyson_fan"
+#                 state: "on"
+#                 speed: "{{ (percentage / 10) | int }}"
+#       set_preset_mode:
+#           - service: rest_command.remote_fan_command
+#             data_template:
+#                 service: "set_preset_mode"
+#                 controller_id: "remote.office_rm4_mini"
+#                 device: "Guest Bedroom Dyson Fan"
+#                 entity_id: "fan.guest_bedroom_dyson_fan"
+#                 preset_mode: "{{ preset_mode }}"
+#       set_oscillating:
+#           - service: rest_command.remote_fan_command
+#             data_template:
+#                 service: "set_oscillating"
+#                 controller_id: "remote.office_rm4_mini"
+#                 device: "Guest Bedroom Dyson Fan"
+#                 entity_id: "fan.guest_bedroom_dyson_fan"
+#                 oscillation: "{{ oscillating }}"
+#       preset_modes:
+#           - "off"
+#           - "low"
+#           - "medium"
+#           - "high"
+#       speed_count: 10

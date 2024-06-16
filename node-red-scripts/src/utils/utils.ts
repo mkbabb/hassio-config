@@ -223,7 +223,11 @@ export const createServiceCall = (entity: Hass.State) => {
 export const createStatesMap = (
     states: Partial<Hass.Service>[]
 ): Map<string, Partial<Hass.Service>> => {
-    return new Map(states.map((state) => [state.data.entity_id, state]));
+    return new Map(
+        states
+            .filter((state) => state?.data?.entity_id != undefined)
+            .map((state) => [state.data.entity_id, state])
+    );
 };
 
 export function mapRange(

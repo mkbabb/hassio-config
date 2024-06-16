@@ -2,34 +2,28 @@ plant_schedule_start:
     name: Plant Schedule Start
     has_date: false
     has_time: true
-    initial: "05:00"
 
 plant_schedule_end:
     name: Plant Schedule End
     has_date: false
     has_time: true
-    initial: "23:00"
 
 weekday_wakeup:
     name: "Weekday Wakeup Time"
     has_date: false
     has_time: true
-    initial: "09:00"
 
 weekday_sleep:
     name: "Weekday Sleep Time"
     has_date: false
     has_time: true
-    initial: "00:00"
 
 weekend_wakeup:
     name: "Weekend Wakeup Time"
     has_date: false
     has_time: true
-    initial: "11:00"
 
 weekend_sleep:
     name: "Weekend Sleep Time"
     has_date: false
     has_time: true
-    initial: "00:00"

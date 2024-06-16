@@ -6,7 +6,6 @@ home_status:
         - "away"
         - "vacation"
         - "en route"
-    initial: "home"
     icon: mdi:home
 
 day_status:
@@ -14,5 +13,4 @@ day_status:
     options:
         - "day"
         - "night"
-    initial: "day"
     icon: mdi:weather-sunset-up

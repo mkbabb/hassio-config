@@ -1,37 +1,7 @@
-/* Example template payload:
-msg.payload = {
-           "service": "turn_on",
-           "target": {
-            "controller_id": "{{ controller_id }}",
-            "device": "{{ device }}",
-            "entity_id": "{{ entity_id }}"
-            "entity_attributes_id": "{{ entity_attributes_id }}"
-          },
-          "data": {
-            "state": "{{ state | default('') }}",
-            "color_mode": "{{ color_mode | default('') }}",
-            "white_value": "{{ white_value | default('') }}",
-            "brightness_pct": "{{ brightness_pct | default('') }}",
-            "color_temp": "{{ color_temp | default('') }}",
-            "hs_color": "{{ hs_color | default('') }}",
-            "rgb_color": "{{ rgb_color | default('') }}",
-            "effect": "{{ effect | default('') }}",
-            "transition": "{{ transition | default('') }}"
-        }
-        "entity_state": {
-            "state": "on",
-            "brightness": 0.5,
-        },
-        "entity_attributes": {
-            "brightness_levels": 5, 
-            "supports_rgb": false, 
-            "supports_color_temp": false,
-        }
-}
-*/
-import { mapRange } from "../utils/utils";
+import { mapRange } from "../../utils/utils";
+import { DEFAULT_REMOTE_DATA, LightCommand } from "./constants";
 
-function createOnServiceCall(target, inputData, currentState) {
+function createOnServiceCall(target, inputData, currentState, attributes) {
     const { controller_id, device } = target;
 
     const MIN_BRIGHTNESS = 0;
@@ -40,8 +10,7 @@ function createOnServiceCall(target, inputData, currentState) {
     const MIN_BRIGHTNESS_LEVELS = 1;
     const MAX_BRIGHTNESS_LEVELS =
         // @ts-ignore
-        parseFloat(msg.payload.entity_attributes.brightness_levels) ??
-        MIN_BRIGHTNESS_LEVELS;
+        parseFloat(attributes.brightness_levels) ?? MIN_BRIGHTNESS_LEVELS;
 
     const mappedInputBrightness = mapRange(
         parseFloat(inputData.brightness_pct) ?? 0,
@@ -53,7 +22,7 @@ function createOnServiceCall(target, inputData, currentState) {
 
     // if brightness is at the minimum level, we want to turn off the light
     if (mappedInputBrightness === MIN_BRIGHTNESS_LEVELS) {
-        return createOffServiceCall(target, inputData, currentState);
+        return createOffServiceCall(target, inputData, currentState, attributes);
     }
 
     const reverseMappedInputBrightness = mapRange(
@@ -74,22 +43,19 @@ function createOnServiceCall(target, inputData, currentState) {
         MAX_BRIGHTNESS_LEVELS
     );
 
-    let calls = [];
-
+    let serviceCalls = [];
     // if the current brightness is 0, then we need to add a call to turn on the light
     if (currentState.brightness === 0 || currentState.state === "off") {
-        calls.push({
+        serviceCalls.push({
             service: "send_command",
             domain: "remote",
             target: {
                 entity_id: controller_id
             },
             data: {
-                num_repeats: 1,
-                delay_secs: 0.4,
-                hold_secs: 0.1,
+                ...DEFAULT_REMOTE_DATA,
                 device,
-                command: "turn on"
+                command: LightCommand.TURN_ON
             }
         });
     }
@@ -99,30 +65,29 @@ function createOnServiceCall(target, inputData, currentState) {
 
     // if it's negative, we want to decrease the brightness
     const brightnessDirection =
-        brightnessDelta < 0 ? "brightness down" : "brightness up";
+        brightnessDelta < 0 ? LightCommand.BRIGHTNESS_DOWN : LightCommand.BRIGHTNESS_UP;
 
     currentState.state = "on";
     currentState.brightness = reverseMappedInputBrightness;
 
-    calls.push({
+    serviceCalls.push({
         service: "send_command",
         domain: "remote",
         target: {
             entity_id: controller_id
         },
         data: {
+            ...DEFAULT_REMOTE_DATA,
             num_repeats: Math.abs(brightnessDelta),
-            delay_secs: 0.4,
-            hold_secs: 0.1,
             device,
             command: brightnessDirection
         }
     });
 
-    return calls;
+    return serviceCalls;
 }
 
-function createOffServiceCall(target, inputData, currentState) {
+function createOffServiceCall(target, inputData, currentState, attributes) {
     const { controller_id, device } = target;
 
     currentState.state = "off";
@@ -139,41 +104,25 @@ function createOffServiceCall(target, inputData, currentState) {
                 delay_secs: 0.4,
                 hold_secs: 0.1,
                 device,
-                command: "turn off"
+                command: LightCommand.TURN_OFF
             }
         }
     ];
 }
 
-//@ts-ignore
-msg.payload.entity_attributes = JSON.parse(msg.payload.entity_attributes);
-//@ts-ignore
-msg.payload.entity_state = JSON.parse(msg.payload.entity_state);
-
-//@ts-ignore
-const service = msg.payload.service;
-
-//@ts-ignore
-const currentState = msg.payload.entity_state;
-//@ts-ignore
-const inputData = msg.payload.data;
-//@ts-ignore
-const target = msg.payload.target;
-
-const serviceCalls = (() => {
+export function createServiceCall(
+    service,
+    target,
+    inputData,
+    currentState,
+    attributes
+) {
     switch (service) {
         case "turn_on":
-            return createOnServiceCall(target, inputData, currentState);
+            return createOnServiceCall(target, inputData, currentState, attributes);
         case "turn_off":
-            return createOffServiceCall(target, inputData, currentState);
+            return createOffServiceCall(target, inputData, currentState, attributes);
         default:
             return undefined;
     }
-})();
-
-// @ts-ignore
-msg.payload = serviceCalls;
-// @ts-ignore
-msg.entity_state = JSON.stringify(currentState);
-// @ts-ignore
-msg.entity_state_id = target.entity_state_id;
+}
