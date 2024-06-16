@@ -1,0 +1,15 @@
+office_monitor_light_attributes:
+    name: Office Monitor Light Attributes
+    initial: >
+        {
+          "brightness_levels": 5,
+          "supports_rgb": false,
+          "supports_color_temp": false
+        }
+office_monitor_light_state:
+    name: Office Monitor Light State
+    initial: >
+        {
+          "brightness": 1,
+          "state": "on"
+        }

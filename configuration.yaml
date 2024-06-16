@@ -5,20 +5,32 @@ group: !include_dir_merge_list group
 
 automation: !include automations.yaml
 
+script: !include scripts.yaml
+
 scene: !include scenes.yaml
 light: !include_dir_merge_list light
 
 input_boolean: !include input_boolean.yaml
 input_datetime: !include input_datetime.yaml
 input_select: !include input_select.yaml
+input_number: !include input_number.yaml
+input_text: !include input_text.yaml
+
+rest_command: !include rest_commands.yaml
 
 binary_sensor: !include binary_sensors.yaml
 
 zone: !include zone.yaml
 
-template: !include template_sensors.yaml
+template: !include template_entities.yaml
 
 frontend:
     themes: !include_dir_merge_named themes
 
 homeassistant: !include customize.yaml
+
+logger:
+    default: info
+    logs:
+        homeassistant.components.rest_command: debug
+        homeassistant.components.rest.data: debug

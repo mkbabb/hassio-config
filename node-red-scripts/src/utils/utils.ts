@@ -123,6 +123,12 @@ const filterAttributes = function (
             if (attributes[colorMode] != undefined) {
                 data[colorMode] = attributes[colorMode];
             }
+            // color mode might also end in _color
+            const colorModeColor = `${colorMode}_color`;
+            if (attributes[colorModeColor] != undefined) {
+                data[colorModeColor] = attributes[colorModeColor];
+            }
+
             lightAttributes.forEach((x) => setIfExists(data, attributes, x));
             break;
         }
@@ -208,7 +214,7 @@ export const createServiceCall = (entity: Hass.State) => {
         service: service,
         data: {
             entity_id: entity.entity_id,
-            state: entity.state,
+            // state: entity.state,
             ...filterAttributes(domain, service, entity.attributes)
         }
     };
@@ -219,3 +225,13 @@ export const createStatesMap = (
 ): Map<string, Partial<Hass.Service>> => {
     return new Map(states.map((state) => [state.data.entity_id, state]));
 };
+
+export function mapRange(
+    value: number,
+    fromMin: number,
+    fromMax: number,
+    toMin: number,
+    toMax: number
+): number {
+    return ((value - fromMin) * (toMax - toMin)) / (fromMax - fromMin) + toMin;
+}

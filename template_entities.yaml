@@ -1,0 +1,39 @@
+- sensor:
+      - name: "Plant Schedule Duration"
+        unit_of_measurement: "hours"
+        state: >
+            {% set start = states('input_datetime.plant_schedule_start') %} {% set end =
+            states('input_datetime.plant_schedule_end') %}
+
+            {% set start_time = strptime(start, '%H:%M:%S') %} {% set end_time =
+            strptime(end, '%H:%M:%S') %}
+
+            {% if end_time < start_time %}
+              {% set end_time = end_time + timedelta(days=1) %}
+            {% endif %}
+
+            {% set duration = (end_time - start_time).total_seconds() / 3600 %}
+
+            {{ duration | round(2) }}
+
+      - name: "Wakeup Time"
+        state: >
+            {% set weekday = now().weekday() %} {% if weekday < 5 %}
+              {{ states('input_datetime.weekday_wakeup') }}
+            {% else %}
+              {{ states('input_datetime.weekend_wakeup') }}
+            {% endif %}
+
+        attributes:
+            friendly_name: "Dynamic Wakeup Time"
+            icon: mdi:alarm
+
+      - name: "Sleep Time"
+        state: >
+            {% set weekday = now().weekday() %} {% if weekday < 5 %} {{
+            states('input_datetime.weekday_sleep') }} {% else %} {{
+            states('input_datetime.weekend_sleep') }} {% endif %}
+
+        attributes:
+            friendly_name: "Dynamic Sleep Time"
+            icon: mdi:alarm

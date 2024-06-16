@@ -139,8 +139,8 @@
       - 114
       - 95
       xy_color:
-      - 0.578
-      - 0.325
+      - 0.578029
+      - 0.324986
       entity_id:
       - light.philips_hue_tv_1_huelight
       - light.philips_hue_tv_2_huelight_2
@@ -148,13 +148,6 @@
       friendly_name: TV Lights
       supported_features: 44
       state: 'on'
-    light.skull_light:
-      supported_color_modes:
-      - onoff
-      color_mode:
-      friendly_name: Skull Light
-      supported_features: 0
-      state: 'off'
     light.laundry_room_light:
       supported_color_modes:
       - onoff
@@ -339,19 +332,19 @@
       state: 'off'
     lock.back_door:
       changed_by: Mike Babb
-      battery_level: 47
+      battery_level: 43
       friendly_name: Back Door
       supported_features: 0
       state: locked
     lock.front_door:
-      changed_by: Manual Lock
-      battery_level: 65
+      changed_by: Mike Babb
+      battery_level: 61
       friendly_name: Front Door
       supported_features: 0
       state: locked
     lock.garage_entry_door:
       changed_by: Mike Babb
-      battery_level: 89
+      battery_level: 88
       friendly_name: Garage Entry Door
       supported_features: 0
       state: locked
@@ -483,6 +476,14 @@
       friendly_name: Garage Door
       supported_features: 15
       state: closed
+    light.office_monitor_light:
+      supported_color_modes:
+      - brightness
+      color_mode: brightness
+      brightness: 3
+      friendly_name: Office Monitor Light
+      supported_features: 0
+      state: 'on'
   icon: mdi:weather-night
   metadata:
     light.kitchen_pendants:
@@ -496,8 +497,6 @@
     light.butterfly_light_2:
       entity_only: true
     light.tv_lights:
-      entity_only: true
-    light.skull_light:
       entity_only: true
     light.laundry_room_light:
       entity_only: true
@@ -546,4 +545,6 @@
     light.butterfly_light_1:
       entity_only: true
     cover.ratgdov25i_4b1c3b_door:
+      entity_only: true
+    light.office_monitor_light:
       entity_only: true

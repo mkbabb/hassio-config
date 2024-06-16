@@ -1,0 +1,25 @@
+remote_light_command:
+    url: "http://localhost:1880/endpoint/remote-light/"
+    method: POST
+    headers:
+        Content-Type: application/json
+    payload: >
+        {
+           "service": "{{ service }}",
+           "target": {
+             "controller_id": "{{ controller_id }}",
+             "device": "{{ device }}",
+             "entity_id": "{{ entity_id }}"
+          },
+          "data": {
+            "state": "{{ state | default('') }}",
+            "color_mode": "{{ color_mode | default('') }}",
+            "white_value": "{{ white_value | default('') }}",
+            "brightness_pct": {{ brightness_pct | default('') }},
+            "color_temp": "{{ color_temp | default('') }}",
+            "hs_color": "{{ hs_color | default('') }}",
+            "rgb_color": "{{ rgb_color | default('') }}",
+            "effect": "{{ effect | default('') }}",
+            "transition": "{{ transition | default('') }}"
+          }
+        }

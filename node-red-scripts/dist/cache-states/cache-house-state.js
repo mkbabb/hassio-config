@@ -36,6 +36,10 @@ const filterAttributes = function(domain, service, attributes) {
       if (attributes[colorMode] != void 0) {
         data[colorMode] = attributes[colorMode];
       }
+      const colorModeColor = `${colorMode}_color`;
+      if (attributes[colorModeColor] != void 0) {
+        data[colorModeColor] = attributes[colorModeColor];
+      }
       lightAttributes.forEach((x) => setIfExists(data, attributes, x));
       break;
     }
@@ -107,7 +111,7 @@ const createServiceCall = (entity) => {
     service,
     data: {
       entity_id: entity.entity_id,
-      state: entity.state,
+      // state: entity.state,
       ...filterAttributes(domain, service, entity.attributes)
     }
   };
@@ -139,9 +143,6 @@ const entities = message.payload.filter((e) => {
   return whitelisted && state !== "unavailable";
 });
 const cachedStates = entities.map(createServiceCall).filter((x) => x !== void 0);
-cachedStates.forEach((x) => {
-  delete x.data.state;
-});
 const awayPayload = cachedStates.map((serviceCall) => {
   const {
     domain,

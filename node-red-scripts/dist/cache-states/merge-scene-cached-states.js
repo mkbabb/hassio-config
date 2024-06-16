@@ -24,6 +24,10 @@ const filterAttributes = function(domain, service, attributes) {
       if (attributes[colorMode] != void 0) {
         data[colorMode] = attributes[colorMode];
       }
+      const colorModeColor = `${colorMode}_color`;
+      if (attributes[colorModeColor] != void 0) {
+        data[colorModeColor] = attributes[colorModeColor];
+      }
       lightAttributes.forEach((x) => setIfExists(data, attributes, x));
       break;
     }
@@ -95,7 +99,7 @@ const createServiceCall = (entity) => {
     service,
     data: {
       entity_id: entity.entity_id,
-      state: entity.state,
+      // state: entity.state,
       ...filterAttributes(domain, service, entity.attributes)
     }
   };

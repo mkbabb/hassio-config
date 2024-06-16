@@ -36,9 +36,6 @@ const entities = <Hass.State[]>message.payload.filter((e) => {
 const cachedStates: Partial<Hass.Service>[] = entities
     .map(createServiceCall)
     .filter((x) => x !== undefined);
-cachedStates.forEach((x) => {
-    delete x.data.state;
-});
 
 // Creates a set of away states that we'll entry once our away condition is met within hass.
 // For example, we turn off all of the cached lights and switches, and turn on all the fans to low.

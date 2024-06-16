@@ -1,33 +1,41 @@
-# # Templates
-# - platform: template
-#   lights:
-#     govee_strip:
-#       friendly_name: "Govee Strip"
-#       turn_on:
-#         service: input_boolean.turn_on
-#         entity_id: input_boolean.govee_strip
-#       turn_off:
-#         service: input_boolean.turn_off
-#         entity_id: input_boolean.govee_strip
-#       set_level:
-#         service: input_number.set_value
-#         data_template:
-#           value: "{{ brightness }}"
-#           entity_id: input_number.govee_strip
-#       temperature_template: "{{states('input_number.govee_temperature_input') | int}}"
-#       set_temperature:
-#         service: input_number.set_value
-#         data_template:
-#           value: "{{ color_temp }}"
-#           entity_id: input_number.govee_temperature_input
-#       color_template: "({{states('input_number.govee_h_input') | int}},
-#         {{states('input_number.govee_s_input') | int}})"
-#       set_color:
-#         - service: input_number.set_value
-#           data_template:
-#             value: "{{ h }}"
-#             entity_id: input_number.govee_h_input
-#         - service: input_number.set_value
-#           data_template:
-#             value: "{{ s }}"
-#             entity_id: input_number.govee_s_input
+- platform: template
+  lights:
+      office_monitor_light:
+          unique_id: office_monitor_light
+          friendly_name: "Office Monitor Light"
+          value_template:
+              "{{ (states('input_text.office_monitor_light_state') | from_json).state ==
+              'on' }}"
+          level_template: >
+              {{
+                ((states('input_text.office_monitor_light_state') |
+              from_json).brightness | float) 
+                * 255.0
+              }}
+          turn_on:
+              - service: rest_command.remote_light_command
+                data_template:
+                    service: "turn_on"
+                    controller_id: "remote.office_rm4_mini"
+                    device: "Office Monitor Light"
+                    entity_id: "light.office_monitor_light"
+                    state: "on"
+                    brightness_pct: "1"
+          turn_off:
+              - service: rest_command.remote_light_command
+                data_template:
+                    service: "turn_off"
+                    controller_id: "remote.office_rm4_mini"
+                    device: "Office Monitor Light"
+                    entity_id: "light.office_monitor_light"
+                    state: "off"
+                    brightness_pct: "0"
+          set_level:
+              - service: rest_command.remote_light_command
+                data_template:
+                    service: "turn_on"
+                    controller_id: "remote.office_rm4_mini"
+                    device: "Office Monitor Light"
+                    entity_id: "light.office_monitor_light"
+                    state: "on"
+                    brightness_pct: "{{ (brightness | int) / 255.0 }}"
