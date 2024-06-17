@@ -30,9 +30,3 @@ frontend:
     themes: !include_dir_merge_named themes
 
 homeassistant: !include customize.yaml
-
-logger:
-    default: info
-    logs:
-        homeassistant.components.rest_command: debug
-        homeassistant.components.rest.data: debug

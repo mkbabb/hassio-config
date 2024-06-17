@@ -1,5 +1,8 @@
+# Hack to modify the zone.home radius
+# Unfortunately, the zone.home entity is not customizable in the UI
+# And you also must include, manually, the persons that are in the zone
 customize:
     zone.home:
-      radius: 40
-      persons:
-        - person.mike
+        radius: 40
+        persons:
+            - person.mike
