@@ -239,3 +239,7 @@ export function mapRange(
 ): number {
     return ((value - fromMin) * (toMax - toMin)) / (fromMax - fromMin) + toMin;
 }
+
+export const parseFloatIfString = (value: string | number): number => {
+    return typeof value === "string" ? parseFloat(value) : value;
+};

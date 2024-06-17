@@ -6,36 +6,54 @@
           value_template:
               "{{ (states('input_text.office_monitor_light_state') | from_json).state ==
               'on' }}"
-          level_template: >
+          level_template: >-
               {{
                 ((states('input_text.office_monitor_light_state') |
               from_json).brightness | float) 
                 * 255.0
               }}
+          temperature_template: >-
+              {{
+                154 + ((
+                (states('input_text.office_monitor_light_state') | from_json).color_temp | float) 
+                * (500 - 154))
+              }}
           turn_on:
               - service: rest_command.remote_light_command
                 data_template:
+                    domain: "light"
                     service: "turn_on"
                     controller_id: "remote.office_rm4_mini"
-                    device: "Office Monitor Light"
+                    device: "office_monitor_light"
                     entity_id: "light.office_monitor_light"
                     state: "on"
-                    brightness_pct: "1"
           turn_off:
               - service: rest_command.remote_light_command
                 data_template:
+                    domain: "light"
                     service: "turn_off"
                     controller_id: "remote.office_rm4_mini"
-                    device: "Office Monitor Light"
+                    device: "office_monitor_light"
                     entity_id: "light.office_monitor_light"
                     state: "off"
-                    brightness_pct: "0"
           set_level:
               - service: rest_command.remote_light_command
                 data_template:
+                    domain: "light"
                     service: "turn_on"
                     controller_id: "remote.office_rm4_mini"
-                    device: "Office Monitor Light"
+                    device: "office_monitor_light"
                     entity_id: "light.office_monitor_light"
                     state: "on"
-                    brightness_pct: "{{ (brightness | int) / 255.0 }}"
+                    brightness_pct: "{{ ((brightness | float) / 255.0) * 100.0 }}"
+          set_temperature:
+              - service: rest_command.remote_light_command
+                data_template:
+                    domain: "light"
+                    service: "turn_on"
+                    controller_id: "remote.office_rm4_mini"
+                    device: "office_monitor_light"
+                    entity_id: "light.office_monitor_light"
+                    state: "on"
+                    color_temp: "{{ color_temp }}"
+

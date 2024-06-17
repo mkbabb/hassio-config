@@ -1,51 +1,57 @@
-import { mapRange } from "../../utils/utils";
-import { DEFAULT_REMOTE_DATA, LightCommand } from "./constants";
+import {
+    DEFAULT_REMOTE_DATA,
+    LightCommand,
+    LightServiceCallPayload,
+    calcPayloadAttributeState
+} from "./utils";
 
-function createOnServiceCall(target, inputData, currentState, attributes) {
-    const { controller_id, device } = target;
-
-    const MIN_BRIGHTNESS = 0;
-    const MAX_BRIGHTNESS = 1;
-
-    const MIN_BRIGHTNESS_LEVELS = 1;
-    const MAX_BRIGHTNESS_LEVELS =
-        // @ts-ignore
-        parseFloat(attributes.brightness_levels) ?? MIN_BRIGHTNESS_LEVELS;
-
-    const mappedInputBrightness = mapRange(
-        parseFloat(inputData.brightness_pct) ?? 0,
-        MIN_BRIGHTNESS,
-        MAX_BRIGHTNESS,
-        MIN_BRIGHTNESS_LEVELS,
-        MAX_BRIGHTNESS_LEVELS
-    );
-
-    // if brightness is at the minimum level, we want to turn off the light
-    if (mappedInputBrightness === MIN_BRIGHTNESS_LEVELS) {
-        return createOffServiceCall(target, inputData, currentState, attributes);
+/* Example template payload:
+{
+    "service": "turn_on",
+    "target": {
+        "controller_id": "{{ controller_id }}",
+        "device": "{{ device }}",
+        "entity_id": "{{ entity_id }}",
+        "entity_attributes_id": "{{ entity_attributes_id }}"
+    },
+    "data": {
+        "state": "{{ state | default('') }}",
+        "color_mode": "{{ color_mode | default('') }}",
+        "white_value": "{{ white_value | default('') }}",
+        "brightness_pct": "{{ brightness_pct | default('') }}",
+        "color_temp": "{{ color_temp | default('') }}",
+        "hs_color": "{{ hs_color | default('') }}",
+        "rgb_color": "{{ rgb_color | default('') }}",
+        "effect": "{{ effect | default('') }}",
+        "transition": "{{ transition | default('') }}"
+    },
+    "entity_state": {
+        "state": "on",
+        "brightness": 0.5
+    },
+    "entity_attributes": {
+        "brightness_levels": 5,
+        "supports_rgb": false,
+        "supports_color_temp": false
     }
+}
+*/
 
-    const reverseMappedInputBrightness = mapRange(
-        mappedInputBrightness,
-        MIN_BRIGHTNESS_LEVELS,
-        MAX_BRIGHTNESS_LEVELS,
-        MIN_BRIGHTNESS,
-        MAX_BRIGHTNESS
-    );
-
-    // Current brightness is NOT mapped by default; default is 1.0
-    const currentBrightness = mapRange(
-        // @ts-ignore
-        currentState.brightness ?? 1,
-        MIN_BRIGHTNESS,
-        MAX_BRIGHTNESS,
-        MIN_BRIGHTNESS_LEVELS,
-        MAX_BRIGHTNESS_LEVELS
-    );
-
+function createOnServiceCall(payload: LightServiceCallPayload) {
     let serviceCalls = [];
-    // if the current brightness is 0, then we need to add a call to turn on the light
-    if (currentState.brightness === 0 || currentState.state === "off") {
+
+    const { controller_id, device } = payload.target;
+    const { entity_state, data } = payload;
+
+    const {
+        currentValue: currentBrightness,
+        reverseMappedInputValue: reverseMappedInputBrightness,
+        delta: brightnessDelta,
+        percentage: brightnessPercentage
+    } = calcPayloadAttributeState(payload, "brightness");
+
+    // if the current brightness is 0 then turn on the light
+    if (currentBrightness === 0 || entity_state.state === "off") {
         serviceCalls.push({
             service: "send_command",
             domain: "remote",
@@ -59,38 +65,80 @@ function createOnServiceCall(target, inputData, currentState, attributes) {
             }
         });
     }
+    // if the percentage is 0, then turn off the light
+    else if (brightnessPercentage === 0) {
+        return createOffServiceCall(payload);
+    }
 
-    // how many levels of brightness we want to change
-    const brightnessDelta = Math.round(mappedInputBrightness - currentBrightness);
+    if (
+        reverseMappedInputBrightness != undefined &&
+        !Number.isNaN(reverseMappedInputBrightness)
+    ) {
+        const brightnessDirection =
+            brightnessDelta > 0
+                ? LightCommand.BRIGHTNESS_UP
+                : LightCommand.BRIGHTNESS_DOWN;
 
-    // if it's negative, we want to decrease the brightness
-    const brightnessDirection =
-        brightnessDelta < 0 ? LightCommand.BRIGHTNESS_DOWN : LightCommand.BRIGHTNESS_UP;
+        entity_state.brightness = reverseMappedInputBrightness;
 
-    currentState.state = "on";
-    currentState.brightness = reverseMappedInputBrightness;
+        serviceCalls.push({
+            service: "send_command",
+            domain: "remote",
+            target: {
+                entity_id: controller_id
+            },
+            data: {
+                ...DEFAULT_REMOTE_DATA,
+                num_repeats: Math.abs(brightnessDelta),
+                device,
+                command: brightnessDirection
+            }
+        });
+    }
 
-    serviceCalls.push({
-        service: "send_command",
-        domain: "remote",
-        target: {
-            entity_id: controller_id
-        },
-        data: {
-            ...DEFAULT_REMOTE_DATA,
-            num_repeats: Math.abs(brightnessDelta),
-            device,
-            command: brightnessDirection
-        }
-    });
+    const {
+        currentValue: currentColorTemp,
+        reverseMappedInputValue: reverseMappedInputColorTemp,
+        delta: colorTempDelta
+    } = calcPayloadAttributeState(payload, "color_temp");
+
+    if (
+        reverseMappedInputColorTemp != undefined &&
+        !Number.isNaN(reverseMappedInputColorTemp)
+    ) {
+        const colorTempDirection =
+            colorTempDelta > 0
+                ? LightCommand.TEMPERATURE_DOWN
+                : LightCommand.TEMPERATURE_UP;
+
+        entity_state.color_temp = reverseMappedInputColorTemp;
+
+        serviceCalls.push({
+            service: "send_command",
+            domain: "remote",
+            target: {
+                entity_id: controller_id
+            },
+            data: {
+                ...DEFAULT_REMOTE_DATA,
+                num_repeats: Math.abs(colorTempDelta),
+                device,
+                command: colorTempDirection
+            }
+        });
+    }
+
+    entity_state.state = "on";
 
     return serviceCalls;
 }
 
-function createOffServiceCall(target, inputData, currentState, attributes) {
-    const { controller_id, device } = target;
+function createOffServiceCall(payload: LightServiceCallPayload) {
+    const { controller_id, device } = payload.target;
 
-    currentState.state = "off";
+    const { entity_state } = payload;
+
+    entity_state.state = "off";
 
     return [
         {
@@ -100,9 +148,7 @@ function createOffServiceCall(target, inputData, currentState, attributes) {
                 entity_id: controller_id
             },
             data: {
-                num_repeats: 1,
-                delay_secs: 0.4,
-                hold_secs: 0.1,
+                ...DEFAULT_REMOTE_DATA,
                 device,
                 command: LightCommand.TURN_OFF
             }
@@ -110,18 +156,28 @@ function createOffServiceCall(target, inputData, currentState, attributes) {
     ];
 }
 
-export function createServiceCall(
-    service,
-    target,
-    inputData,
-    currentState,
-    attributes
-) {
-    switch (service) {
+function createToggleServiceCall(payload: LightServiceCallPayload) {
+    const { entity_state } = payload;
+    const newState = entity_state.state === "off" ? "on" : "off";
+
+    const serviceCall =
+        entity_state.state === "off"
+            ? createOnServiceCall(payload)
+            : createOffServiceCall(payload);
+
+    entity_state.state = newState;
+
+    return serviceCall;
+}
+
+export function createServiceCall(payload: LightServiceCallPayload) {
+    switch (payload.service) {
         case "turn_on":
-            return createOnServiceCall(target, inputData, currentState, attributes);
+            return createOnServiceCall(payload);
         case "turn_off":
-            return createOffServiceCall(target, inputData, currentState, attributes);
+            return createOffServiceCall(payload);
+        case "toggle":
+            return createToggleServiceCall(payload);
         default:
             return undefined;
     }

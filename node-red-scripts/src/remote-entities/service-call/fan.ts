@@ -1,127 +1,254 @@
-// import { mapRange } from "../../utils/utils";
-// import { DEFAULT_REMOTE_DATA, FanCommand } from "./constants";
+import {
+    DEFAULT_REMOTE_DATA,
+    FanCommand,
+    FanServiceCallPayload,
+    calcPayloadAttributeState
+} from "./utils";
 
-// function createOnServiceCall(target, inputData, currentState, attributes) {
-//     const { controller_id, device } = target;
+/* Example template payload:
+{
+    "service": "turn_on",
+    "target": {
+        "controller_id": "{{ controller_id }}",
+        "device": "{{ device }}",
+        "entity_id": "{{ entity_id }}",
+        "entity_attributes_id": "{{ entity_attributes_id }}"
+    },
+    "data": {
+        "state": "{{ state | default('') }}",
+        "percentage": "{{ percentage | default('') }}",
+        "preset_mode": "{{ preset_mode | default('') }}",
+        "direction": "{{ direction | default('') }}",
+        "oscillating": "{{ oscillating | default('') }}",
+    },
+    "entity_state": {
+        "state": "on",
+        "speed": 0.5
+    },
+    "entity_attributes": {
+        "speed_levels": 5
+    }
+}
+*/
+function createOnServiceCall(payload: FanServiceCallPayload) {
+    let serviceCalls = [];
 
-//     const MIN_SPEED = 0;
-//     const MAX_SPEED = 3;
+    const { controller_id, device } = payload.target;
+    const { entity_state } = payload;
 
-//     // const MIN_BRIGHTNESS_LEVELS = 1;
-//     // const MAX_BRIGHTNESS_LEVELS =
-//     //     // @ts-ignore
-//     //     parseFloat(msg.payload.entity_attributes.brightness_levels) ??
-//     //     MIN_BRIGHTNESS_LEVELS;
+    const {
+        currentValue: currentSpeed,
+        reverseMappedInputValue: reverseMappedInputSpeed,
+        delta: speedDelta,
+        percentage: speedPercentage
+    } = calcPayloadAttributeState(payload, "speed");
 
-//     const MIN_SPEED_LEVELS = 1;
-//     const MAX_SPEED_LEVELS = parseFloat(attributes.speed_levels) ?? MIN_SPEED_LEVELS;
+    // if the current speed is 0 then turn on the fan
+    if (currentSpeed === 0 || entity_state.state === "off") {
+        serviceCalls.push({
+            service: "send_command",
+            domain: "remote",
+            target: {
+                entity_id: controller_id
+            },
+            data: {
+                ...DEFAULT_REMOTE_DATA,
+                device,
+                command: FanCommand.TURN_ON
+            }
+        });
+    }
+    // if the percentage is 0, then turn off the fan
+    else if (speedPercentage === 0) {
+        return createOffServiceCall(payload);
+    }
 
-//     const mappedInputSpeed = mapRange(
-//         parseFloat(inputData.speed) ?? 0,
-//         MIN_SPEED,
-//         MAX_SPEED,
-//         MIN_SPEED_LEVELS,
-//         MAX_SPEED_LEVELS
-//     );
+    if (reverseMappedInputSpeed != undefined) {
+        const speedDirection =
+            speedDelta > 0 ? FanCommand.INCREASE_SPEED : FanCommand.DECREASE_SPEED;
 
-//     // if brightness is at the minimum level, we want to turn off the light
-//     if (mappedInputBrightness === MIN_BRIGHTNESS_LEVELS) {
-//         return createOffServiceCall(target, inputData, currentState);
-//     }
+        entity_state.speed = reverseMappedInputSpeed;
 
-//     const reverseMappedInputBrightness = mapRange(
-//         mappedInputBrightness,
-//         MIN_BRIGHTNESS_LEVELS,
-//         MAX_BRIGHTNESS_LEVELS,
-//         MIN_BRIGHTNESS,
-//         MAX_BRIGHTNESS
-//     );
+        serviceCalls.push({
+            service: "send_command",
+            domain: "remote",
+            target: {
+                entity_id: controller_id
+            },
+            data: {
+                ...DEFAULT_REMOTE_DATA,
+                num_repeats: Math.abs(speedDelta),
+                device,
+                command: speedDirection
+            }
+        });
+    }
 
-//     // Current brightness is NOT mapped by default; default is 1.0
-//     const currentBrightness = mapRange(
-//         // @ts-ignore
-//         currentState.brightness ?? 1,
-//         MIN_BRIGHTNESS,
-//         MAX_BRIGHTNESS,
-//         MIN_BRIGHTNESS_LEVELS,
-//         MAX_BRIGHTNESS_LEVELS
-//     );
+    entity_state.state = "on";
 
-//     let calls = [];
+    return serviceCalls;
+}
 
-//     // if the current brightness is 0, then we need to add a call to turn on the light
-//     if (currentState.brightness === 0 || currentState.state === "off") {
-//         calls.push({
-//             service: "send_command",
-//             domain: "remote",
-//             target: {
-//                 entity_id: controller_id
-//             },
-//             data: {
-//                 ...DEFAULT_REMOTE_DATA,
-//                 device,
-//                 command: "turn on"
-//             }
-//         });
-//     }
+function createOffServiceCall(payload: FanServiceCallPayload) {
+    const { controller_id, device } = payload.target;
+    const { entity_state } = payload;
 
-//     // how many levels of brightness we want to change
-//     const brightnessDelta = Math.round(mappedInputBrightness - currentBrightness);
+    entity_state.state = "off";
 
-//     // if it's negative, we want to decrease the brightness
-//     const brightnessDirection =
-//         brightnessDelta < 0 ? "brightness down" : "brightness up";
+    return [
+        {
+            service: "send_command",
+            domain: "remote",
+            target: {
+                entity_id: controller_id
+            },
+            data: {
+                ...DEFAULT_REMOTE_DATA,
+                device,
+                command: FanCommand.TURN_OFF
+            }
+        }
+    ];
+}
 
-//     currentState.state = "on";
-//     currentState.brightness = reverseMappedInputBrightness;
+function createToggleServiceCall(payload: FanServiceCallPayload) {
+    const { entity_state } = payload;
 
-//     calls.push({
-//         service: "send_command",
-//         domain: "remote",
-//         target: {
-//             entity_id: controller_id
-//         },
-//         data: {
-//             ...DEFAULT_REMOTE_DATA,
-//             num_repeats: Math.abs(brightnessDelta),
-//             device,
-//             command: brightnessDirection
-//         }
-//     });
+    const newState = entity_state.state === "off" ? "on" : "off";
 
-//     return calls;
-// }
+    const serviceCall =
+        entity_state.state === "off"
+            ? createOnServiceCall(payload)
+            : createOffServiceCall(payload);
 
-// function createOffServiceCall(target, inputData, currentState) {
-//     const { controller_id, device } = target;
+    entity_state.state = newState;
 
-//     currentState.state = "off";
+    return serviceCall;
+}
 
-//     return [
-//         {
-//             service: "send_command",
-//             domain: "remote",
-//             target: {
-//                 entity_id: controller_id
-//             },
-//             data: {
-//                 num_repeats: 1,
-//                 delay_secs: 0.4,
-//                 hold_secs: 0.1,
-//                 device,
-//                 command: FanCommand.TURN_OFF
-//             }
-//         }
-//     ];
-// }
+function setPresetModeServiceCall(payload: FanServiceCallPayload) {
+    const { controller_id, device } = payload.target;
+    const { data } = payload;
 
-// export function createServiceCall(service, target, inputData, currentState) {
-//     switch (service) {
-//         case "turn_on":
-//             return createOnServiceCall(target, inputData, currentState);
-//         case "turn_off":
-//             return createOffServiceCall(target, inputData, currentState);
-//         default:
-//             return undefined;
-//     }
-// }
+    return [
+        {
+            service: "send_command",
+            domain: "remote",
+            target: {
+                entity_id: controller_id
+            },
+            data: {
+                ...DEFAULT_REMOTE_DATA,
+                device,
+                command: data.preset_mode
+            }
+        }
+    ];
+}
+
+function setDirectionServiceCall(payload: FanServiceCallPayload) {
+    const { controller_id, device } = payload.target;
+    const { data } = payload;
+
+    return [
+        {
+            service: "send_command",
+            domain: "remote",
+            target: {
+                entity_id: controller_id
+            },
+            data: {
+                ...DEFAULT_REMOTE_DATA,
+                device,
+                command: data.direction
+            }
+        }
+    ];
+}
+
+function oscillateServiceCall(payload: FanServiceCallPayload) {
+    const { controller_id, device } = payload.target;
+    const { data, entity_state } = payload;
+
+    entity_state.oscillating = data.oscillating;
+
+    return [
+        {
+            service: "send_command",
+            domain: "remote",
+            target: {
+                entity_id: controller_id
+            },
+            data: {
+                ...DEFAULT_REMOTE_DATA,
+                device,
+                command: data.oscillating
+                    ? FanCommand.OSCILLATE_ON
+                    : FanCommand.OSCILLATE_OFF
+            }
+        }
+    ];
+}
+
+function increaseSpeedServiceCall(payload: FanServiceCallPayload) {
+    const { controller_id, device } = payload.target;
+    const { data } = payload;
+
+    return [
+        {
+            service: "send_command",
+            domain: "remote",
+            target: {
+                entity_id: controller_id
+            },
+            data: {
+                ...DEFAULT_REMOTE_DATA,
+                device,
+                command: FanCommand.INCREASE_SPEED,
+                num_repeats: data.percentage_step
+            }
+        }
+    ];
+}
+
+function decreaseSpeedServiceCall(payload: FanServiceCallPayload) {
+    const { controller_id, device } = payload.target;
+    const { data } = payload;
+
+    return [
+        {
+            service: "send_command",
+            domain: "remote",
+            target: {
+                entity_id: controller_id
+            },
+            data: {
+                ...DEFAULT_REMOTE_DATA,
+                device,
+                command: FanCommand.DECREASE_SPEED,
+                num_repeats: data.percentage_step
+            }
+        }
+    ];
+}
+
+export function createServiceCall(payload: FanServiceCallPayload) {
+    switch (payload.service) {
+        case "turn_on":
+            return createOnServiceCall(payload);
+        case "turn_off":
+            return createOffServiceCall(payload);
+        case "toggle":
+            return createToggleServiceCall(payload);
+        case "set_preset_mode":
+            return setPresetModeServiceCall(payload);
+        case "oscillate":
+            return oscillateServiceCall(payload);
+        case "increase_speed":
+            return increaseSpeedServiceCall(payload);
+        case "decrease_speed":
+            return decreaseSpeedServiceCall(payload);
+        default:
+            return undefined;
+    }
+}

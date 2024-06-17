@@ -1,32 +1,9 @@
 office_monitor_light_attributes:
     name: Office Monitor Light Attributes
-    # initial: >
-    #     {
-    #       "brightness_levels": 5,
-    #       "supports_rgb": false,
-    #       "supports_color_temp": false
-    #     }
 office_monitor_light_state:
     name: Office Monitor Light State
-    # initial: >
-    #     {
-    #       "brightness": 1,
-    #       "state": "on"
-    #     }
+
 guest_bedroom_dyson_fan_attributes:
     name: Guest Bedroom Dyson Fan Attributes
-    initial: >
-        {
-          "speed_levels": 10,
-          "supports_oscillation": true,
-          "supports_preset_mode": true
-        }
 guest_bedroom_dyson_fan_state:
     name: Guest Bedroom Dyson Fan State
-    initial: >
-        {
-            "speed": 1,
-            "state": "on",
-            "oscillation": "off",
-            "preset_mode": "auto"
-        }
