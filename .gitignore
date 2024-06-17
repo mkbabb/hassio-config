@@ -25,6 +25,7 @@ tmp/
 node_modules/
 my_venv/
 __pycache__
+dist/
 
 # secrets
 secrets.yaml
