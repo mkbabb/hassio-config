@@ -2,7 +2,8 @@ import {
     DEFAULT_REMOTE_DATA,
     LightCommand,
     LightServiceCallPayload,
-    calcPayloadAttributeState
+    calcPayloadAttributeState,
+    createResetServiceCall
 } from "./utils";
 
 /* Example template payload:
@@ -76,8 +77,8 @@ function createOnServiceCall(payload: LightServiceCallPayload) {
     ) {
         const brightnessDirection =
             brightnessDelta > 0
-                ? LightCommand.BRIGHTNESS_UP
-                : LightCommand.BRIGHTNESS_DOWN;
+                ? LightCommand.INCREASE_BRIGHTNESS
+                : LightCommand.DECREASE_BRIGHTNESS;
 
         entity_state.brightness = reverseMappedInputBrightness;
 
@@ -108,8 +109,8 @@ function createOnServiceCall(payload: LightServiceCallPayload) {
     ) {
         const colorTempDirection =
             colorTempDelta > 0
-                ? LightCommand.TEMPERATURE_DOWN
-                : LightCommand.TEMPERATURE_UP;
+                ? LightCommand.DECREASE_COLOR_TEMP
+                : LightCommand.INCREASE_COLOR_TEMP;
 
         entity_state.color_temp = reverseMappedInputColorTemp;
 
@@ -178,6 +179,8 @@ export function createServiceCall(payload: LightServiceCallPayload) {
             return createOffServiceCall(payload);
         case "toggle":
             return createToggleServiceCall(payload);
+        case "reset":
+            createResetServiceCall(payload);
         default:
             return undefined;
     }

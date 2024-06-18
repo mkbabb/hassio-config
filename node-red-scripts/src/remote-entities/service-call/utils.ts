@@ -6,27 +6,51 @@ export const DEFAULT_REMOTE_DATA = {
     hold_secs: 0.05
 } as const;
 
-// Make an enum for light commands
-export enum LightCommand {
+export enum OnOffCommand {
     TURN_ON = "turn_on",
     TURN_OFF = "turn_off",
-    BRIGHTNESS_UP = "increase_brightness",
-    BRIGHTNESS_DOWN = "decrease_brightness",
-    TEMPERATURE_UP = "increase_color_temp",
-    TEMPERATURE_DOWN = "decrease_color_temp"
+    TOGGLE = "toggle"
 }
 
+// Make an enum for light commands
+export enum LightCommand {
+    TURN_ON = OnOffCommand.TURN_ON,
+    TURN_OFF = OnOffCommand.TURN_OFF,
+    TOGGLE = OnOffCommand.TOGGLE,
+    INCREASE_BRIGHTNESS = "increase_brightness",
+    DECREASE_BRIGHTNESS = "decrease_brightness",
+    INCREASE_COLOR_TEMP = "increase_color_temp",
+    DECREASE_COLOR_TEMP = "decrease_color_temp",
+    RESET = "reset"
+}
+
+export const LightService = ["turn_on", "turn_off", "toggle", "reset"] as const;
+
 export enum FanCommand {
-    TURN_ON = "turn_on",
-    TURN_OFF = "turn_off",
+    TURN_ON = OnOffCommand.TURN_ON,
+    TURN_OFF = OnOffCommand.TURN_OFF,
+    TOGGLE = OnOffCommand.TOGGLE,
     INCREASE_SPEED = "increase_speed",
     DECREASE_SPEED = "decrease_speed",
     OSCILLATE_ON = "oscillate_on",
     OSCILLATE_OFF = "oscillate_off",
-    SET_PRESET_MODE = "set_preset_mode"
+    SET_PRESET_MODE = "set_preset_mode",
+    SET_DIRECTION = "set_direction",
+    RESET = "reset"
 }
 
-// Base class
+export const FanService = [
+    "turn_on",
+    "turn_off",
+    "toggle",
+    "oscillate",
+    "set_preset_mode",
+    "increase_speed",
+    "decrease_speed",
+    "set_direction",
+    "reset"
+] as const;
+
 export type Target = {
     controller_id: string;
     device: string;
@@ -80,35 +104,14 @@ export type LightAttributes = BaseAttributes & {
     color_temp_levels?: number;
 };
 
+type AttributeStateKeys = keyof LightState | keyof FanState;
+
 // Define DomainType, BaseServiceType, LightServiceType, and FanServiceType as const arrays
 export const DomainType = ["light", "fan"] as const;
-export const BaseServiceType = ["turn_on", "turn_off", "toggle"] as const;
-
-export const LightServiceType = [
-    ...BaseServiceType,
-    "increase_brightness",
-    "decrease_brightness",
-    "increase_temperature",
-    "decrease_temperature"
-] as const;
-
-export const FanServiceType = [
-    ...BaseServiceType,
-    "increase_speed",
-    "decrease_speed",
-    "oscillate",
-    "set_preset_mode"
-] as const;
-
-// Types for DomainType, BaseServiceType, LightServiceType, and FanServiceType
-export type DomainType = (typeof DomainType)[number];
-export type BaseServiceType = (typeof BaseServiceType)[number];
-export type LightServiceType = (typeof LightServiceType)[number];
-export type FanServiceType = (typeof FanServiceType)[number];
 
 // Generic RemoteServiceCallInput
 export type TRemoteServiceCallPayload<TService, TState, TAttributes, TInputData> = {
-    domain: DomainType;
+    domain: (typeof DomainType)[number];
     service: TService;
     target: Target;
     data: Partial<TInputData>;
@@ -118,13 +121,13 @@ export type TRemoteServiceCallPayload<TService, TState, TAttributes, TInputData>
 
 // Specialized RemoteServiceCallInput types
 export type LightServiceCallPayload = TRemoteServiceCallPayload<
-    LightServiceType,
+    (typeof LightService)[number],
     LightState,
     LightAttributes,
     LightInputData
 >;
 export type FanServiceCallPayload = TRemoteServiceCallPayload<
-    FanServiceType,
+    (typeof FanService)[number],
     FanState,
     FanAttributes,
     FanInputData
@@ -185,19 +188,19 @@ function isFanServiceCallPayload(
 
 function getLightPayloadValues(
     payload: LightServiceCallPayload,
-    commandType: "brightness" | "color_temp"
+    attribute: keyof LightState
 ) {
     let maxLevel;
     let currentValue;
     let mappedInputValue;
 
-    if (commandType == "brightness") {
+    if (attribute == "brightness") {
         maxLevel = parseFloatIfString(payload.entity_attributes.brightness_levels);
 
         mappedInputValue = mapInputBrightness(payload, maxLevel);
 
         currentValue = parseFloatIfString(payload.entity_state.brightness);
-    } else if (commandType === "color_temp") {
+    } else if (attribute === "color_temp") {
         maxLevel = parseFloatIfString(payload.entity_attributes.color_temp_levels);
 
         mappedInputValue = parseFloatIfString(payload.data.color_temp);
@@ -216,12 +219,15 @@ function getLightPayloadValues(
     return { maxLevel, currentValue, mappedInputValue };
 }
 
-function getFanPayloadValues(payload: FanServiceCallPayload, commandType: "speed") {
+function getFanPayloadValues(
+    payload: FanServiceCallPayload,
+    attribute: keyof FanState
+) {
     let maxLevel;
     let currentValue;
     let mappedInputValue;
 
-    if (commandType == "speed") {
+    if (attribute == "speed") {
         maxLevel = parseFloatIfString(payload.entity_attributes.speed_levels);
         mappedInputValue = mapRange(
             parseFloatIfString(payload.data.percentage),
@@ -230,7 +236,6 @@ function getFanPayloadValues(payload: FanServiceCallPayload, commandType: "speed
             MIN_LEVEL,
             maxLevel
         );
-        // TODO: check if this mapping is necessary
         currentValue = parseFloatIfString(payload.entity_state.speed);
     }
 
@@ -239,7 +244,7 @@ function getFanPayloadValues(payload: FanServiceCallPayload, commandType: "speed
 
 export function calcPayloadAttributeState(
     payload: ServiceCallPayload,
-    commandType: "brightness" | "color_temp" | "speed"
+    attribute: string
 ) {
     const DEFAULT_PAYLOAD = {
         currentValue: undefined,
@@ -250,9 +255,9 @@ export function calcPayloadAttributeState(
 
     const { maxLevel, currentValue, mappedInputValue } = (() => {
         if (isLightServiceCallPayload(payload)) {
-            return getLightPayloadValues(payload, commandType as any);
+            return getLightPayloadValues(payload, attribute as any);
         } else if (isFanServiceCallPayload(payload)) {
-            return getFanPayloadValues(payload, commandType as any);
+            return getFanPayloadValues(payload, attribute as any);
         }
     })();
 
@@ -287,4 +292,87 @@ export function calcPayloadAttributeState(
         delta,
         percentage
     };
+}
+
+const NUM_REPEATS_FOR_RESET = 10;
+
+function resetAttributeState(
+    payload: ServiceCallPayload,
+    attribute: AttributeStateKeys,
+    command: string
+) {
+    const { controller_id, device } = payload.target;
+    const { entity_state } = payload;
+
+    entity_state[attribute] = 0.0;
+
+    return {
+        service: "send_command",
+        domain: "remote",
+        target: {
+            entity_id: controller_id
+        },
+        data: {
+            ...DEFAULT_REMOTE_DATA,
+            num_repeats: NUM_REPEATS_FOR_RESET,
+            device,
+            command
+        }
+    };
+}
+
+export function createResetServiceCall(payload: ServiceCallPayload) {
+    let serviceCalls = [];
+
+    const { controller_id, device } = payload.target;
+    const { entity_state } = payload;
+
+    if (entity_state.state === "off") {
+        entity_state.state = "on";
+
+        serviceCalls.push({
+            service: "send_command",
+            domain: "remote",
+            target: {
+                entity_id: controller_id
+            },
+            data: {
+                ...DEFAULT_REMOTE_DATA,
+                device,
+                command: "turn_on"
+            }
+        });
+    }
+
+    if (isLightServiceCallPayload(payload)) {
+        const brightnessReset = resetAttributeState(
+            payload,
+            "brightness",
+            LightCommand.DECREASE_BRIGHTNESS
+        );
+        serviceCalls.push(brightnessReset);
+
+        const colorTempReset = resetAttributeState(
+            payload,
+            "color_temp",
+            LightCommand.DECREASE_COLOR_TEMP
+        );
+        serviceCalls.push(colorTempReset);
+    } else if (isFanServiceCallPayload(payload)) {
+        const speedReset = resetAttributeState(
+            payload,
+            "speed",
+            FanCommand.DECREASE_SPEED
+        );
+        serviceCalls.push(speedReset);
+
+        const oscillationReset = resetAttributeState(
+            payload,
+            "oscillating",
+            FanCommand.OSCILLATE_OFF
+        );
+        serviceCalls.push(oscillationReset);
+    }
+
+    return serviceCalls;
 }
