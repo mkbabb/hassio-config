@@ -1,7 +1,7 @@
 import { createServiceCall, createStatesMap } from "../utils/utils";
 
 // @ts-ignore
-const cachedStates: Partial<Hass.Service>[] = global.get("cachedStates") || [];
+const cachedStates: Partial<Hass.Service>[] = global.get("cachedStates") ?? [];
 const cachedStatesMap = createStatesMap(cachedStates);
 
 // @ts-ignore
