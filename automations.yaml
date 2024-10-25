@@ -58,8 +58,8 @@
   mode: single
 
 - id: "hey_lamp_off"
-  alias: "Lamp Flash Before Turn Off"
-  description: "Flashes the lamp before turning it off"
+  alias: "Hey Lamp Off"
+  description: "Flashes the Hey Lamp when toggled off to ensure it's in the right warm color state when turned back on"
   trigger:
   - platform: state
     entity_id: light.hey_lamp
