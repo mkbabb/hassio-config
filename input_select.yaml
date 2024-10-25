@@ -8,6 +8,13 @@ home_status:
         - "en route"
     icon: mdi:home
 
+awake_status:
+    name: Awake Status
+    options:
+        - "awake"
+        - "asleep"
+    icon: mdi:weather-night
+
 day_status:
     name: Day Status
     options:

@@ -37,3 +37,14 @@
         attributes:
             friendly_name: "Dynamic Sleep Time"
             icon: mdi:alarm
+            
+      - name: "Lights Off Percentage"
+        unit_of_measurement: "%"
+        state: >
+            {% set lights = states.light | map(attribute='state') | list %} {% set
+            off_lights = lights | select('eq', 'off') | list %} {% if lights | length ==
+            0 %}
+              0
+            {% else %}
+              {{ (off_lights | length / lights | length * 100) | round(1) }}
+            {% endif %}

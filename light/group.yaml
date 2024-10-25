@@ -2,7 +2,7 @@
   name: Hanging Light
   entities:
       - light.hanging_light_1
-      - light.hanging_light_2
+      # - light.hanging_light_2
       - light.hanging_light_3
 
 - platform: group
@@ -10,6 +10,7 @@
   entities:
       - light.kitchen_pendant_1
       - light.kitchen_pendant_2
+      - light.kitchen_pendant_3
 
 - platform: group
   name: Kitchen Cabinet Lights

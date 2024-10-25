@@ -1,0 +1,13 @@
+- platform: mqtt_room
+  device_id: "fff"
+  name: "ESP fff"
+  state_topic: "espresense/devices/fff"
+  timeout: 10
+  away_timeout: 120
+
+- platform: mqtt_room
+  device_id: "fff_w"
+  name: "ESP fff-w"
+  state_topic: "espresense/devices/fff_w"
+  timeout: 10
+  away_timeout: 120

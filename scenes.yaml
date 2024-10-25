@@ -71,7 +71,6 @@
       - 0.388
       entity_id:
       - light.hanging_light_1
-      - light.hanging_light_2
       - light.hanging_light_3
       icon: mdi:lightbulb-group
       friendly_name: Hanging Light
@@ -100,7 +99,7 @@
       - hs
       effect:
       color_mode: color_temp
-      brightness: 89
+      brightness: 255
       color_temp_kelvin: 1501
       color_temp: 666
       hs_color:
@@ -176,13 +175,6 @@
       friendly_name: 'Master Bedroom Closet Light '
       supported_features: 0
       state: 'off'
-    light.master_bathroom_light_2:
-      supported_color_modes:
-      - onoff
-      color_mode: onoff
-      friendly_name: 'Master Bathroom Light 2 '
-      supported_features: 0
-      state: 'on'
     light.upstairs_hallway_lights:
       supported_color_modes:
       - onoff
@@ -244,11 +236,11 @@
     light.office_ceiling_light:
       supported_color_modes:
       - brightness
-      color_mode: brightness
-      brightness: 46
+      color_mode:
+      brightness:
       friendly_name: 'Office Ceiling Light '
       supported_features: 32
-      state: 'on'
+      state: 'off'
     light.guest_bathroom_light:
       supported_color_modes:
       - onoff
@@ -332,19 +324,19 @@
       state: 'off'
     lock.back_door:
       changed_by: Mike Babb
-      battery_level: 42
+      battery_level: 7
       friendly_name: Back Door
       supported_features: 0
       state: locked
     lock.front_door:
       changed_by: Mike Babb
-      battery_level: 61
+      battery_level: 45
       friendly_name: Front Door
       supported_features: 0
       state: locked
     lock.garage_entry_door:
       changed_by: Mike Babb
-      battery_level: 88
+      battery_level: 69
       friendly_name: Garage Entry Door
       supported_features: 0
       state: locked
@@ -483,23 +475,81 @@
       max_mireds: 500
       supported_color_modes:
       - color_temp
+      color_mode:
+      brightness:
+      color_temp_kelvin:
+      color_temp:
+      hs_color:
+      rgb_color:
+      xy_color:
       friendly_name: Office Monitor Light
       supported_features: 0
+      state: 'off'
+    light.kid_s_theme_desk_light:
+      min_color_temp_kelvin: 1500
+      max_color_temp_kelvin: 9000
+      min_mireds: 111
+      max_mireds: 666
+      effect_list:
+      - effect_colorloop
+      - effect_pulse
+      - effect_stop
+      supported_color_modes:
+      - color_temp
+      - hs
+      effect:
       color_mode: color_temp
-      brightness: 3
-      color_temp_kelvin: 2000
-      color_temp: 500
+      brightness: 110
+      color_temp_kelvin: 2087
+      color_temp: 479
       hs_color:
-      - 30.601
-      - 94.547
+      - 30.228
+      - 90.016
       rgb_color:
       - 255
-      - 136
-      - 13
+      - 141
+      - 25
       xy_color:
-      - 0.599
-      - 0.382
+      - 0.59
+      - 0.386
+      friendly_name: Kid’s Theme Desk Light
+      supported_features: 36
       state: 'on'
+    light.penguin_light:
+      supported_color_modes:
+      - onoff
+      color_mode:
+      friendly_name: Penguin Light
+      supported_features: 0
+      state: 'off'
+    light.ratgdov25i_4b1c3b_light:
+      supported_color_modes:
+      - onoff
+      color_mode:
+      friendly_name: Garage Door Light
+      supported_features: 8
+      state: 'off'
+    light.master_bathroom_chili_pepper_lights:
+      supported_color_modes:
+      - onoff
+      color_mode: onoff
+      friendly_name: Master Bathroom Chili Pepper Lights
+      supported_features: 0
+      state: 'on'
+    light.master_bathroom_light_2:
+      supported_color_modes:
+      - onoff
+      color_mode:
+      friendly_name: 'Master Bathroom Light 2 '
+      supported_features: 0
+      state: 'off'
+    light.hey_lamp:
+      supported_color_modes:
+      - onoff
+      color_mode:
+      friendly_name: Hey Lamp
+      supported_features: 0
+      state: 'off'
   icon: mdi:weather-night
   metadata:
     light.kitchen_pendants:
@@ -521,8 +571,6 @@
     light.master_bathroom_light_1:
       entity_only: true
     light.master_bedroom_closet_light:
-      entity_only: true
-    light.master_bathroom_light_2:
       entity_only: true
     light.upstairs_hallway_lights:
       entity_only: true
@@ -563,4 +611,16 @@
     cover.ratgdov25i_4b1c3b_door:
       entity_only: true
     light.office_monitor_light:
+      entity_only: true
+    light.kid_s_theme_desk_light:
+      entity_only: true
+    light.penguin_light:
+      entity_only: true
+    light.ratgdov25i_4b1c3b_light:
+      entity_only: true
+    light.master_bathroom_chili_pepper_lights:
+      entity_only: true
+    light.master_bathroom_light_2:
+      entity_only: true
+    light.hey_lamp:
       entity_only: true

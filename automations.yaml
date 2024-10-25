@@ -2,57 +2,98 @@
   alias: Downstairs Chili Pepper Lights Gate
   description: ""
   trigger:
-      - platform: state
-        entity_id:
-            - light.downstairs_bathroom_chili_pepper_lights
-        from: "off"
-        to: "on"
-      - platform: state
-        entity_id:
-            - light.downstairs_bathroom_light
-        from: "off"
-        to: "on"
+  - platform: state
+    entity_id:
+    - light.downstairs_bathroom_chili_pepper_lights
+    from: "off"
+    to: "on"
+  - platform: state
+    entity_id:
+    - light.downstairs_bathroom_light
+    from: "off"
+    to: "on"
   condition:
-      - condition: state
-        entity_id: light.downstairs_bathroom_light
-        state: "on"
+  - condition: state
+    entity_id: light.downstairs_bathroom_light
+    state: "on"
   action:
-      - service: light.turn_off
-        metadata: {}
-        data: {}
-        target:
-            entity_id: light.downstairs_bathroom_chili_pepper_lights
+  - service: light.turn_off
+    metadata: {}
+    data: {}
+    target:
+      entity_id: light.downstairs_bathroom_chili_pepper_lights
   mode: single
 
 - id: "nighttime_daytime_mutex"
   alias: Nighttime and Daytime Mutex
   description: Ensure Nighttime and Daytime don't overlap
   trigger:
-      - platform: state
-        entity_id: input_boolean.nighttime
-        to: "on"
-      - platform: state
-        entity_id: input_boolean.daytime
-        to: "on"
+  - platform: state
+    entity_id: input_boolean.nighttime
+    to: "on"
+  - platform: state
+    entity_id: input_boolean.daytime
+    to: "on"
   condition: []
   action:
-      - choose:
-            - conditions:
-                  - condition: state
-                    entity_id: input_boolean.nighttime
-                    state: "on"
-                    for: "00:00:01"
-              sequence:
-                  - service: input_boolean.turn_off
-                    target:
-                        entity_id: input_boolean.daytime
-            - conditions:
-                  - condition: state
-                    entity_id: input_boolean.daytime
-                    state: "on"
-                    for: "00:00:01"
-              sequence:
-                  - service: input_boolean.turn_off
-                    target:
-                        entity_id: input_boolean.nighttime
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: input_boolean.nighttime
+        state: "on"
+        for: "00:00:01"
+      sequence:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.daytime
+    - conditions:
+      - condition: state
+        entity_id: input_boolean.daytime
+        state: "on"
+        for: "00:00:01"
+      sequence:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.nighttime
   mode: single
+
+- id: "hey_lamp_off"
+  alias: "Lamp Flash Before Turn Off"
+  description: "Flashes the lamp before turning it off"
+  trigger:
+  - platform: state
+    entity_id: light.hey_lamp
+    to: "off"
+  condition: []
+  mode: single
+  max_exceeded: silent
+  action:
+  - sequence:
+    # First flash
+    - service: light.turn_off
+      target:
+        entity_id: light.hey_lamp
+    - delay:
+        milliseconds: 500
+    - service: light.turn_on
+      target:
+        entity_id: light.hey_lamp
+    - delay:
+        milliseconds: 500
+
+    # Second flash  
+    - service: light.turn_off
+      target:
+        entity_id: light.hey_lamp
+    - delay:
+        milliseconds: 500
+    - service: light.turn_on
+      target:
+        entity_id: light.hey_lamp
+    - delay:
+        milliseconds: 500
+
+    # Final turn off
+    - service: light.turn_off
+      target:
+        entity_id: light.hey_lamp
