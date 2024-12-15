@@ -221,12 +221,20 @@ export const createServiceCall = (entity: Hass.State) => {
 };
 
 export const serviceToActionCall = (
-    serviceCall: Partial<Hass.Service>
+    call: Partial<Hass.Service> | Partial<Hass.Action>
 ): Partial<Hass.Action> => {
+    // If the service call is already an action, return it as is:
+    // @ts-ignore
+    if (call?.action != null) {
+        return call;
+    }
+
+    const serviceCall = call as Partial<Hass.Service>;
+
     const out = {
         ...serviceCall,
         action: `${serviceCall.domain}.${serviceCall.service}`,
-        
+
         target: {
             entity_id: serviceCall.data.entity_id
         }

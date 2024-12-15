@@ -13,13 +13,11 @@ const entities = <Hass.State[]>message.payload.filter((e) => {
 });
 
 // create the cached state object that will be saved to the global flow.
-const currentStates = entities.map(createServiceCall).filter((x) => x !== undefined);
-
-const cachedStates = groupActions(currentStates.map(serviceToActionCall));
+const cachedStates = entities.map(createServiceCall).filter((x) => x !== undefined);
 
 // Creates a set of away states that we'll entry once our away condition is met within hass.
 // For example, we turn off all of the cached lights and switches, and turn on all the fans to low.
-const awayPayload: Partial<Hass.Service & Hass.Action>[] = currentStates
+const awayPayload: Partial<Hass.Service & Hass.Action>[] = cachedStates
     .map((serviceCall) => {
         const {
             domain,
@@ -72,7 +70,9 @@ const awayPayload: Partial<Hass.Service & Hass.Action>[] = currentStates
     .flat();
 
 message.entities = message.payload;
+
 message.cachedStates = cachedStates;
+
 // the next node will execute this payload.
 message.payload = groupActions(awayPayload);
 

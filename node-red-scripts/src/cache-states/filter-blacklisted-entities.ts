@@ -19,7 +19,9 @@ const blacklistedEntities = [
     "washer_power",
     "dryer_power",
     // water pump
-    "switch.plant_water_pump_switch"
+    "switch.plant_water_pump_switch",
+    // ESPresnce:
+    /espresense_.*/i
 ];
 
 //@ts-ignore
