@@ -31,6 +31,7 @@
       entity_id:
       - light.kitchen_pendant_1
       - light.kitchen_pendant_2
+      - light.kitchen_pendant_3
       icon: mdi:lightbulb-group
       friendly_name: Kitchen Pendants
       supported_features: 36
@@ -79,10 +80,10 @@
     light.couch_lights:
       supported_color_modes:
       - onoff
-      color_mode: onoff
+      color_mode:
       friendly_name: Couch Lights
       supported_features: 0
-      state: 'on'
+      state: 'off'
     light.butterfly_light_2:
       min_color_temp_kelvin: 1500
       max_color_temp_kelvin: 9000
@@ -324,19 +325,19 @@
       state: 'off'
     lock.back_door:
       changed_by: Mike Babb
-      battery_level: 7
+      battery_level: 100
       friendly_name: Back Door
       supported_features: 0
       state: locked
     lock.front_door:
       changed_by: Mike Babb
-      battery_level: 45
+      battery_level: 40
       friendly_name: Front Door
       supported_features: 0
       state: locked
     lock.garage_entry_door:
       changed_by: Mike Babb
-      battery_level: 69
+      battery_level: 64
       friendly_name: Garage Entry Door
       supported_features: 0
       state: locked
@@ -550,6 +551,27 @@
       friendly_name: Hey Lamp
       supported_features: 0
       state: 'off'
+    light.palette_light:
+      supported_color_modes:
+      - onoff
+      color_mode: onoff
+      friendly_name: Palette Light
+      supported_features: 0
+      state: 'on'
+    light.kaiser_light:
+      supported_color_modes:
+      - onoff
+      color_mode:
+      friendly_name: Kaiser Light
+      supported_features: 0
+      state: 'off'
+    light.titanic_light:
+      supported_color_modes:
+      - onoff
+      color_mode: onoff
+      friendly_name: Titanic Light
+      supported_features: 0
+      state: 'on'
   icon: mdi:weather-night
   metadata:
     light.kitchen_pendants:
@@ -623,4 +645,10 @@
     light.master_bathroom_light_2:
       entity_only: true
     light.hey_lamp:
+      entity_only: true
+    light.palette_light:
+      entity_only: true
+    light.kaiser_light:
+      entity_only: true
+    light.titanic_light:
       entity_only: true

@@ -220,6 +220,65 @@ export const createServiceCall = (entity: Hass.State) => {
     };
 };
 
+export const serviceToActionCall = (
+    serviceCall: Partial<Hass.Service>
+): Partial<Hass.Action> => {
+    const out = {
+        ...serviceCall,
+        action: `${serviceCall.domain}.${serviceCall.service}`,
+        
+        target: {
+            entity_id: serviceCall.data.entity_id
+        }
+    };
+
+    // Remove the domain and service fields:
+    delete out.domain;
+    delete out.service;
+
+    return out;
+};
+
+// Groups a series of actions into a single action based on the:
+// - action type
+// - data payload
+// - target entity ids
+export const groupActions = (
+    actions: Partial<Hass.Action>[]
+): Partial<Hass.Action>[] => {
+    const grouped = actions.reduce((acc, cur) => {
+        const { action, data, target } = cur;
+
+        // Remove the "entity_id" field from the data object to avoid duplication:
+        const dataCopy = { ...data };
+        delete dataCopy.entity_id;
+
+        const key = `${action}-${JSON.stringify(dataCopy)}`;
+
+        if (!acc[key]) {
+            acc[key] = {
+                action,
+                data: dataCopy,
+                target: {
+                    entity_id: new Set([target.entity_id])
+                }
+            };
+        } else {
+            acc[key].target.entity_id.add(target.entity_id);
+        }
+
+        return acc;
+    }, {});
+
+    // Reformat the grouped entity ids to an array:
+    // @ts-ignore
+    return Object.values(grouped).map((x) => {
+        // @ts-ignore
+        x.target.entity_id = Array.from(x.target.entity_id);
+        return x;
+    });
+};
+
 export const createStatesMap = (
     states: Partial<Hass.Service>[]
 ): Map<string, Partial<Hass.Service>> => {

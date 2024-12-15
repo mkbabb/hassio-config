@@ -1,4 +1,9 @@
-import { createServiceCall, isBlacklisted } from "../utils/utils";
+import {
+    createServiceCall,
+    isBlacklisted,
+    serviceToActionCall,
+    groupActions
+} from "../utils/utils";
 
 //@ts-ignore
 const message: Hass.Message = msg;
@@ -8,13 +13,13 @@ const entities = <Hass.State[]>message.payload.filter((e) => {
 });
 
 // create the cached state object that will be saved to the global flow.
-const cachedStates: Partial<Hass.Service>[] = entities
-    .map(createServiceCall)
-    .filter((x) => x !== undefined);
+const currentStates = entities.map(createServiceCall).filter((x) => x !== undefined);
+
+const cachedStates = groupActions(currentStates.map(serviceToActionCall));
 
 // Creates a set of away states that we'll entry once our away condition is met within hass.
 // For example, we turn off all of the cached lights and switches, and turn on all the fans to low.
-const awayPayload: Partial<Hass.Service>[] = cachedStates
+const awayPayload: Partial<Hass.Service & Hass.Action>[] = currentStates
     .map((serviceCall) => {
         const {
             domain,
@@ -27,38 +32,49 @@ const awayPayload: Partial<Hass.Service>[] = cachedStates
             case "switch":
             case "light": {
                 payload["service"] = "turn_off";
-                return payload;
+                break;
             }
             case "fan": {
                 payload["service"] = "turn_on";
                 payload.data["percentage"] = 100 / 3;
-                return payload;
+                break;
             }
             case "climate": {
                 payload["service"] = "set_preset_mode";
                 payload.data["preset_mode"] = "away";
-                return payload;
+                break;
             }
             case "lock": {
                 payload["service"] = "lock";
-                return payload;
+                break;
             }
             case "cover": {
                 payload["service"] = "close_cover";
-                return payload;
+                break;
             }
             case "media_player": {
                 payload["service"] = "turn_off";
-                return payload;
+                break;
             }
         }
+
+        // Support the new "action" field, which is the union of "service" and "domain"
+        // @ts-ignore
+        payload["action"] = `${payload.domain}.${payload.service}`; // e.g. "light.turn_off"
+
+        // New "target" field, which supports various ids:
+        payload["target"] = {
+            entity_id: entity_id
+        };
+
+        return payload;
     })
     .flat();
 
 message.entities = message.payload;
 message.cachedStates = cachedStates;
 // the next node will execute this payload.
-message.payload = awayPayload;
+message.payload = groupActions(awayPayload);
 
 //@ts-ignore
 msg = message;

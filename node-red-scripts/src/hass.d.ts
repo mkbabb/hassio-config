@@ -88,6 +88,20 @@ declare namespace Hass {
         [s: string]: any;
     }
 
+    interface Action {
+        action: string;
+        data: {
+            [s: string]: any;
+        };
+        target: {
+            entity_id?: string | string[];
+            device_id?: string | string[];
+            floor_id?: string | string[];
+            area_id?: string | string[];
+            label_id?: string | string[];
+        };
+    }
+
     interface Service {
         domain: string;
         service: string;
