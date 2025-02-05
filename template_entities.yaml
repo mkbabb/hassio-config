@@ -1,50 +1,51 @@
 - sensor:
-      - name: "Plant Schedule Duration"
-        unit_of_measurement: "hours"
-        state: >
-            {% set start = states('input_datetime.plant_schedule_start') %} {% set end =
-            states('input_datetime.plant_schedule_end') %}
+  - name: "Plant Schedule Duration"
+    unit_of_measurement: "hours"
+    state: >
+      {% set start = states('input_datetime.plants_global_schedule_start') %} {% set end = states('input_datetime.plants_global_schedule_end') %}
 
-            {% set start_time = strptime(start, '%H:%M:%S') %} {% set end_time =
-            strptime(end, '%H:%M:%S') %}
+      {% set start_time = strptime(start, '%H:%M:%S') %} {% set end_time = strptime(end, '%H:%M:%S') %}
 
-            {% if end_time < start_time %}
-              {% set end_time = end_time + timedelta(days=1) %}
-            {% endif %}
+      {% if end_time < start_time %}
+        {% set end_time = end_time + timedelta(days=1) %}
+      {% endif %}
 
-            {% set duration = (end_time - start_time).total_seconds() / 3600 %}
+      {% set duration = (end_time - start_time).total_seconds() / 3600 %}
 
-            {{ duration | round(2) }}
+      {{ duration | round(2) }}
 
-      - name: "Wakeup Time"
-        state: >
-            {% set weekday = now().weekday() %} {% if weekday < 5 %}
-              {{ states('input_datetime.weekday_wakeup') }}
-            {% else %}
-              {{ states('input_datetime.weekend_wakeup') }}
-            {% endif %}
+  - name: "Wakeup Time"
+    state: >
+      {% set weekday = now().weekday() %} {% if weekday < 5 %}
+        {{ states('input_datetime.weekday_wakeup') }}
+      {% else %}
+        {{ states('input_datetime.weekend_wakeup') }}
+      {% endif %}
+    # Proxy entities for wake up and sleep times conforming to the plant schedule naming
+    # convention of "plants_bedroom_schedule_start" and "plants_bedroom_schedule_end"
+  - name: "Bedroom Plants Schedule Start"
+    state: "{{ states('input_datetime.weekday_wakeup') }}"
 
-        attributes:
-            friendly_name: "Dynamic Wakeup Time"
-            icon: mdi:alarm
+  - name: "Bedroom Plants Schedule End"
+    state: "{{ states('input_datetime.weekday_sleep') }}"
 
-      - name: "Sleep Time"
-        state: >
-            {% set weekday = now().weekday() %} {% if weekday < 5 %} {{
-            states('input_datetime.weekday_sleep') }} {% else %} {{
-            states('input_datetime.weekend_sleep') }} {% endif %}
+    attributes:
+      friendly_name: "Dynamic Wakeup Time"
+      icon: mdi:alarm
 
-        attributes:
-            friendly_name: "Dynamic Sleep Time"
-            icon: mdi:alarm
-            
-      - name: "Lights Off Percentage"
-        unit_of_measurement: "%"
-        state: >
-            {% set lights = states.light | map(attribute='state') | list %} {% set
-            off_lights = lights | select('eq', 'off') | list %} {% if lights | length ==
-            0 %}
-              0
-            {% else %}
-              {{ (off_lights | length / lights | length * 100) | round(1) }}
-            {% endif %}
+  - name: "Sleep Time"
+    state: >
+      {% set weekday = now().weekday() %} {% if weekday < 5 %} {{ states('input_datetime.weekday_sleep') }} {% else %} {{ states('input_datetime.weekend_sleep') }} {% endif %}
+
+    attributes:
+      friendly_name: "Dynamic Sleep Time"
+      icon: mdi:alarm
+
+  - name: "Lights Off Percentage"
+    unit_of_measurement: "%"
+    state: >
+      {% set lights = states.light | map(attribute='state') | list %} {% set off_lights = lights | select('eq', 'off') | list %} {% if lights | length == 0 %}
+        0
+      {% else %}
+        {{ (off_lights | length / lights | length * 100) | round(1) }}
+      {% endif %}

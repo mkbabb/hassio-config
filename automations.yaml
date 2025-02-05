@@ -1,21 +1,21 @@
-- id: "1716506933201"
+- id: '1716506933201'
   alias: Downstairs Chili Pepper Lights Gate
-  description: ""
+  description: ''
   trigger:
   - platform: state
     entity_id:
     - light.downstairs_bathroom_chili_pepper_lights
-    from: "off"
-    to: "on"
+    from: 'off'
+    to: 'on'
   - platform: state
     entity_id:
     - light.downstairs_bathroom_light
-    from: "off"
-    to: "on"
+    from: 'off'
+    to: 'on'
   condition:
   - condition: state
     entity_id: light.downstairs_bathroom_light
-    state: "on"
+    state: 'on'
   action:
   - service: light.turn_off
     metadata: {}
@@ -23,25 +23,24 @@
     target:
       entity_id: light.downstairs_bathroom_chili_pepper_lights
   mode: single
-
-- id: "nighttime_daytime_mutex"
+- id: nighttime_daytime_mutex
   alias: Nighttime and Daytime Mutex
   description: Ensure Nighttime and Daytime don't overlap
   trigger:
   - platform: state
     entity_id: input_boolean.nighttime
-    to: "on"
+    to: 'on'
   - platform: state
     entity_id: input_boolean.daytime
-    to: "on"
+    to: 'on'
   condition: []
   action:
   - choose:
     - conditions:
       - condition: state
         entity_id: input_boolean.nighttime
-        state: "on"
-        for: "00:00:01"
+        state: 'on'
+        for: 00:00:01
       sequence:
       - service: input_boolean.turn_off
         target:
@@ -49,40 +48,43 @@
     - conditions:
       - condition: state
         entity_id: input_boolean.daytime
-        state: "on"
-        for: "00:00:01"
+        state: 'on'
+        for: 00:00:01
       sequence:
       - service: input_boolean.turn_off
         target:
           entity_id: input_boolean.nighttime
   mode: single
-
-- id: "hey_lamp_on"
-  alias: "Hey Lamp On"
-  description: "Flashes the Hey Lamp when toggled on to ensure it's in the right warm color state"
-  trigger:
-  - platform: state
-    entity_id: light.hey_lamp
-    to: "on"
-  condition: []
+- id: hey_lamp_on
+  alias: Hey Lamp On
+  description: Flashes the Hey Lamp when toggled on to ensure it's in the right warm
+    color state
+  triggers:
+  - entity_id:
+    - light.hey_lamp
+    to: 'on'
+    trigger: state
+    from: 'off'
+  conditions: []
+  actions:
+  - sequence:
+    - target:
+        entity_id: light.hey_lamp
+      action: light.turn_on
+      data: {}
+    - delay:
+        milliseconds: 500
+    - target:
+        entity_id: light.hey_lamp
+      action: light.turn_off
+      data: {}
+    - delay:
+        milliseconds: 500
+    - target:
+        entity_id: light.hey_lamp
+      action: light.turn_on
+      data: {}
+    - delay:
+        milliseconds: 500
   mode: single
   max_exceeded: silent
-  action:
-  - sequence:
-    # First flash
-    - service: light.turn_on
-      target:
-        entity_id: light.hey_lamp
-    - delay:
-        milliseconds: 500
-    - service: light.turn_off
-      target:
-        entity_id: light.hey_lamp
-    - delay:
-        milliseconds: 500
-    # Second flash  
-    - service: light.turn_on
-      target:
-        entity_id: light.hey_lamp
-    - delay:
-        milliseconds: 500

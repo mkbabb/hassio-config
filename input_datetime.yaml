@@ -1,9 +1,9 @@
-plant_schedule_start:
+plants_global_schedule_start:
     name: Plant Schedule Start
     has_date: false
     has_time: true
 
-plant_schedule_end:
+plants_global_schedule_end:
     name: Plant Schedule End
     has_date: false
     has_time: true

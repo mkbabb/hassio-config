@@ -21,8 +21,8 @@
 - platform: group
   name: TV Lights
   entities:
-      - light.philips_hue_tv_1_huelight
-      - light.philips_hue_tv_2_huelight_2
+      - light.playbar_1_huelight
+      - light.playbar_2_huelight
 
 - platform: group
   name: Rose Light

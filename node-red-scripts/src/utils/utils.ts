@@ -34,6 +34,7 @@ export function timeStringToDate(time: string): Date {
     let [hours, mins, seconds] = getTimeComponents(time);
 
     let date = new Date();
+    
     date.setHours(hours);
     date.setMinutes(mins);
     date.setSeconds(seconds);
@@ -41,11 +42,34 @@ export function timeStringToDate(time: string): Date {
     return date;
 }
 
+export function compareTime(
+    time1: Date,
+    time2: Date,
+    withDay: boolean = false
+): number {
+    let t1 = time1.getHours() * 3600 + time1.getMinutes() * 60 + time1.getSeconds();
+    let t2 = time2.getHours() * 3600 + time2.getMinutes() * 60 + time2.getSeconds();
+
+    if (withDay) {
+        t1 += time1.getDate() * 86400;
+        t2 += time2.getDate() * 86400;
+    }
+
+    return t1 === t2 ? 0 : t1 > t2 ? 1 : -1;
+}
+
+export function isTimeInRange(current: Date, start: Date, end: Date): boolean {
+    return (
+        compareTime(current, start, true) >= 0 && compareTime(current, end, true) <= 0
+    );
+}
+
 export function extractTimeFromPayload(
     entityId: string,
     payload: Hass.State[]
 ): string {
     const entity = payload.find((item) => item.entity_id === entityId);
+
     return entity ? normalizeTime(entity.state) : "00:00:00";
 }
 
@@ -67,6 +91,32 @@ export function getTimeString(): string {
 
     return timeObject.toLocaleString(locale, options);
 }
+
+export const deepEqual = (a: any, b: any): boolean => {
+    if (a === b) {
+        return true;
+    }
+
+    if (typeof a !== "object" || typeof b !== "object") {
+        return false;
+    }
+
+    if (Object.keys(a).length !== Object.keys(b).length) {
+        return false;
+    }
+
+    for (const key in a) {
+        if (!(key in b)) {
+            return false;
+        }
+
+        if (!deepEqual(a[key], b[key])) {
+            return false;
+        }
+    }
+
+    return true;
+};
 
 export const setIfExists = (
     to: object,
@@ -220,6 +270,71 @@ export const createServiceCall = (entity: Hass.State) => {
     };
 };
 
+// Converts a service call to state, with data from the service call.
+// turn_on -> on
+// turn_off -> off
+// light.turn_on with brightness 50% -> { state: "on", data: { brightness: 50 } }
+// etc.
+export const mapServiceCallToState = (
+    serviceCall: Hass.Service & Hass.Action
+): Partial<Hass.State> => {
+    const {
+        domain,
+        data: { entity_id }
+    } = serviceCall;
+
+    const service = serviceCall.service || serviceCall.action;
+
+    const serviceData = JSON.parse(JSON.stringify(serviceCall.data));
+
+    // Delete the entity_id field from the data object to avoid duplication:
+    delete serviceData.entity_id;
+
+    switch (domain) {
+        case "light":
+        case "switch":
+        case "fan": {
+            return {
+                entity_id,
+                state: service === "turn_on" ? "on" : "off",
+                attributes: serviceData
+            };
+        }
+        case "media_player": {
+            return {
+                entity_id,
+                state: service === "turn_on" ? "on" : "off",
+                attributes: serviceData
+            };
+        }
+        case "lock": {
+            return {
+                entity_id,
+                state: service === "lock" ? "locked" : "unlocked",
+                attributes: serviceData
+            };
+        }
+        case "cover": {
+            return {
+                entity_id,
+                state: service === "open_cover" ? "open" : "closed",
+                attributes: serviceData
+            };
+        }
+        case "climate": {
+            switch (service) {
+                case "set_preset_mode": {
+                    return {
+                        entity_id,
+                        state: serviceData.preset_mode,
+                        attributes: serviceData
+                    };
+                }
+            }
+        }
+    }
+};
+
 export const serviceToActionCall = (
     call: Partial<Hass.Service> | Partial<Hass.Action>
 ): Partial<Hass.Action> => {
@@ -288,13 +403,37 @@ export const groupActions = (
 };
 
 export const createStatesMap = (
-    states: Partial<Hass.Service>[]
+    states: Partial<Hass.Service>[],
+    basename: boolean = false
 ): Map<string, Partial<Hass.Service>> => {
     return new Map(
         states
             .filter((state) => state?.data?.entity_id != undefined)
-            .map((state) => [state.data.entity_id, state])
+            .map((state) => {
+                const name = basename
+                    ? getEntityBasename(state.data.entity_id)
+                    : state.data.entity_id;
+
+                return [name, state];
+            })
     );
+};
+
+export const createStatesObject = (
+    states: Partial<Hass.State>[],
+    basename: boolean = false
+): Record<string, Partial<Hass.State>> => {
+    // @ts-ignore
+    return states.reduce((acc, state) => {
+        if (state?.entity_id != undefined) {
+            const name = basename
+                ? getEntityBasename(state.entity_id)
+                : state.entity_id;
+
+            acc[name] = state;
+        }
+        return acc;
+    }, {});
 };
 
 export function mapRange(

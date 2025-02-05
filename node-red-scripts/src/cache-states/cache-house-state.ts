@@ -2,18 +2,29 @@ import {
     createServiceCall,
     isBlacklisted,
     serviceToActionCall,
-    groupActions
+    groupActions,
+    mapServiceCallToState,
+    deepEqual
 } from "../utils/utils";
 
 //@ts-ignore
 const message: Hass.Message = msg;
-const entities = <Hass.State[]>message.payload.filter((e) => {
-    const { entity_id, state } = e;
-    return state !== "unavailable";
-});
+const entities: {
+    [key: string]: Hass.State;
+} = message.payload
+    .filter((e) => {
+        const { entity_id, state } = e;
+        return state !== "unavailable";
+    })
+    .reduce((acc, e) => {
+        acc[e.entity_id] = e;
+        return acc;
+    }, {});
 
 // create the cached state object that will be saved to the global flow.
-const cachedStates = entities.map(createServiceCall).filter((x) => x !== undefined);
+const cachedStates = Object.values(entities)
+    .map(createServiceCall)
+    .filter((x) => x !== undefined);
 
 // Creates a set of away states that we'll entry once our away condition is met within hass.
 // For example, we turn off all of the cached lights and switches, and turn on all the fans to low.
@@ -21,6 +32,7 @@ const awayPayload: Partial<Hass.Service & Hass.Action>[] = cachedStates
     .map((serviceCall) => {
         const {
             domain,
+
             data: { entity_id }
         } = serviceCall;
 
@@ -67,9 +79,11 @@ const awayPayload: Partial<Hass.Service & Hass.Action>[] = cachedStates
 
         return payload;
     })
-    .flat();
 
-message.entities = message.payload;
+    .flat()
+    .filter(Boolean);
+
+message.entities = entities;
 
 message.cachedStates = cachedStates;
 
