@@ -23,15 +23,15 @@ function determineEntityStatus(
     }
 
     // Find highest precedence matching schedule
-    const matchingSchedule = schedules
-        .filter((schedule) =>
-            schedule.entities.some((pattern) => pattern.test(entity.entity_id))
-        )
-        .sort((a, b) => b.precedence - a.precedence)[0];
+    const matchingSchedules = schedules.filter((schedule) =>
+        schedule.entities.some((pattern) => pattern.test(entity.entity_id))
+    );
 
-    if (!matchingSchedule) {
+    if (matchingSchedules.length === 0) {
         return null;
     }
+
+    const matchingSchedule = matchingSchedules[0];
 
     return {
         state: isTimeInRange(now, matchingSchedule.start, matchingSchedule.end)
@@ -61,37 +61,39 @@ const entities: Hass.State[] = (
 const scheduleEntities = createStatesObject(msg.schedule_entities, true);
 
 // normalize schedules from msg.schedule_entities:
-const normalizedSchedules: NormalizedSchedule[] = schedules.map((schedule) => {
-    const { name, entities, start, end, precedence } = schedule;
+const normalizedSchedules: NormalizedSchedule[] = schedules
+    .map((schedule) => {
+        const { name, entities, start, end, precedence } = schedule;
 
-    const startOverride = scheduleEntities?.[`${name}_schedule_start`];
-    const endOverride = scheduleEntities?.[`${name}_schedule_end`];
+        const startOverride = scheduleEntities?.[`${name}_schedule_start`];
+        const endOverride = scheduleEntities?.[`${name}_schedule_end`];
 
-    const startTimeString = startOverride ? startOverride.state : start;
-    const endTimeString = endOverride ? endOverride.state : end;
+        const startTimeString = startOverride ? startOverride.state : start;
+        const endTimeString = endOverride ? endOverride.state : end;
 
-    const startTime = timeStringToDate(startTimeString);
-    const endTime = timeStringToDate(endTimeString);
+        const startTime = timeStringToDate(startTimeString);
+        const endTime = timeStringToDate(endTimeString);
 
-    // If the startTime is after the endTime
-    if (compareTime(startTime, endTime) >= 1) {
-        // If the current time is before the endTime, we need to subtract a day from the startTime
-        if (compareTime(now, endTime) < 1) {
-            startTime.setDate(startTime.getDate() - 1);
-        } else {
-            // Otherwise, we need to add a day to the endTime
-            endTime.setDate(endTime.getDate() + 1);
+        // If the startTime is after the endTime
+        if (compareTime(startTime, endTime) >= 1) {
+            // If the current time is before the endTime, we need to subtract a day from the startTime
+            if (compareTime(now, endTime) < 1) {
+                startTime.setDate(startTime.getDate() - 1);
+            } else {
+                // Otherwise, we need to add a day to the endTime
+                endTime.setDate(endTime.getDate() + 1);
+            }
         }
-    }
 
-    return {
-        name,
-        entities: entities.map((entity) => new RegExp(entity)),
-        start: startTime,
-        end: endTime,
-        precedence
-    };
-});
+        return {
+            name,
+            entities: entities.map((entity) => new RegExp(entity)),
+            start: startTime,
+            end: endTime,
+            precedence
+        };
+    })
+    .sort((a, b) => b.precedence - a.precedence);
 
 const serviceActions = entities
     .map((entity) => {
@@ -116,3 +118,5 @@ const serviceActions = entities
 
 // @ts-ignore
 msg.payload = groupActions(serviceActions);
+// @ts-ignore
+msg.actions = serviceActions;

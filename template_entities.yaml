@@ -21,25 +21,16 @@
       {% else %}
         {{ states('input_datetime.weekend_wakeup') }}
       {% endif %}
-    # Proxy entities for wake up and sleep times conforming to the plant schedule naming
-    # convention of "plants_bedroom_schedule_start" and "plants_bedroom_schedule_end"
-  - name: "Bedroom Plants Schedule Start"
-    state: "{{ states('input_datetime.weekday_wakeup') }}"
-
-  - name: "Bedroom Plants Schedule End"
-    state: "{{ states('input_datetime.weekday_sleep') }}"
-
-    attributes:
-      friendly_name: "Dynamic Wakeup Time"
-      icon: mdi:alarm
 
   - name: "Sleep Time"
     state: >
       {% set weekday = now().weekday() %} {% if weekday < 5 %} {{ states('input_datetime.weekday_sleep') }} {% else %} {{ states('input_datetime.weekend_sleep') }} {% endif %}
 
-    attributes:
-      friendly_name: "Dynamic Sleep Time"
-      icon: mdi:alarm
+  - name: "Bedroom Plants Schedule Start"
+    state: "{{ states('input_datetime.weekday_wakeup') }}"
+
+  - name: "Bedroom Plants Schedule End"
+    state: "{{ states('input_datetime.weekday_sleep') }}"
 
   - name: "Lights Off Percentage"
     unit_of_measurement: "%"
