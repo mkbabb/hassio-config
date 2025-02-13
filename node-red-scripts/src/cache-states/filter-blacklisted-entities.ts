@@ -1,4 +1,4 @@
-import { createServiceCall, isBlacklisted } from "../utils/utils";
+import { createServiceCall, isBlacklisted, getEntityDomain } from "../utils/utils";
 
 // Ignore the car, and all grow lights.
 const blacklistedEntities = [
@@ -27,16 +27,36 @@ const blacklistedEntities = [
 //@ts-ignore
 const message: Hass.Message = msg;
 
+const payload = Array.isArray(message.payload) ? message.payload : [message.payload];
+
 //@ts-ignore
 const blacklist = msg.blacklist ?? blacklistedEntities;
+//@ts-ignore
+const domains = msg.domains ?? undefined;
 
-const entities = <Hass.State[]>message.payload.filter((e) => {
-    const { entity_id, state } = e;
+const filterEntity = (e: Hass.State | string) => {
+    // check if the object is an entity, or just an entity_id
+    let entity_id: string;
+    let state: string;
+
+    if (typeof e === "string") {
+        entity_id = e;
+        state = undefined;
+    } else {
+        entity_id = e.entity_id;
+        state = e.state;
+    }
 
     const whitelisted = !isBlacklisted(entity_id, blacklist);
 
-    return whitelisted && state !== "unavailable";
-});
+    const inDomain = domains ? domains.includes(getEntityDomain(entity_id)) : true;
+
+    const isUnavailable = state === "unavailable" || state === "unknown";
+
+    return whitelisted && inDomain && !isUnavailable;
+};
+
+const entities = payload.filter(filterEntity);
 
 // @ts-ignore
 msg.payload = entities;

@@ -34,7 +34,7 @@ export function timeStringToDate(time: string): Date {
     let [hours, mins, seconds] = getTimeComponents(time);
 
     let date = new Date();
-    
+
     date.setHours(hours);
     date.setMinutes(mins);
     date.setSeconds(seconds);
@@ -179,11 +179,22 @@ const filterAttributes = function (
                 data[colorModeColor] = attributes[colorModeColor];
             }
 
+            // If the light is being turned off, we don't need to save the brightness.
+            if (service === "turn_off") {
+                break;
+            }
+
             lightAttributes.forEach((x) => setIfExists(data, attributes, x));
             break;
         }
         case "fan": {
+            // If the fan is being turned off, we don't need to save the percentage.
+            if (service === "turn_off") {
+                break;
+            }
+
             fanAttributes.forEach((x) => setIfExists(data, attributes, x));
+
             break;
         }
         case "climate": {
