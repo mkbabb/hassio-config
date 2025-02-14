@@ -50,3 +50,6 @@ image/
 
 # nest
 nest/
+
+# Build files
+.build-cache.json
