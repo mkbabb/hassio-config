@@ -54,22 +54,23 @@ payload.forEach((entity: Hass.State) => {
 
     schedules.set(basename, { time, cron: createCronEntry(basename, time) });
 
-    const dateTime = timeStringToDate(time);
+    const scheduleTime = timeStringToDate(time);
+
+    // 9
+    // 8:30
+    // 8:45
 
     if (basename.includes("wakeup")) {
-        const offsetTime = new Date(dateTime.getTime());
-        offsetTime.setMinutes(dateTime.getMinutes() - offset);
+        const offsetTime = new Date(scheduleTime.getTime());
+        offsetTime.setMinutes(scheduleTime.getMinutes() - offset);
 
-        // if the offset time is in the past,
-        // set it to the current time, just 30 seconds in the future
-        if (offsetTime.getTime() < now.getTime()) {
-            offsetTime.setMinutes(now.getMinutes());
-            offsetTime.setSeconds(now.getSeconds() + 30);
-        }
-        // but ensure this is still less than the original time
-        if (offsetTime.getTime() >= dateTime.getTime()) {
-            offsetTime.setMinutes(dateTime.getMinutes());
-            offsetTime.setSeconds(dateTime.getSeconds() - 30);
+        // Check if the offset time is in the past
+        // But only if the current time is between the offset time and the schedule time
+        if (
+            now.getTime() >= offsetTime.getTime() &&
+            now.getTime() <= scheduleTime.getTime()
+        ) {
+            offsetTime.setMinutes(now.getMinutes() - scheduleTime.getMinutes());
         }
 
         time = dateToTimeString(offsetTime);
