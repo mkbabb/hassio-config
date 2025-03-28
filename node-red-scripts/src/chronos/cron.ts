@@ -56,10 +56,6 @@ payload.forEach((entity: Hass.State) => {
 
     const scheduleTime = timeStringToDate(time);
 
-    // 9
-    // 8:30
-    // 8:45
-
     if (basename.includes("wakeup")) {
         const offsetTime = new Date(scheduleTime.getTime());
         offsetTime.setMinutes(scheduleTime.getMinutes() - offset);

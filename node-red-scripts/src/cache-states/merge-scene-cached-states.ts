@@ -17,6 +17,7 @@ const sceneStates: Partial<Hass.Service>[] = Object.entries(msg.payload.entities
     })
     .map(createServiceCall)
     .filter((x) => x !== undefined);
+
 const newStatesMap = createStatesMap(sceneStates);
 
 const mergedStatesMap = new Map([...cachedStatesMap, ...newStatesMap]);

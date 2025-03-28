@@ -24,20 +24,20 @@ const schedules: Schedule[] = [
         end: "23:00",
         precedence: 1
     },
-    // {
-    //     name: "bedroom_plants",
-    //     entities: ["(switch|light)\\.(.*bedroom.*grow.*)"],
-    //     start: "09:00",
-    //     end: "23:00",
-    //     precedence: 2
-    // },
-    // {
-    //     name: "hey",
-    //     entities: ["light\.penguin_light"],
-    //     start: "09:00",
-    //     end: "18:45",
-    //     precedence: 3
-    // }
+    {
+        name: "bedroom_plants",
+        entities: ["(switch|light)\\.(.*bedroom.*grow.*)"],
+        start: "09:00",
+        end: "23:00",
+        precedence: 2
+    },
+    {
+        name: "hey",
+        entities: ["light\.penguin_light"],
+        start: "09:00",
+        end: "18:45",
+        precedence: 3
+    }
 ];
 
 // @ts-ignore

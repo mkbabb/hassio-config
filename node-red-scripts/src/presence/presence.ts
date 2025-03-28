@@ -48,6 +48,7 @@ if (flowInfo == null || typeof flowInfo !== "object") {
 }
 
 const lastOn = flowInfo.lastOn ?? NOW;
+const lastOff = flowInfo.lastOff ?? NOW;
 
 // Update the presence state's data entity id with the current state:
 presenceStates[dataEntityId] = payload === "on";
@@ -73,22 +74,23 @@ if (!presenceStateOn) {
 
     const actions = groupActions(offPayload);
 
-    // @ts-ignore
-    msg.payload = actions;
-
     let delay = coolDown;
     // Override the cool down period with the one from the flow info:
     if (flowInfo.coolDown != null) {
         delay = flowInfo.coolDown;
     }
 
-    const minutesDwelled = (NOW - lastOn) / 1000 / 60;
+    const secondsDwelled = (NOW - lastOff) / 1000;
+    const minutesDwelled = secondsDwelled / 60;
     // For every minute dwelled, exponentially increase the cool down period,
     // up to a maximum of 10 minutes:
     delay = Math.min(10 * 60, delay + Math.pow(minutesDwelled, 2));
 
     // @ts-ignore
     msg.delay = delay * 1000; // Convert to milliseconds
+
+    // @ts-ignore
+    msg.payload = actions;
 } else {
     flowInfo.lastOn = NOW;
 
@@ -105,9 +107,6 @@ if (!presenceStateOn) {
 
     const actions = groupActions(onPayload);
 
-    // @ts-ignore
-    msg.payload = actions;
-
     // Check to see if more than 90% of the entities are on:
     const onCount = entities
         .map((e) => {
@@ -121,9 +120,14 @@ if (!presenceStateOn) {
     if (onPercentage >= 0.9) {
         flowInfo.coolDown = coolDown * 3;
     }
+    // @ts-ignore
+    msg.delay = 0;
+
+    // @ts-ignore
+    msg.payload = actions;
 }
 
 // @ts-ignore
 msg.presenceStates = presenceStates;
 // @ts-ignore
-msg.presenceState = presenceStateOn;
+msg.presenceState = presenceStateOn ? "on" : "off";

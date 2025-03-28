@@ -74,8 +74,11 @@ const normalizedSchedules: NormalizedSchedule[] = schedules
         const startTime = timeStringToDate(startTimeString);
         const endTime = timeStringToDate(endTimeString);
 
+        startTime.setDate(now.getDate());
+        endTime.setDate(now.getDate());
+
         // If the startTime is after the endTime
-        if (compareTime(startTime, endTime) >= 1) {
+        if (compareTime(startTime, endTime) >= 0) {
             // If the current time is before the endTime, we need to subtract a day from the startTime
             if (compareTime(now, endTime) < 1) {
                 startTime.setDate(startTime.getDate() - 1);
@@ -83,6 +86,9 @@ const normalizedSchedules: NormalizedSchedule[] = schedules
                 // Otherwise, we need to add a day to the endTime
                 endTime.setDate(endTime.getDate() + 1);
             }
+            // If the current time is after the endTime, we need to add a day to the startTime
+        } else if (compareTime(now, endTime) > 1) {
+            startTime.setDate(startTime.getDate() + 1);
         }
 
         return {
@@ -90,6 +96,16 @@ const normalizedSchedules: NormalizedSchedule[] = schedules
             entities: entities.map((entity) => new RegExp(entity)),
             start: startTime,
             end: endTime,
+            startTime: startTime.toLocaleDateString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false
+            }),
+            endTime: endTime.toLocaleDateString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false
+            }),
             precedence
         };
     })
@@ -120,3 +136,5 @@ const serviceActions = entities
 msg.payload = groupActions(serviceActions);
 // @ts-ignore
 msg.actions = serviceActions;
+// @ts-ignore
+msg.normalizedSchedules = normalizedSchedules;

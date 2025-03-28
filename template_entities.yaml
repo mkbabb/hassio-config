@@ -26,11 +26,31 @@
     state: >
       {% set weekday = now().weekday() %} {% if weekday < 5 %} {{ states('input_datetime.weekday_sleep') }} {% else %} {{ states('input_datetime.weekend_sleep') }} {% endif %}
 
+  - name: "Day Type"
+    state: >
+      {% if now().weekday() >= 5 %}
+        weekend
+      {% else %}
+        weekday
+      {% endif %}
+    icon: >
+      {% if now().weekday() >= 5 %}
+        mdi:calendar-weekend
+      {% else %}
+        mdi:calendar-week
+      {% endif %}
+
+  - name: "Day of Week"
+    state: >
+      {% set days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %} {{ days[now().weekday()] }}
+    icon: >
+      {% set icons = ['mdi:calendar-week', 'mdi:calendar-week', 'mdi:calendar-week', 'mdi:calendar-week', 'mdi:calendar-week', 'mdi:calendar-weekend', 'mdi:calendar-weekend'] %} {{ icons[now().weekday()] }}
+
   - name: "Bedroom Plants Schedule Start"
-    state: "{{ states('input_datetime.weekday_wakeup') }}"
+    state: "{{ states('sensor.wakeup_time') }}"
 
   - name: "Bedroom Plants Schedule End"
-    state: "{{ states('input_datetime.weekday_sleep') }}"
+    state: "{{ states('sensor.sleep_time') }}"
 
   - name: "Lights Off Percentage"
     unit_of_measurement: "%"
