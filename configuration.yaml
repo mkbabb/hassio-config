@@ -12,6 +12,7 @@ scene: !include scenes.yaml
 light: !include_dir_merge_list light
 fan: !include_dir_merge_list fan
 sensor: !include_dir_merge_list sensor
+cover: !include cover.yaml
 
 input_boolean: !include input_boolean.yaml
 input_datetime: !include input_datetime.yaml

@@ -3,7 +3,7 @@ import {
     isBlacklisted,
     serviceToActionCall,
     groupActions,
-    mapServiceCallToState,
+    serviceCallToState,
     deepEqual
 } from "../utils/utils";
 

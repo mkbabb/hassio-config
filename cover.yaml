@@ -1,0 +1,18 @@
+- platform: group
+  name: Front Blinds
+  entities:
+      - cover.front_blinds_1
+      - cover.front_blinds_2
+      
+- platform: group
+  name: Master Bedroom Blinds
+  entities:
+      - cover.master_bedroom_blinds_1
+      - cover.master_bedroom_blinds_2
+      - cover.master_bathroom_blinds
+
+- platform: group
+  name: Bonus Room Blinds
+  entities:
+      - cover.bonus_room_blinds_1
+      - cover.bonus_room_blinds_2

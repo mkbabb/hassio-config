@@ -57,9 +57,12 @@ const presenceStatesValues = Object.values(presenceStates);
 // If they're all off (all false), then the presence state is off (false); if any are on (true), then the presence state is on:
 const presenceStateOn = presenceStatesValues.some(Boolean);
 
+const state = presenceStateOn ? "on" : "off";
+
 // If the state is off, cache the states of the entities:
 if (!presenceStateOn) {
     flowInfo.lastOff = NOW;
+    flowInfo.state = state;
 
     const offPayload: Partial<Hass.Service & Hass.Action>[] = entities.map((e) => {
         const entityId = e.entity_id;
@@ -75,16 +78,18 @@ if (!presenceStateOn) {
     const actions = groupActions(offPayload);
 
     let delay = coolDown;
-    // Override the cool down period with the one from the flow info:
-    if (flowInfo.coolDown != null) {
-        delay = flowInfo.coolDown;
-    }
+    // // Override the cool down period with the one from the flow info:
+    // if (flowInfo.coolDown != null) {
+    //     delay = flowInfo.coolDown;
+    // }
 
-    const secondsDwelled = (NOW - lastOff) / 1000;
-    const minutesDwelled = secondsDwelled / 60;
+    const msDwelled = NOW - lastOn;
+    const secondsDwelled = Math.floor(msDwelled / 1000);
+    const minutesDwelled = Math.floor(secondsDwelled / 60);
+
     // For every minute dwelled, exponentially increase the cool down period,
     // up to a maximum of 10 minutes:
-    delay = Math.min(10 * 60, delay + Math.pow(minutesDwelled, 2));
+    delay = Math.min(10 * 60, delay + Math.pow(minutesDwelled, 2) * 60);
 
     // @ts-ignore
     msg.delay = delay * 1000; // Convert to milliseconds
@@ -93,6 +98,7 @@ if (!presenceStateOn) {
     msg.payload = actions;
 } else {
     flowInfo.lastOn = NOW;
+    flowInfo.state = state;
 
     const onPayload: Partial<Hass.Service & Hass.Action>[] = entities.map((e) => {
         const entityId = e.entity_id;
@@ -107,19 +113,6 @@ if (!presenceStateOn) {
 
     const actions = groupActions(onPayload);
 
-    // Check to see if more than 90% of the entities are on:
-    const onCount = entities
-        .map((e) => {
-            return e.state === "on";
-        })
-        .filter(Boolean).length;
-
-    const onPercentage = onCount / entities.length;
-
-    // If so, set the cool down to 3x within the flow info:
-    if (onPercentage >= 0.9) {
-        flowInfo.coolDown = coolDown * 3;
-    }
     // @ts-ignore
     msg.delay = 0;
 
@@ -130,4 +123,4 @@ if (!presenceStateOn) {
 // @ts-ignore
 msg.presenceStates = presenceStates;
 // @ts-ignore
-msg.presenceState = presenceStateOn ? "on" : "off";
+msg.presenceState = state;

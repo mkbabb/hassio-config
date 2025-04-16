@@ -21,3 +21,10 @@ day_status:
         - "day"
         - "night"
     icon: mdi:weather-sunset-up
+    
+force_day_status:
+    name: Force Day Status
+    options:
+        - "day"
+        - "night"
+    icon: mdi:weather-sunset-up

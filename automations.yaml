@@ -88,3 +88,36 @@
         milliseconds: 500
   mode: single
   max_exceeded: silent
+- id: hey_lamp_on_2
+  alias: Hey Lamp On 2
+  description: Flashes the Hey Lamp when toggled on to ensure it's in the right warm
+    color state
+  triggers:
+  - entity_id:
+    - light.hey_lamp_2_2
+    to: 'on'
+    trigger: state
+    from: 'off'
+  conditions: []
+  actions:
+  - sequence:
+    - target:
+        entity_id: light.hey_lamp_2_2
+      action: light.turn_on
+      data: {}
+    - delay:
+        milliseconds: 500
+    - target:
+        entity_id: light.hey_lamp_2_2
+      action: light.turn_off
+      data: {}
+    - delay:
+        milliseconds: 500
+    - target:
+        entity_id: light.hey_lamp_2_2
+      action: light.turn_on
+      data: {}
+    - delay:
+        milliseconds: 500
+  mode: single
+  max_exceeded: silent

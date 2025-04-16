@@ -2,6 +2,6 @@ import {
     createServiceCall,
     isBlacklisted,
     serviceToActionCall,
-    mapServiceCallToState,
+    serviceCallToState,
     groupActions
 } from "../utils/utils";

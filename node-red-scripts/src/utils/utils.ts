@@ -215,7 +215,7 @@ const filterAttributes = function (
  * @param entity input hass entity.
  * @param domain domain thereof.
  */
-export const mapDomainToService = function (entity: Hass.State, domain: string) {
+export const domainToService = function (entity: Hass.State, domain: string) {
     switch (domain) {
         case "switch":
         case "light":
@@ -264,7 +264,7 @@ export const mapDomainToService = function (entity: Hass.State, domain: string) 
 
 export const createServiceCall = (entity: Hass.State) => {
     const domain = getEntityDomain(entity.entity_id);
-    const service = mapDomainToService(entity, domain);
+    const service = domainToService(entity, domain);
 
     if (!domains.includes(domain) || service === undefined) {
         return undefined;
@@ -286,7 +286,7 @@ export const createServiceCall = (entity: Hass.State) => {
 // turn_off -> off
 // light.turn_on with brightness 50% -> { state: "on", data: { brightness: 50 } }
 // etc.
-export const mapServiceCallToState = (
+export const serviceCallToState = (
     serviceCall: Hass.Service & Hass.Action
 ): Partial<Hass.State> => {
     const {
