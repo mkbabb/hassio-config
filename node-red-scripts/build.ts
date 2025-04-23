@@ -417,7 +417,8 @@ class BuildManager {
                     platform: "node",
                     footer: { js: RETURN_MSG },
                     minify: false,
-                    metafile: true
+                    metafile: true,
+                    target: "es2022"
                 });
 
                 // Store the context for future incremental builds
@@ -457,7 +458,8 @@ class BuildManager {
                     footer: { js: RETURN_MSG },
                     minify: false,
                     metafile: true,
-                    metafileOutputFile: path.join(this.outputDir, `${name}.meta.json`)
+                    metafileOutputFile: path.join(this.outputDir, `${name}.meta.json`),
+                    target: "es2022"
                 });
 
                 // Read metafile manually

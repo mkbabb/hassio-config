@@ -66,7 +66,7 @@ if (!presenceStateOn) {
 
     // Clear the presence states:
     // @ts-ignore
-    flow.set(presenceStatesKey, {});
+    // flow.set(presenceStatesKey, {});
 
     const offPayload: Partial<Hass.Service & Hass.Action>[] = entities.map((e) => {
         const entityId = e.entity_id;
