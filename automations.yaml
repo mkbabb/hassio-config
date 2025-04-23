@@ -94,7 +94,7 @@
     color state
   triggers:
   - entity_id:
-    - light.hey_lamp_2_2
+    - light.dining_room_christmas_lights
     to: 'on'
     trigger: state
     from: 'off'
@@ -102,19 +102,19 @@
   actions:
   - sequence:
     - target:
-        entity_id: light.hey_lamp_2_2
+        entity_id: light.dining_room_christmas_lights
       action: light.turn_on
       data: {}
     - delay:
         milliseconds: 500
     - target:
-        entity_id: light.hey_lamp_2_2
+        entity_id: light.dining_room_christmas_lights
       action: light.turn_off
       data: {}
     - delay:
         milliseconds: 500
     - target:
-        entity_id: light.hey_lamp_2_2
+        entity_id: light.dining_room_christmas_lights
       action: light.turn_on
       data: {}
     - delay:

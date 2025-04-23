@@ -8,19 +8,22 @@
         "watch": "tsx build.ts -i src -o dist -r -w"
     },
     "dependencies": {
-        "@rollup/plugin-commonjs": "^28.0.2",
-        "@rollup/plugin-node-resolve": "^16.0.0",
-        "@types/node": "^22.10.2",
-        "@types/yargs": "^17.0.33",
-        "chalk": "^5.3.0",
-        "chokidar": "^4.0.1",
-        "prettier": "^3.4.2",
-        "tsx": "^4.19.2",
-        "typescript": "^5.7.2",
-        "vite": "^6.0.3",
+        "@rollup/plugin-commonjs": "^28.0.3",
+        "@rollup/plugin-node-resolve": "^16.0.1",
+        "chalk": "^5.4.1",
+        "chokidar": "^4.0.3",
+        "esbuild": "^0.25.3",
+        "prettier": "^3.5.3",
+        "tsx": "^4.19.3",
+        "typescript": "^5.8.3",
+        "vite": "^6.3.2",
         "vite-plugin-commonjs": "^0.10.4",
         "yargs": "^17.7.2"
     },
     "author": "Mike Babb <mike@babb.dev>",
-    "license": "ISC"
+    "license": "ISC",
+    "devDependencies": {
+        "@types/node": "^22.14.1",
+        "@types/yargs": "^17.0.33"
+    }
 }

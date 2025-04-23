@@ -2,7 +2,7 @@
   name: Hanging Light
   entities:
       - light.hanging_light_1
-      # - light.hanging_light_2
+      - light.hanging_light_2
       - light.hanging_light_3
 
 - platform: group

@@ -59,10 +59,14 @@ const presenceStateOn = presenceStatesValues.some(Boolean);
 
 const state = presenceStateOn ? "on" : "off";
 
-// If the state is off, cache the states of the entities:
+// If the state is off:
 if (!presenceStateOn) {
     flowInfo.lastOff = NOW;
     flowInfo.state = state;
+
+    // Clear the presence states:
+    // @ts-ignore
+    flow.set(presenceStatesKey, {});
 
     const offPayload: Partial<Hass.Service & Hass.Action>[] = entities.map((e) => {
         const entityId = e.entity_id;
