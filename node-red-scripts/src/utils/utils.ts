@@ -147,6 +147,55 @@ export const isBlacklisted = (entity_id: string, blacklisted: (string | RegExp)[
     });
 };
 
+// Ignore the car, and all grow lights.
+const BLACKLISTED_ENTITIES = [
+    // car
+    "son_of_toast",
+    // grow lights
+    /.*grow.*/i,
+    // blinds
+    /.*blinds.*/i,
+    // air purifiers
+    /.*air_purifier.*/i,
+    // garage door
+    /switch.ratgdov25i_4b1c3b.*/i,
+    "lock.ratgdov25i_4b1c3b_lock_remotes",
+    // sonos
+    /.*sonos_beam.*/i,
+    // washer/dryer
+    "washer_power",
+    "dryer_power",
+    // water pump
+    "switch.plant_water_pump_switch",
+    // ESPresnce:
+    /espresense_.*/i
+];
+
+export const filterBlacklistedEntity = (
+    e: Hass.State | string,
+    blacklist: (string | RegExp)[] = BLACKLISTED_ENTITIES
+) => {
+    // check if the object is an entity, or just an entity_id
+    let entity_id: string;
+    let state: string;
+
+    if (typeof e === "string") {
+        entity_id = e;
+        state = undefined;
+    } else {
+        entity_id = e.entity_id;
+        state = e.state;
+    }
+
+    const whitelisted = !isBlacklisted(entity_id, blacklist);
+
+    const inDomain = domains ? domains.includes(getEntityDomain(entity_id)) : true;
+
+    const isUnavailable = state === "unavailable" || state === "unknown";
+
+    return whitelisted && inDomain && !isUnavailable;
+};
+
 const lightAttributes = ["brightness"];
 const fanAttributes = ["percentage"];
 const climateAttributes = ["preset_mode"];

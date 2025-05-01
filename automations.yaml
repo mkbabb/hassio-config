@@ -1,6 +1,6 @@
-- id: '1716506933201'
+- id: downstairs_bathroom_chili_pepper_lights_gate
   alias: Downstairs Chili Pepper Lights Gate
-  description: ''
+  description: 'Turns off the downstairs bathroom chili pepper lights when the main light is turned on'
   trigger:
   - platform: state
     entity_id:
@@ -23,37 +23,65 @@
     target:
       entity_id: light.downstairs_bathroom_chili_pepper_lights
   mode: single
-- id: nighttime_daytime_mutex
-  alias: Nighttime and Daytime Mutex
-  description: Ensure Nighttime and Daytime don't overlap
+- id: guest_bathroom_peppa_pig_lights_gate
+  alias: Guest Bathroom Peppa Pig Lights Gate
+  description: 'Turns off the guest bathroom Peppa Pig lights when the main light is turned on'
   trigger:
   - platform: state
-    entity_id: input_boolean.nighttime
+    entity_id:
+    - light.guest_bathroom_peppa_pig_lights
+    from: 'off'
     to: 'on'
   - platform: state
-    entity_id: input_boolean.daytime
+    entity_id:
+    - light.guest_bathroom_light
+    from: 'off'
     to: 'on'
-  condition: []
+  condition:
+  - condition: state
+    entity_id: light.guest_bathroom_light
+    state: 'on'
   action:
-  - choose:
-    - conditions:
+  - service: light.turn_off
+    metadata: {}
+    data: {}
+    target:
+      entity_id: light.guest_bathroom_peppa_pig_lights
+  mode: single
+- id: master_bathroom_chili_pepper_lights_gate
+  alias: Master Bathroom Chili Pepper Lights Gate
+  description: 'Turns off the master bathroom chili pepper lights when either of the main lights are turned on'
+  trigger:
+  - platform: state
+    entity_id:
+    - light.master_bathroom_chili_pepper_lights
+    from: 'off'
+    to: 'on'
+  - platform: state
+    entity_id:
+    - light.master_bathroom_light_1
+    from: 'off'
+    to: 'on'
+  - platform: state
+    entity_id:
+    - light.master_bathroom_light_2
+    from: 'off'
+    to: 'on'
+  condition:
+  - condition: or
+    conditions:
       - condition: state
-        entity_id: input_boolean.nighttime
+        entity_id: light.master_bathroom_light_1
         state: 'on'
-        for: 00:00:01
-      sequence:
-      - service: input_boolean.turn_off
-        target:
-          entity_id: input_boolean.daytime
-    - conditions:
       - condition: state
-        entity_id: input_boolean.daytime
+        entity_id: light.master_bathroom_light_2
         state: 'on'
-        for: 00:00:01
-      sequence:
-      - service: input_boolean.turn_off
-        target:
-          entity_id: input_boolean.nighttime
+  action:
+  - service: light.turn_off
+    metadata: {}
+    data: {}
+    target:
+      entity_id: light.master_bathroom_chili_pepper_lights
   mode: single
 - id: hey_lamp_on
   alias: Hey Lamp On
@@ -73,19 +101,19 @@
       action: light.turn_on
       data: {}
     - delay:
-        milliseconds: 500
+        milliseconds: 200
     - target:
         entity_id: light.hey_lamp
       action: light.turn_off
       data: {}
     - delay:
-        milliseconds: 500
+        milliseconds: 200
     - target:
         entity_id: light.hey_lamp
       action: light.turn_on
       data: {}
     - delay:
-        milliseconds: 500
+        milliseconds: 200
   mode: single
   max_exceeded: silent
 - id: hey_lamp_on_2
@@ -106,18 +134,18 @@
       action: light.turn_on
       data: {}
     - delay:
-        milliseconds: 500
+        milliseconds: 200
     - target:
         entity_id: light.dining_room_christmas_lights
       action: light.turn_off
       data: {}
     - delay:
-        milliseconds: 500
+        milliseconds: 200
     - target:
         entity_id: light.dining_room_christmas_lights
       action: light.turn_on
       data: {}
     - delay:
-        milliseconds: 500
+        milliseconds: 200
   mode: single
   max_exceeded: silent

@@ -1,4 +1,8 @@
-import { groupActions } from "../utils/utils";
+import { groupActions, filterBlacklistedEntity } from "../utils/utils";
+
+const MAX_COOL_DOWN = 30 * 60; // 30 minutes
+
+const DEFAULT_COOL_DOWN = 10 * 60; // 10 minutes
 
 const NOW = Date.now();
 
@@ -17,11 +21,15 @@ const dataEntityId = data.entity_id;
 const topic: string = message.topic ?? dataEntityId;
 
 // Cool down period for the presence in seconds
-const coolDown = message.coolDown ?? 30;
+const coolDown = message.coolDown ?? DEFAULT_COOL_DOWN;
 
 const entities: Hass.State[] = Array.isArray(message.entities)
     ? message.entities
     : [message.entities];
+
+const filteredEntities = entities.filter((e) => {
+    return filterBlacklistedEntity(e);
+});
 
 const cachedStatesKey = `cachedState.${topic}`;
 
@@ -58,73 +66,89 @@ const presenceStatesValues = Object.values(presenceStates);
 const presenceStateOn = presenceStatesValues.some(Boolean);
 
 const state = presenceStateOn ? "on" : "off";
+const prevState = flowInfo.state ?? "off";
 
-// If the state is off:
 if (!presenceStateOn) {
+    // If the state is off:
     flowInfo.lastOff = NOW;
     flowInfo.state = state;
 
-    // Clear the presence states:
-    // @ts-ignore
-    // flow.set(presenceStatesKey, {});
+    const offPayload: Partial<Hass.Service & Hass.Action>[] = filteredEntities.map(
+        (e) => {
+            const entityId = e.entity_id;
 
-    const offPayload: Partial<Hass.Service & Hass.Action>[] = entities.map((e) => {
-        const entityId = e.entity_id;
-
-        return {
-            action: "homeassistant.turn_off",
-            target: {
-                entity_id: entityId
-            }
-        };
-    });
+            return {
+                action: "homeassistant.turn_off",
+                target: {
+                    entity_id: entityId
+                }
+            };
+        }
+    );
 
     const actions = groupActions(offPayload);
 
     let delay = coolDown;
-    // // Override the cool down period with the one from the flow info:
-    // if (flowInfo.coolDown != null) {
-    //     delay = flowInfo.coolDown;
-    // }
 
     const msDwelled = NOW - lastOn;
     const secondsDwelled = Math.floor(msDwelled / 1000);
     const minutesDwelled = Math.floor(secondsDwelled / 60);
 
     // For every minute dwelled, exponentially increase the cool down period,
-    // up to a maximum of 10 minutes:
-    delay = Math.min(10 * 60, delay + Math.pow(minutesDwelled, 2) * 60);
+    // up to a maximum:
+    delay = Math.min(MAX_COOL_DOWN, delay + Math.pow(minutesDwelled, 2) * 60);
+    delay = delay * 1000; // Convert to milliseconds
+
+    // If the previous state was off, then the cool down period is 1:
+    if (prevState === "off") {
+        delay = 1;
+        // Clear the cached state:
+        // @ts-ignore
+        flow.set(presenceStatesKey, {});
+    }
 
     // @ts-ignore
-    msg.delay = delay * 1000; // Convert to milliseconds
-
+    msg.delay = delay;
     // @ts-ignore
     msg.payload = actions;
-} else {
+} else if (presenceStateOn && prevState === "off") {
+    // If the state is on and the previous state was off:
     flowInfo.lastOn = NOW;
     flowInfo.state = state;
 
-    const onPayload: Partial<Hass.Service & Hass.Action>[] = entities.map((e) => {
-        const entityId = e.entity_id;
+    const onPayload: Partial<Hass.Service & Hass.Action>[] = filteredEntities.map(
+        (e) => {
+            const entityId = e.entity_id;
 
-        return {
-            action: "homeassistant.turn_on",
-            target: {
-                entity_id: entityId
-            }
-        };
-    });
+            return {
+                action: "homeassistant.turn_on",
+                target: {
+                    entity_id: entityId
+                }
+            };
+        }
+    );
 
     const actions = groupActions(onPayload);
 
     // @ts-ignore
-    msg.delay = 0;
+    msg.delay = 1;
 
     // @ts-ignore
     msg.payload = actions;
+} else if (presenceStateOn && prevState === "on") {
+    // If the state is on, and the previous state is on, then we don't need to do anything.
+    // Just set the delay to 1, and the payload to null:
+
+    // @ts-ignore
+    msg.delay = 1;
+    // @ts-ignore
+    msg.payload = null;
 }
 
 // @ts-ignore
 msg.presenceStates = presenceStates;
 // @ts-ignore
 msg.presenceState = state;
+
+// @ts-ignore
