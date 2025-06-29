@@ -4,7 +4,35 @@ const MAX_COOL_DOWN = 30 * 60; // 30 minutes
 
 const DEFAULT_COOL_DOWN = 10 * 60; // 10 minutes
 
-const NOW = Date.now();
+const createOnPayload = (entities: Hass.State[]) => {
+    const actions: Partial<Hass.Service & Hass.Action>[] = entities.map((e) => {
+        const entityId = e.entity_id;
+
+        return {
+            action: "homeassistant.turn_on",
+            target: {
+                entity_id: entityId
+            }
+        };
+    });
+
+    return groupActions(actions);
+};
+
+const createOffPayload = (entities: Hass.State[]) => {
+    const actions: Partial<Hass.Service & Hass.Action>[] = entities.map((e) => {
+        const entityId = e.entity_id;
+
+        return {
+            action: "homeassistant.turn_off",
+            target: {
+                entity_id: entityId
+            }
+        };
+    });
+
+    return groupActions(actions);
+};
 
 // @ts-ignore
 const message = msg;
@@ -31,14 +59,12 @@ const filteredEntities = entities.filter((e) => {
     return filterBlacklistedEntity(e);
 });
 
-const cachedStatesKey = `cachedState.${topic}`;
-
 const presenceStatesKey = `presenceStates.${topic}`;
 
 const flowInfoKey = `flowInfo.${topic}`;
 
 // @ts-ignore
-let presenceStates: Record<string, boolean> = flow.get(presenceStatesKey);
+let presenceStates: Record<string, string> = flow.get(presenceStatesKey);
 if (presenceStates == null || typeof presenceStates !== "object") {
     // @ts-ignore
     flow.set(presenceStatesKey, {});
@@ -55,42 +81,56 @@ if (flowInfo == null || typeof flowInfo !== "object") {
     flowInfo = flow.get(flowInfoKey);
 }
 
-const lastOn = flowInfo.lastOn ?? NOW;
-const lastOff = flowInfo.lastOff ?? NOW;
+// Helper function to check if there are pending timers
+const hasPendingTimer = () => {
+    if (!flowInfo.delay || !flowInfo.lastOff) {
+        return false;
+    }
+
+    const timeSinceLastOff = Date.now() - flowInfo.lastOff;
+
+    return timeSinceLastOff < flowInfo.delay;
+};
+
+const lastOn = flowInfo.lastOn ?? Date.now();
 
 // Update the presence state's data entity id with the current state:
-presenceStates[dataEntityId] = payload === "on";
+presenceStates[dataEntityId] = payload;
 
 const presenceStatesValues = Object.values(presenceStates);
-// If they're all off (all false), then the presence state is off (false); if any are on (true), then the presence state is on:
-const presenceStateOn = presenceStatesValues.some(Boolean);
 
-const state = presenceStateOn ? "on" : "off";
+const presenceStateOn = presenceStatesValues.some((state) => {
+    return state === "on";
+});
+
+const presenceStateOff = presenceStatesValues.every((state) => {
+    return state === "off";
+});
+
+const presenceStateUnknown = presenceStatesValues.some((state) => {
+    return state === "unknown";
+});
+
 const prevState = flowInfo.state ?? "off";
 
-if (!presenceStateOn) {
-    // If the state is off:
-    flowInfo.lastOff = NOW;
-    flowInfo.state = state;
+if (presenceStateUnknown) {
+    // If the state is unknown:
+    flowInfo.state = "unknown";
 
-    const offPayload: Partial<Hass.Service & Hass.Action>[] = filteredEntities.map(
-        (e) => {
-            const entityId = e.entity_id;
+    // @ts-ignore
+    msg.delay = 1;
 
-            return {
-                action: "homeassistant.turn_off",
-                target: {
-                    entity_id: entityId
-                }
-            };
-        }
-    );
-
-    const actions = groupActions(offPayload);
+    // @ts-ignore
+    msg.payload = null;
+} else if (presenceStateOff && prevState === "on") {
+    // If the state is off and the previous state was on:
+    flowInfo.lastOff = Date.now();
+    flowInfo.lastOn = null;
+    flowInfo.state = "off";
 
     let delay = coolDown;
 
-    const msDwelled = NOW - lastOn;
+    const msDwelled = Date.now() - lastOn;
     const secondsDwelled = Math.floor(msDwelled / 1000);
     const minutesDwelled = Math.floor(secondsDwelled / 60);
 
@@ -99,49 +139,69 @@ if (!presenceStateOn) {
     delay = Math.min(MAX_COOL_DOWN, delay + Math.pow(minutesDwelled, 2) * 60);
     delay = delay * 1000; // Convert to milliseconds
 
-    // If the previous state was off, then the cool down period is 1:
-    if (prevState === "off") {
-        delay = 1;
-        // Clear the cached state:
-        // @ts-ignore
-        flow.set(presenceStatesKey, {});
-    }
-
     // @ts-ignore
     msg.delay = delay;
+    // Update the flow info with the delay
+    flowInfo.delay = delay;
+
     // @ts-ignore
-    msg.payload = actions;
+    msg.payload = createOffPayload(filteredEntities);
+} else if (presenceStateOff && prevState === "off") {
+    // If the state is off and the previous state was off:
+    // @ts-ignore
+    msg.delay = 1;
+
+    // @ts-ignore
+    msg.payload = null;
+} else if (presenceStateOff && prevState === "unknown") {
+    // If the state is off and the previous state was unknown:
+
+    // Only issue off payload if there are NO pending timers active
+    if (!hasPendingTimer()) {
+        flowInfo.lastOff = Date.now();
+        flowInfo.state = "off";
+
+        // @ts-ignore
+        msg.delay = 1;
+        // Update the flow info with the delay
+        flowInfo.delay = 1;
+
+        // @ts-ignore
+        msg.payload = createOffPayload(filteredEntities);
+    } else {
+        // There's a pending timer, so don't issue off payload
+        // @ts-ignore
+        msg.delay = 1;
+
+        // @ts-ignore
+        msg.payload = null;
+    }
 } else if (presenceStateOn && prevState === "off") {
     // If the state is on and the previous state was off:
-    flowInfo.lastOn = NOW;
-    flowInfo.state = state;
-
-    const onPayload: Partial<Hass.Service & Hass.Action>[] = filteredEntities.map(
-        (e) => {
-            const entityId = e.entity_id;
-
-            return {
-                action: "homeassistant.turn_on",
-                target: {
-                    entity_id: entityId
-                }
-            };
-        }
-    );
-
-    const actions = groupActions(onPayload);
+    flowInfo.lastOn = Date.now();
+    flowInfo.lastOff = null;
+    flowInfo.state = "on";
 
     // @ts-ignore
     msg.delay = 1;
 
     // @ts-ignore
-    msg.payload = actions;
+    msg.payload = createOnPayload(filteredEntities);
 } else if (presenceStateOn && prevState === "on") {
-    // If the state is on, and the previous state is on, then we don't need to do anything.
-    // Just set the delay to 1, and the payload to null:
+    // If the state is on and the previous state was on:
+    flowInfo.lastOn = Date.now();
+    flowInfo.lastOff = null;
+    flowInfo.state = "on";
 
     // @ts-ignore
     msg.delay = 1;
+
+    // @ts-ignore
+    msg.payload = null;
+} else {
+    // @ts-ignore
+    msg.delay = 1;
+
     // @ts-ignore
     msg.payload = null;
 }
@@ -149,6 +209,6 @@ if (!presenceStateOn) {
 // @ts-ignore
 msg.presenceStates = presenceStates;
 // @ts-ignore
-msg.presenceState = state;
-
+msg.presenceState = flowInfo.state;
 // @ts-ignore
+msg.flowInfo = flowInfo;

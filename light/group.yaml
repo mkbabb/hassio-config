@@ -1,31 +1,36 @@
 - platform: group
   name: Hanging Light
+  unique_id: hanging_light_group
   entities:
-      - light.hanging_light_1
-      - light.hanging_light_2
-      - light.hanging_light_3
+  - light.hanging_light_1
+  - light.hanging_light_2
+  - light.hanging_light_3
 
 - platform: group
   name: Kitchen Pendants
+  unique_id: kitchen_pendants_group
   entities:
-      - light.kitchen_pendant_1
-      - light.kitchen_pendant_2
-      - light.kitchen_pendant_3
+  - light.kitchen_pendant_1
+  - light.kitchen_pendant_2
+  - light.kitchen_pendant_3
 
 - platform: group
   name: Kitchen Cabinet Lights
+  unique_id: kitchen_cabinet_lights_group
   entities:
-      - light.under_cabinet_lights_1
-      - light.under_cabinet_lights_2
+  - light.under_cabinet_lights_1
+  - light.under_cabinet_lights_2
 
 - platform: group
   name: TV Lights
+  unique_id: tv_lights_group
   entities:
-      - light.playbar_1_huelight
-      - light.playbar_2_huelight
+  - light.playbar_1_huelight
+  - light.playbar_2_huelight
 
 - platform: group
   name: Rose Light
+  unique_id: rose_light_group
   entities:
-      - light.rose_light_1
-      - light.rose_light_2
+  - light.rose_light_1
+  - light.rose_light_2

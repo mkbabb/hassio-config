@@ -1,5 +1,6 @@
 - platform: group
   name: All Locks
+  unique_id: all_locks_group
   entities:
       - lock.back_door
       - lock.front_door

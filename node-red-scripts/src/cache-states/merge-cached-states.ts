@@ -1,7 +1,8 @@
-import { createStatesMap } from "../utils/utils";
+import { createStatesMap, GLOBAL_CACHED_STATES_KEY } from "../utils/utils";
 
 // @ts-ignore
-const cachedStates: Partial<Hass.Service>[] = global.get("cachedStates") ?? [];
+const cachedStates: Partial<Hass.Service>[] =
+    global.get(GLOBAL_CACHED_STATES_KEY) ?? [];
 const cachedStatesMap = createStatesMap(cachedStates);
 
 // @ts-ignore
@@ -12,6 +13,6 @@ const mergedStatesMap = new Map([...cachedStatesMap, ...newStatesMap]);
 const mergedStates = Array.from(mergedStatesMap.values());
 
 // @ts-ignore
-global.set("cachedStates", mergedStates);
+global.set(GLOBAL_CACHED_STATES_KEY, mergedStates);
 // @ts-ignore
 msg.payload = mergedStates;

@@ -48,11 +48,35 @@ const entities = flow.get("entities");
 // @ts-ignore
 const areaEntities = flow.get("areaEntities");
 
-// filter out entities that are not in an area
-const areaEntitiesIds = areaEntities.map((areaEntity) => areaEntity.entity).flat();
-const areaEntitiesInArea = entities.filter((entity) =>
-    areaEntitiesIds.includes(entity.entity_id)
-);
+// Create a mapping from entity_id to its area information
+const entityToAreaMap = {};
+
+// Populate the map with information from areaEntities
+areaEntities.forEach((areaEntity, index) => {
+    // Use the index as the area_id if there isn't one explicitly defined
+    const areaId = areaEntity?.area_id;
+
+    // For each entity in this area, store its area_id and floor
+    areaEntity?.entity?.forEach((entityId) => {
+        entityToAreaMap[entityId] = {
+            area_id: areaId,
+            floor: areaEntity?.floor ?? []
+        };
+    });
+});
+
+// Filter entities that are in an area and add area information
+const areaEntitiesInArea = entities
+    .filter((entity) => entityToAreaMap[entity.entity_id])
+    .map((entity) => {
+        // Create a new entity object with floor and area_id added
+        const areaInfo = entityToAreaMap[entity.entity_id];
+        return {
+            ...entity,
+            floor: areaInfo.floor,
+            area_id: areaInfo.area_id
+        };
+    });
 
 // @ts-ignore
 msg.payload = areaEntitiesInArea;

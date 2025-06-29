@@ -16,10 +16,6 @@ declare namespace Hass {
             color_temp?: number;
         }
 
-        interface LightGroup extends Light {
-            entity_id: string | string[];
-        }
-
         interface BinarySensor extends Switch {
             node_id: number;
             value_index: number;
@@ -44,13 +40,18 @@ declare namespace Hass {
             equipment_running: string;
             fan_min_on_time: number;
         }
+
+        interface Group {
+            entity_id: string | string[];
+        }
     }
 
     type Attribute =
         | Attributes.Light
-        | Attributes.LightGroup
         | Attributes.Switch
-        | Attributes.Climate;
+        | Attributes.Climate
+        | Attributes.BinarySensor
+        | Attributes.Group;
 
     /**
      * Template state for a hass entity.
@@ -59,7 +60,7 @@ declare namespace Hass {
     interface State {
         entity_id: string;
         state: string;
-        attributes: Attribute;
+        attributes: Partial<Attribute>;
 
         last_changed: string;
         last_updated: string;
@@ -68,6 +69,7 @@ declare namespace Hass {
             parent_id: string;
             user_id: string;
         };
+
         timeSinceChangedMs: number;
     }
 
@@ -105,7 +107,7 @@ declare namespace Hass {
     interface Service {
         domain: string;
         service: string;
-        entity_id: string;
+        entity_id?: string;
         data?: {
             [s: string]: any;
             entity_id: string;

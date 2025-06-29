@@ -1,3 +1,5 @@
+export const GLOBAL_CACHED_STATES_KEY = "cachedStates";
+
 export function getEntityBasename(entityId: string): string {
     const match = entityId.match(/^.*\.(.*)$/);
 
@@ -311,10 +313,12 @@ export const domainToService = function (entity: Hass.State, domain: string) {
     return undefined;
 };
 
-export const createServiceCall = (entity: Hass.State) => {
+export const createServiceCall = (entity: Hass.State): Hass.Service | undefined => {
     const domain = getEntityDomain(entity.entity_id);
     const service = domainToService(entity, domain);
 
+    // If the entity is not in the domain list, or the service is undefined,
+    // return undefined.
     if (!domains.includes(domain) || service === undefined) {
         return undefined;
     }
@@ -420,6 +424,63 @@ export const serviceToActionCall = (
     delete out.service;
 
     return out;
+};
+
+export const createAwayPayload = (states: Hass.Service[]) => {
+    return states
+        .map((serviceCall) => {
+            const {
+                domain,
+
+                data: { entity_id }
+            } = serviceCall;
+
+            const payload = { domain, data: { entity_id } };
+
+            switch (domain) {
+                case "switch":
+                case "light": {
+                    payload["service"] = "turn_off";
+                    break;
+                }
+                case "fan": {
+                    payload["service"] = "turn_on";
+                    payload.data["percentage"] = 100 / 3;
+                    break;
+                }
+                case "climate": {
+                    payload["service"] = "set_preset_mode";
+                    payload.data["preset_mode"] = "away";
+                    break;
+                }
+                case "lock": {
+                    payload["service"] = "lock";
+                    break;
+                }
+                case "cover": {
+                    payload["service"] = "close_cover";
+                    break;
+                }
+                case "media_player": {
+                    payload["service"] = "turn_off";
+                    break;
+                }
+            }
+
+            // Support the new "action" field, which is the union of "service" and "domain"
+            // @ts-ignore
+            payload["action"] = `${payload.domain}.${payload.service}`; // e.g. "light.turn_off"
+
+            // New "target" field, which supports various ids:
+            payload["target"] = {
+                entity_id: entity_id
+            };
+
+            return payload;
+        })
+
+        .flat()
+        .filter(Boolean);
 };
 
 // Groups a series of actions into a single action based on the:
