@@ -53,3 +53,6 @@ nest/
 
 # Build files
 .build-cache.json
+
+# Node-RED flow backups
+node-red-backups/
