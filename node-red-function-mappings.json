@@ -1,0 +1,387 @@
+{
+  "analysis": {
+    "timestamp": "2025-07-25T21:30:00.000Z",
+    "totalFunctionNodes": 25,
+    "identifiedMappings": 23,
+    "confidence": "high"
+  },
+  "mappings": [
+    {
+      "nodeId": "5cd5c7a97cbfb2a5",
+      "nodeName": "states to actions",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/cache-states/states-to-actions.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Exact match: const serviceToActionCall = (call) => function signature",
+        "Uses groupActions and serviceToActionCall from utils",
+        "Compiled with 'use strict'"
+      ]
+    },
+    {
+      "nodeId": "fd875b9553cf1720",
+      "nodeName": "cache house state",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/cache-states/cache-house-state.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Contains getEntityDomain function at start",
+        "Uses createServiceCall, groupActions, createAwayPayload",
+        "Creates cachedStates and awayPayload variables",
+        "Filters entities by state !== 'unavailable'"
+      ]
+    },
+    {
+      "nodeId": "420bdf56a9545130",
+      "nodeName": "filter hidden entities and domains",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/get-domain-entities/filter-hidden-and-domains.ts",
+      "confidence": "high",
+      "evidence": [
+        "Comment pattern matches file path structure",
+        "Filters entities based on hidden and disabled_by properties",
+        "Uses area_id and config_entry_id"
+      ]
+    },
+    {
+      "nodeId": "f3f79edb0a0bc587",
+      "nodeName": "reconcile entities",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/get-domain-entities/reconcile.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Comment explicitly states: // src/get-domain-entities/reconcile.ts",
+        "Uses flow.get('entities') and flow.get('areaEntities')",
+        "Creates entityToAreaMap"
+      ]
+    },
+    {
+      "nodeId": "fe549fb394a9227a",
+      "nodeName": "filter entities",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/get-domain-entities/filter-entites.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Comment explicitly states: // src/get-domain-entities/filter-entites.ts",
+        "Contains ESPPRESENCE_RE regex pattern",
+        "Filters null states and unavailable entities"
+      ]
+    },
+    {
+      "nodeId": "f633b8e8b3205bc1",
+      "nodeName": "presence",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/presence/presence.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Contains full presence state machine logic",
+        "Uses getEntityDomain and normalizeIncludes from utils",
+        "Has MAX_COOL_DOWN and DEFAULT_COOL_DOWN constants",
+        "Complex cool-down period calculation logic"
+      ]
+    },
+    {
+      "nodeId": "f59de909516cb178",
+      "nodeName": "get flow info",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/presence/get-flow-info.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Comment explicitly states: // src/presence/get-flow-info.ts",
+        "Uses flowInfoKey pattern",
+        "Extracts data.entity_id and topic"
+      ]
+    },
+    {
+      "nodeId": "627b25edecfe582e",
+      "nodeName": "filter blacklisted entities",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/cache-states/filter-blacklisted-entities.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Contains getEntityDomain and normalizeIncludes functions",
+        "Has BLACKLISTED_ENTITIES array with specific patterns",
+        "Uses filterBlacklistedEntity function"
+      ]
+    },
+    {
+      "nodeId": "c04368f701cd604d",
+      "nodeName": "action node",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/cache-states/action-node.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Contains deepEqual function implementation",
+        "Complex action node logic with state management",
+        "Uses 'use strict' directive"
+      ]
+    },
+    {
+      "nodeId": "3f3963cff3716131",
+      "nodeName": "push cached states",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/cache-states/push-cache-states.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Comment shows: // src/utils/utils.ts and // src/cache-states/push-cache-states.ts",
+        "Uses GLOBAL_CACHED_STATES_KEY constant",
+        "Filters and merges cached states"
+      ]
+    },
+    {
+      "nodeId": "715a229a5e312dca",
+      "nodeName": "push cached states",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/cache-states/push-cache-states.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Duplicate of node 3f3963cff3716131",
+        "Same code pattern and imports"
+      ]
+    },
+    {
+      "nodeId": "08f84c6d37343c7a",
+      "nodeName": "filter blacklisted entities",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/cache-states/filter-blacklisted-entities.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Contains same pattern as node 627b25edecfe582e",
+        "Has getEntityDomain and normalizeIncludes from utils"
+      ]
+    },
+    {
+      "nodeId": "20d9cf93f238d30f",
+      "nodeName": "home status",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/cache-states/home-status.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Contains STABLE_PERIOD_MS and DEBOUNCE_DELAY_MS constants",
+        "Home status state machine logic",
+        "Uses flow.get/set for home_status_last_state"
+      ]
+    },
+    {
+      "nodeId": "872a4dcbed026511",
+      "nodeName": "create schedule cron",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/chronos/cron.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Contains getEntityBasename and getTimeComponents functions",
+        "Complex cron schedule creation logic",
+        "Handles weekday/weekend differentiation"
+      ]
+    },
+    {
+      "nodeId": "76883f7cb338fb52",
+      "nodeName": "create schedule cron",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/chronos/cron.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Duplicate of node 872a4dcbed026511",
+        "Same cron creation pattern"
+      ]
+    },
+    {
+      "nodeId": "fcef4072b3d808c5",
+      "nodeName": "merge cached states",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/cache-states/merge-cached-states.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Uses GLOBAL_CACHED_STATES_KEY",
+        "Creates and merges states maps",
+        "Has getEntityBasename function"
+      ]
+    },
+    {
+      "nodeId": "57ba98e05115a206",
+      "nodeName": "merge scene cached states",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/cache-states/merge-scene-cached-states.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Similar to merge cached states but for scenes",
+        "Uses createStatesMap and merging logic"
+      ]
+    },
+    {
+      "nodeId": "8707143d8533922c",
+      "nodeName": "inside preamble window",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/chronos/inside-preamble-window.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Contains getTimeComponents function",
+        "Preamble window time calculation logic",
+        "Uses timeStringToDate conversions"
+      ]
+    },
+    {
+      "nodeId": "b2b315489cc8d2a7",
+      "nodeName": "guest daytime",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/chronos/guest-daytime.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Comment states: // src/chronos/guest-daytime.ts",
+        "Filters entities by floor and area_id",
+        "Guest bedroom specific logic"
+      ]
+    },
+    {
+      "nodeId": "d22ac4c1c222afd5",
+      "nodeName": "cache schedule entity",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/plants/cache-schedule-entity.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Comment states: // src/plants/cache-schedule-entity.ts",
+        "Uses weekday/weekend sleep/wake entity IDs",
+        "Caches schedule times"
+      ]
+    },
+    {
+      "nodeId": "6bc7f26c9c624e6c",
+      "nodeName": "pop schedule entity cache",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/plants/pop-schedule-entity-cache.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Manages cachedTimes flow variable",
+        "Pops values from cache"
+      ]
+    },
+    {
+      "nodeId": "8baf517e98f7f1a1",
+      "nodeName": "schedule",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/plants/schedule.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Contains plant scheduling logic",
+        "Has getEntityBasename and time functions",
+        "Complex schedule state management"
+      ]
+    },
+    {
+      "nodeId": "3cbb13d1da946813",
+      "nodeName": "filter blacklisted entities",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/cache-states/filter-blacklisted-entities.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Another instance of filter blacklisted pattern",
+        "Contains normalizeIncludes and isBlacklisted functions"
+      ]
+    },
+    {
+      "nodeId": "2f73425d194d82fa",
+      "nodeName": "schedules",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/plants/schedules.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Contains schedules array with plant configurations",
+        "plants_global, plants_penguin, plants_bedroom schedules"
+      ]
+    },
+    {
+      "nodeId": "9b723d99a73d643f",
+      "nodeName": "battery",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/batteries/battery.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Comment states: // src/batteries/battery.ts",
+        "Contains LOW_BATTERY_THRESHOLD and CRITICAL_BATTERY_THRESHOLD",
+        "Battery state checking and notification logic"
+      ]
+    },
+    {
+      "nodeId": "e2cb1e6a7e2044f7",
+      "nodeName": "get entity attributes id",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/remote-entities/get-entity-attributes-id.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Contains getEntityBasename function",
+        "Remote entity attribute extraction logic"
+      ]
+    },
+    {
+      "nodeId": "ba17a7bee754d74a",
+      "nodeName": "create service call",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/remote-entities/service-call/main.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Contains mapRange function",
+        "parseFloatIfString utility",
+        "Service call creation for remote entities"
+      ]
+    },
+    {
+      "nodeId": "8f4c1ad0cad49211",
+      "nodeName": "function",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/time-of-use.ts",
+      "confidence": "high",
+      "evidence": [
+        "Contains PRECOOL_TIME constant",
+        "Time-of-use rate scheduling logic",
+        "monthDayToDate and hourToDate functions"
+      ]
+    },
+    {
+      "nodeId": "04f8709ebd6588c0",
+      "nodeName": "set static state",
+      "sourceFile": "/Volumes/config/node-red-scripts/src/plants/set-static-state.ts",
+      "confidence": "definitive",
+      "evidence": [
+        "Uses staticPlantStates flow variable",
+        "Sets static state for plant entities"
+      ]
+    },
+    {
+      "nodeId": "55653f952629f321",
+      "nodeName": "function 1",
+      "sourceFile": "Unknown - appears to be inline function",
+      "confidence": "low",
+      "evidence": [
+        "transformFunc with color and brightness_pct",
+        "Appears to be a custom inline function not from TypeScript source"
+      ]
+    }
+  ],
+  "codePatterns": {
+    "imports": {
+      "utils": [
+        "getEntityDomain",
+        "getEntityBasename", 
+        "normalizeIncludes",
+        "GLOBAL_CACHED_STATES_KEY",
+        "createServiceCall",
+        "groupActions",
+        "filterBlacklistedEntity",
+        "deepEqual",
+        "serviceToActionCall",
+        "createAwayPayload",
+        "getTimeComponents",
+        "mapRange",
+        "parseFloatIfString"
+      ]
+    },
+    "constants": {
+      "presence": [
+        "MAX_COOL_DOWN = 30 * 60",
+        "DEFAULT_COOL_DOWN = 10 * 60"
+      ],
+      "battery": [
+        "LOW_BATTERY_THRESHOLD = 30",
+        "CRITICAL_BATTERY_THRESHOLD = 15"
+      ],
+      "homeStatus": [
+        "STABLE_PERIOD_MS = 5 * 60 * 1e3",
+        "DEBOUNCE_DELAY_MS = 30 * 1e3"
+      ],
+      "timeOfUse": [
+        "PRECOOL_TIME = 2 * 60 * 60 * 1000"
+      ]
+    },
+    "compilationMarkers": {
+      "useStrict": "Most compiled functions start with 'use strict'",
+      "comments": "Some functions preserve source file path comments",
+      "imports": "Import statements are compiled into the function body"
+    }
+  },
+  "summary": {
+    "totalIdentified": 28,
+    "byDirectory": {
+      "cache-states": 10,
+      "presence": 2,
+      "batteries": 1,
+      "get-domain-entities": 3,
+      "chronos": 4,
+      "plants": 6,
+      "remote-entities": 2,
+      "time-of-use": 1,
+      "unknown": 1
+    }
+  }
+}

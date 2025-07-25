@@ -8,6 +8,8 @@ import * as esbuild from "esbuild";
 import crypto from "crypto";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
+import { generateMappingFile } from "./src/deploy/mapper";
+import { Deployer } from "./src/deploy/deploy";
 
 // Constants
 const __filename = fileURLToPath(import.meta.url);
@@ -71,11 +73,26 @@ const argv = yargs(hideBin(process.argv))
         default: false,
         describe: "Enable debug logging"
     })
+    .option("deploy", {
+        type: "boolean",
+        default: false,
+        describe: "Deploy to Node-RED after build"
+    })
+    .option("dry-run", {
+        type: "boolean",
+        default: false,
+        describe: "Preview deployment without making changes"
+    })
+    .option("map", {
+        type: "boolean",
+        default: false,
+        describe: "Generate Node-RED function mappings"
+    })
     .help()
     .alias("help", "h")
     .parseSync();
 
-const { inputDir, outputDir, emptyOutDir, recursive, watch, cacheTime, debug } = argv;
+const { inputDir, outputDir, emptyOutDir, recursive, watch, cacheTime, debug, deploy, "dry-run": dryRun, map } = argv;
 
 // Dependency Graph
 class DependencyGraph {
@@ -376,7 +393,7 @@ class BuildManager {
         return dependencies;
     }
 
-    async buildFile(inputFile: string): Promise<void> {
+    async buildFile(inputFile: string): Promise<string | null> {
         try {
             console.log(chalk.blue(`Building ${inputFile}...`));
             const name = path.relative(this.inputDir, inputFile).replace(/\.ts$/, "");
@@ -404,7 +421,7 @@ class BuildManager {
                 }
 
                 console.log(chalk.green(`Successfully rebuilt ${inputFile}`));
-                return;
+                return path.join(this.outputDir, `${name}.js`);
             }
 
             // Create a new build context for first-time build
@@ -445,6 +462,7 @@ class BuildManager {
                 }
 
                 console.log(chalk.green(`Successfully built ${inputFile}`));
+                return path.join(this.outputDir, `${name}.js`);
             } catch (error) {
                 console.error(chalk.red(`Failed to build ${inputFile}:`), error);
 
@@ -498,13 +516,15 @@ class BuildManager {
                 console.log(
                     chalk.green(`Successfully built ${inputFile} (fallback method)`)
                 );
+                return path.join(this.outputDir, `${name}.js`);
             }
         } catch (error) {
             console.error(chalk.red(`Failed to build ${inputFile}:`), error);
         }
+        return null;
     }
 
-    async buildFiles(changedFile?: string): Promise<void> {
+    async buildFiles(changedFile?: string): Promise<Map<string, string>> {
         if (!changedFile) {
             await this.loadCache();
         }
@@ -560,14 +580,21 @@ class BuildManager {
 
         if (filesToBuild.length === 0) {
             console.log(chalk.gray("No files need rebuilding"));
-            return;
+            return new Map();
         }
 
         console.log(chalk.blue(`Building ${filesToBuild.length} files...`));
 
+        // Track built files for deployment
+        const builtFiles = new Map<string, string>();
+
         // Process files sequentially to avoid race conditions
         for (const file of filesToBuild) {
-            await this.buildFile(file);
+            const outputPath = await this.buildFile(file);
+            if (outputPath) {
+                const relativePath = path.relative(this.inputDir, file);
+                builtFiles.set(relativePath, outputPath);
+            }
         }
 
         // Save the updated cache
@@ -577,6 +604,8 @@ class BuildManager {
             console.log(chalk.cyan("Final dependency graph:"));
             this.dependencyGraph.printGraph();
         }
+
+        return builtFiles;
     }
 
     async cleanupStaleCache(): Promise<void> {
@@ -699,14 +728,47 @@ class BuildManager {
 
 // Main function
 async function main(): Promise<void> {
+    // Generate mappings if requested
+    if (map) {
+        console.log(chalk.cyan("Generating Node-RED function mappings..."));
+        await generateMappingFile();
+        return;
+    }
+
     // Create build manager
     const buildManager = new BuildManager(inputDir, outputDir, cacheTime);
 
     // Initial build
-    await buildManager.buildFiles();
+    const builtFiles = await buildManager.buildFiles();
+
+    // Deploy if requested and not in watch mode
+    if ((deploy || dryRun) && !watch) {
+        if (builtFiles.size === 0) {
+            console.log(chalk.yellow("No files were built, nothing to deploy"));
+        } else {
+            console.log(chalk.cyan("\nDeploying to Node-RED..."));
+            const deployer = new Deployer();
+            const tsFiles = Array.from(builtFiles.keys()).map(f => path.join(inputDir, f));
+            const result = await deployer.deploy(tsFiles, { backup: true, dryRun });
+            
+            if (result.success) {
+                console.log(chalk.green(`\n✓ Deployment successful`));
+                console.log(chalk.green(`  Deployed: ${result.deployed.length} files`));
+                if (result.failed.length > 0) {
+                    console.log(chalk.yellow(`  Failed: ${result.failed.length} files`));
+                }
+            } else {
+                console.error(chalk.red(`\n✗ Deployment failed: ${result.error}`));
+                process.exit(1);
+            }
+        }
+    }
 
     // Watch mode
     if (watch) {
+        if (deploy) {
+            console.log(chalk.yellow("\nNote: Deployment is disabled in watch mode"));
+        }
         await buildManager.startWatching();
     } else {
         // Dispose of resources if not in watch mode
