@@ -45,8 +45,8 @@ function getCodeHash(code: string): string {
 
 export async function mapFunctions(): Promise<Mapping[]> {
   const flowsPath = '/Volumes/addon_configs/a0d7b954_nodered/flows.json';
-  const distDir = path.join(__dirname, '../../dist');
-  const srcDir = path.join(__dirname, '../../src');
+  const distDir = path.join(__dirname, '../../../dist');
+  const srcDir = path.join(__dirname, '../../../src');
   
   // Load flows
   const flows = JSON.parse(fs.readFileSync(flowsPath, 'utf8'));
@@ -185,7 +185,9 @@ export async function mapFunctions(): Promise<Mapping[]> {
   return mappings;
 }
 
-export async function generateMappingFile(): Promise<void> {
+import { reconcileUnmappedFunctions, exportReconciliationResults } from '../reconcile';
+
+export async function generateMappingFile(options: { useAI?: boolean } = {}): Promise<void> {
   const mappings = await mapFunctions();
   
   // Group by confidence
@@ -219,12 +221,11 @@ export async function generateMappingFile(): Promise<void> {
       nodeId: m.nodeId,
       nodeName: m.nodeName,
       flowId: m.flowId,
-      flowName: m.flowName,
-      codePreview: functionNodes.find(n => n.id === m.nodeId)?.func.substring(0, 200) + '...'
+      flowName: m.flowName
     }))
   };
   
-  const mappingsDir = path.join(__dirname, 'mappings');
+  const mappingsDir = __dirname;  // Current directory is mappings
   if (!fs.existsSync(mappingsDir)) {
     fs.mkdirSync(mappingsDir, { recursive: true });
   }
@@ -246,8 +247,49 @@ export async function generateMappingFile(): Promise<void> {
     unmapped.forEach(m => {
       console.log(`  - ${m.nodeName} (${m.nodeId}) in ${m.flowName}`);
     });
+    console.log('\nRun with --ai flag to attempt AI reconciliation');
+  }
+  
+  // AI reconciliation for unmapped functions
+  if (unmapped.length > 0 && options.useAI) {
+    console.log(`\nStarting AI reconciliation for ${unmapped.length} unmapped functions...`);
+    
+    // Get function nodes for unmapped
+    const flowsPath = '/Volumes/addon_configs/a0d7b954_nodered/flows.json';
+    const flows = JSON.parse(fs.readFileSync(flowsPath, 'utf8'));
+    const unmappedNodes = unmapped.map(m => {
+      const node = flows.find((n: any) => n.id === m.nodeId);
+      return {
+        id: m.nodeId,
+        name: m.nodeName,
+        func: node?.func || '',
+        flowId: m.flowId,
+        flowName: m.flowName
+      };
+    }).filter(n => n.func); // Only process nodes with function code
+    
+    const srcDir = path.join(__dirname, '../../../src');
+    const baseMappings = mappings.reduce((acc, m) => {
+      if (m.confidence !== 'none') {
+        acc[m.tsFile] = acc[m.tsFile] || [];
+        acc[m.tsFile].push({
+          nodeId: m.nodeId,
+          nodeName: m.nodeName,
+          flowId: m.flowId,
+          flowName: m.flowName,
+          confidence: m.confidence
+        });
+      }
+      return acc;
+    }, {} as Record<string, any[]>);
+    
+    const results = await reconcileUnmappedFunctions(unmappedNodes, srcDir, baseMappings);
+    
+    // Export enhanced mappings
+    exportReconciliationResults(
+      results,
+      baseMappings,
+      path.join(mappingsDir, 'node-mappings-ai-enhanced.json')
+    );
   }
 }
-
-// Add this at the bottom to fix the reference error
-const functionNodes: FunctionNode[] = [];

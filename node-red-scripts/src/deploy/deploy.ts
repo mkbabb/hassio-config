@@ -5,6 +5,7 @@ import * as crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { config as loadEnv } from 'dotenv';
 import { createBackup } from './backup';
+import { renameFunctionNodes } from './rename';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
@@ -432,8 +433,19 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       type: 'boolean',
       describe: 'Use file-based deployment instead of Node-RED API'
     })
+    .option('rename', {
+      alias: 'r',
+      type: 'boolean',
+      describe: 'Rename function nodes to match their file names'
+    })
+    .option('rename-only', {
+      type: 'boolean',
+      describe: 'Only rename nodes without deploying code'
+    })
     .example('$0 src/presence/presence.ts', 'Deploy a specific file')
     .example('$0 --all', 'Deploy all mapped functions')
+    .example('$0 --all --rename', 'Deploy and rename all functions')
+    .example('$0 --rename-only', 'Only rename nodes without deploying')
     .example('$0 --dry-run src/**.ts', 'Preview deployment of multiple files')
     .example('$0 --no-api', 'Use file-based deployment with restart')
     .help()
@@ -442,6 +454,38 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   async function main() {
     try {
       const deployer = new Deployer();
+      
+      // Handle rename-only mode
+      if (argv['rename-only']) {
+        console.log('Renaming function nodes...');
+        const auth = process.env.HA_USERNAME && process.env.HA_PASSWORD
+          ? { username: process.env.HA_USERNAME, password: process.env.HA_PASSWORD }
+          : undefined;
+        
+        const renameResult = await renameFunctionNodes({
+          dryRun: argv['dry-run'],
+          auth
+        });
+        
+        if (!renameResult.success) {
+          console.error(`✗ Rename failed: ${renameResult.error}`);
+          process.exit(1);
+        }
+        
+        if (renameResult.renamed.length === 0) {
+          console.log('No nodes need renaming');
+        } else {
+          console.log(`\n${argv['dry-run'] ? 'Would rename' : 'Renamed'} ${renameResult.renamed.length} function node(s):`);
+          renameResult.renamed.forEach(r => console.log(`  ${r.oldName} → ${r.newName}`));
+        }
+        
+        if (renameResult.failed.length > 0) {
+          console.log(`\nFailed to rename ${renameResult.failed.length} node(s):`);
+          renameResult.failed.forEach(f => console.log(`  ${f.nodeId}: ${f.error}`));
+        }
+        
+        process.exit(0);
+      }
       
       // Determine which files to deploy
       let filesToDeploy: string[] = argv._ as string[];
@@ -477,6 +521,24 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         if (result.failed.length > 0) {
           console.log(`\n⚠️  Failed: ${result.failed.length} functions`);
           result.failed.forEach(f => console.log(`    - ${f}`));
+        }
+        
+        // Handle rename option after successful deployment
+        if (argv.rename && result.deployed.length > 0 && !argv['dry-run']) {
+          console.log('\nRenaming deployed function nodes...');
+          const auth = process.env.HA_USERNAME && process.env.HA_PASSWORD
+            ? { username: process.env.HA_USERNAME, password: process.env.HA_PASSWORD }
+            : undefined;
+          
+          const renameResult = await renameFunctionNodes({
+            dryRun: false,
+            auth
+          });
+          
+          if (renameResult.success && renameResult.renamed.length > 0) {
+            console.log(`✓ Renamed ${renameResult.renamed.length} function node(s):`);
+            renameResult.renamed.forEach(r => console.log(`  ${r.oldName} → ${r.newName}`));
+          }
         }
       } else {
         console.error(`\n✗ Deployment failed: ${result.error}`);

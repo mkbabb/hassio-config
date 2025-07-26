@@ -10,7 +10,9 @@
         "deploy": "tsx src/deploy/deploy.ts",
         "deploy:all": "tsx src/deploy/deploy.ts --all",
         "deploy:dry-run": "tsx src/deploy/deploy.ts --dry-run",
+        "deploy:rename": "tsx src/deploy/deploy.ts --rename-only",
         "map": "tsx build.ts --map",
+        "map:ai": "tsx build.ts --map --ai",
         "clean": "rm -rf dist"
     },
     "dependencies": {
@@ -21,6 +23,7 @@
         "dotenv": "^16.3.1",
         "esbuild": "^0.25.3",
         "node-fetch": "^3.3.2",
+        "openai": "^4.52.7",
         "prettier": "^3.5.3",
         "tsx": "^4.19.3",
         "typescript": "^5.8.3",

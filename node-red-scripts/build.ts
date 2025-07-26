@@ -9,7 +9,7 @@ import crypto from "crypto";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { config as loadEnv } from "dotenv";
-import { generateMappingFile } from "./src/deploy/mapper";
+import { generateMappingFile } from "./src/deploy/mappings/mapper";
 import { Deployer } from "./src/deploy/deploy";
 
 // Load environment variables
@@ -96,7 +96,7 @@ const argv = yargs(hideBin(process.argv))
     .alias("help", "h")
     .parseSync();
 
-const { inputDir, outputDir, emptyOutDir, recursive, watch, cacheTime, debug, deploy, "dry-run": dryRun, map } = argv;
+const { inputDir, outputDir, emptyOutDir, recursive, watch, cacheTime, debug, deploy, "dry-run": dryRun, map, ai } = argv;
 
 // Dependency Graph
 class DependencyGraph {
@@ -735,7 +735,7 @@ async function main(): Promise<void> {
     // Generate mappings if requested
     if (map) {
         console.log(chalk.cyan("Generating Node-RED function mappings..."));
-        await generateMappingFile();
+        await generateMappingFile({ useAI: ai });
         return;
     }
 

@@ -55,6 +55,13 @@ npm run deploy:all
 
 # Skip backup
 npm run deploy -- src/presence/presence.ts --no-backup
+
+# Deploy and rename nodes to match file names
+npm run deploy:all -- --rename
+
+# Only rename nodes without deploying
+npm run deploy:rename
+npm run deploy:rename -- --dry-run
 ```
 
 ### Watch mode (no deployment)
@@ -88,10 +95,13 @@ npm run watch
 
 ## Files
 
-- `src/deploy/mapper.ts` - Generates function mappings
+- `src/deploy/deploy.ts` - Main deployment script with integrated rename functionality
 - `src/deploy/backup.ts` - Handles flow backups  
-- `src/deploy/deploy.ts` - Deploys to Node-RED
+- `src/deploy/rename.ts` - Renames function nodes to match file names
+- `src/deploy/reconcile.ts` - AI reconciliation logic for unmapped functions
 - `src/deploy/mappings/` - Directory containing mapping files
+  - `mapper.ts` - Generates function mappings
   - `node-mappings.json` - Auto-generated mappings
-  - `node-mappings-enhanced.json` - Manually verified mappings
+  - `node-mappings-ai-enhanced.json` - AI-enhanced mappings (when using --ai)
+  - `prompts/` - Markdown templates for AI prompts
 - `.env` - Environment configuration (gitignored)

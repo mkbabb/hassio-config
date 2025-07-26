@@ -1,0 +1,243 @@
+{
+  "generated": "2025-07-26T03:22:22.137Z",
+  "aiModel": "gpt-4o-mini",
+  "confidenceThreshold": 75,
+  "mappings": {
+    "src/cache-states/states-to-actions.ts": [
+      {
+        "nodeId": "5cd5c7a97cbfb2a5",
+        "nodeName": "states to actions",
+        "flowId": "dc6c7d82059d5798",
+        "flowName": "subflow",
+        "confidence": "medium"
+      }
+    ],
+    "src/cache-states/cache-house-state.ts": [
+      {
+        "nodeId": "fd875b9553cf1720",
+        "nodeName": "cache house state",
+        "flowId": "dc6c7d82059d5798",
+        "flowName": "subflow",
+        "confidence": "medium"
+      }
+    ],
+    "unknown": [
+      {
+        "nodeId": "f3f79edb0a0bc587",
+        "nodeName": "reconcile entities",
+        "flowId": "e920ad5e223ac1b7",
+        "flowName": "subflow",
+        "confidence": "exact"
+      },
+      {
+        "nodeId": "fe549fb394a9227a",
+        "nodeName": "filter entities",
+        "flowId": "e920ad5e223ac1b7",
+        "flowName": "subflow",
+        "confidence": "exact"
+      },
+      {
+        "nodeId": "f633b8e8b3205bc1",
+        "nodeName": "presence",
+        "flowId": "173c5faccfb73051",
+        "flowName": "subflow",
+        "confidence": "exact"
+      },
+      {
+        "nodeId": "f59de909516cb178",
+        "nodeName": "get flow info",
+        "flowId": "173c5faccfb73051",
+        "flowName": "subflow",
+        "confidence": "exact"
+      },
+      {
+        "nodeId": "3f3963cff3716131",
+        "nodeName": "push cached states",
+        "flowId": "4f871e90.29a61",
+        "flowName": "Cache Home 🏡",
+        "confidence": "exact"
+      },
+      {
+        "nodeId": "715a229a5e312dca",
+        "nodeName": "push cached states",
+        "flowId": "4f871e90.29a61",
+        "flowName": "Cache Home 🏡",
+        "confidence": "exact"
+      },
+      {
+        "nodeId": "08f84c6d37343c7a",
+        "nodeName": "filter blacklisted entities",
+        "flowId": "4f871e90.29a61",
+        "flowName": "Cache Home 🏡",
+        "confidence": "exact"
+      },
+      {
+        "nodeId": "fcef4072b3d808c5",
+        "nodeName": "merge cached states",
+        "flowId": "a807a4834abd67fa",
+        "flowName": "Day 🌞/Night 🌚",
+        "confidence": "exact"
+      },
+      {
+        "nodeId": "57ba98e05115a206",
+        "nodeName": "merge scene cached states",
+        "flowId": "a807a4834abd67fa",
+        "flowName": "Day 🌞/Night 🌚",
+        "confidence": "exact"
+      },
+      {
+        "nodeId": "b2b315489cc8d2a7",
+        "nodeName": "guest daytime",
+        "flowId": "a807a4834abd67fa",
+        "flowName": "Day 🌞/Night 🌚",
+        "confidence": "exact"
+      },
+      {
+        "nodeId": "d22ac4c1c222afd5",
+        "nodeName": "cache schedule entity",
+        "flowId": "a807a4834abd67fa",
+        "flowName": "Day 🌞/Night 🌚",
+        "confidence": "exact"
+      },
+      {
+        "nodeId": "9b723d99a73d643f",
+        "nodeName": "battery",
+        "flowId": "e05fae85092ccf96",
+        "flowName": "Batteries",
+        "confidence": "exact"
+      }
+    ],
+    "src/cache-states/filter-blacklisted-entities.ts": [
+      {
+        "nodeId": "627b25edecfe582e",
+        "nodeName": "filter blacklisted entities",
+        "flowId": "b0e3e1c3c40d9540",
+        "flowName": "subflow",
+        "confidence": "medium"
+      },
+      {
+        "nodeId": "3cbb13d1da946813",
+        "nodeName": "filter blacklisted entities",
+        "flowId": "e921812388e8a474",
+        "flowName": "Plants 🌱",
+        "confidence": "medium"
+      }
+    ],
+    "src/cache-states/action-node.ts": [
+      {
+        "nodeId": "c04368f701cd604d",
+        "nodeName": "action node",
+        "flowId": "8021f5177f6126d9",
+        "flowName": "subflow",
+        "confidence": "medium"
+      }
+    ],
+    "src/cache-states/home-status.ts": [
+      {
+        "nodeId": "20d9cf93f238d30f",
+        "nodeName": "home status",
+        "flowId": "4f871e90.29a61",
+        "flowName": "Cache Home 🏡",
+        "confidence": "medium"
+      }
+    ],
+    "src/chronos/inside-preamble-window.ts": [
+      {
+        "nodeId": "8707143d8533922c",
+        "nodeName": "inside preamble window",
+        "flowId": "a807a4834abd67fa",
+        "flowName": "Day 🌞/Night 🌚",
+        "confidence": "medium"
+      }
+    ],
+    "src/plants/pop-schedule-entity-cache.ts": [
+      {
+        "nodeId": "6bc7f26c9c624e6c",
+        "nodeName": "pop schedule entity cache",
+        "flowId": "a807a4834abd67fa",
+        "flowName": "Day 🌞/Night 🌚",
+        "confidence": "medium"
+      }
+    ],
+    "src/plants/set-static-state.ts": [
+      {
+        "nodeId": "04f8709ebd6588c0",
+        "nodeName": "set static state",
+        "flowId": "e921812388e8a474",
+        "flowName": "Plants 🌱",
+        "confidence": "medium"
+      }
+    ],
+    "src/plants/schedule.ts": [
+      {
+        "nodeId": "8baf517e98f7f1a1",
+        "nodeName": "schedule",
+        "flowId": "e921812388e8a474",
+        "flowName": "Plants 🌱",
+        "confidence": "medium"
+      }
+    ],
+    "src/plants/schedules.ts": [
+      {
+        "nodeId": "2f73425d194d82fa",
+        "nodeName": "schedules",
+        "flowId": "e921812388e8a474",
+        "flowName": "Plants 🌱",
+        "confidence": "medium"
+      }
+    ],
+    "src/remote-entities/get-entity-attributes-id.ts": [
+      {
+        "nodeId": "e2cb1e6a7e2044f7",
+        "nodeName": "get entity attributes id",
+        "flowId": "6337f535d7b8e1f2",
+        "flowName": "Remote Entities",
+        "confidence": "medium"
+      }
+    ]
+  },
+  "reconciliationResults": [
+    {
+      "nodeId": "420bdf56a9545130",
+      "nodeName": "filter hidden entities and domains",
+      "selectedFile": null,
+      "confidence": 0,
+      "reasoning": "No candidates found"
+    },
+    {
+      "nodeId": "872a4dcbed026511",
+      "nodeName": "create schedule cron",
+      "selectedFile": null,
+      "confidence": 0,
+      "reasoning": "No candidates found"
+    },
+    {
+      "nodeId": "76883f7cb338fb52",
+      "nodeName": "create schedule cron",
+      "selectedFile": null,
+      "confidence": 0,
+      "reasoning": "No candidates found"
+    },
+    {
+      "nodeId": "8f4c1ad0cad49211",
+      "nodeName": "function",
+      "selectedFile": null,
+      "confidence": 0,
+      "reasoning": "No candidates found"
+    },
+    {
+      "nodeId": "55653f952629f321",
+      "nodeName": "function 1",
+      "selectedFile": null,
+      "confidence": 0,
+      "reasoning": "No candidates found"
+    },
+    {
+      "nodeId": "ba17a7bee754d74a",
+      "nodeName": "create service call",
+      "selectedFile": null,
+      "confidence": 0,
+      "reasoning": "No candidates found"
+    }
+  ]
+}
