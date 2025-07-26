@@ -1,6 +1,6 @@
 import { groupActions, filterBlacklistedEntity } from "../utils/utils";
 
-const MAX_COOL_DOWN = 30 * 60; // 30 minutes
+const MAX_COOL_DOWN = 30 * 60; // 30 minutes max cool-down
 const DEFAULT_COOL_DOWN = 10 * 60; // 10 minutes
 
 // States for the presence state machine

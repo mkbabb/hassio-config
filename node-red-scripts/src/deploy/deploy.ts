@@ -37,10 +37,17 @@ interface DeployResult {
 export class Deployer {
   private config: DeployConfig;
   private nodeHashes: Map<string, string> = new Map();
+  private nodeRedUrl: string;
+  private haToken: string | undefined;
   
   constructor() {
     // Direct file path to flows.json
     const flowsPath = '/Volumes/addon_configs/a0d7b954_nodered/flows.json';
+    
+    // Node-RED URL and auth
+    // Try direct Node-RED port first, then ingress
+    this.nodeRedUrl = process.env.NODE_RED_URL || 'http://localhost:1880';
+    this.haToken = process.env.HA_TOKEN;
     
     // Load mappings
     const mappingsDir = path.join(__dirname, 'mappings');
@@ -73,7 +80,96 @@ export class Deployer {
     return Object.keys(this.config.mappings);
   }
   
-  async deploy(tsFiles: string[], options: { backup?: boolean; dryRun?: boolean; force?: boolean } = {}): Promise<DeployResult> {
+  /**
+   * Deploy using Node-RED Admin API with "nodes" deployment type
+   * This only restarts modified nodes, not the entire addon
+   */
+  private async deployViaAPI(flows: any[], updatedNodeIds: string[]): Promise<boolean> {
+    const { default: fetch } = await import('node-fetch');
+    
+    // Try multiple Node-RED endpoints
+    const urls = [
+      process.env.NODE_RED_URL,
+      'http://localhost:1880',
+      'http://127.0.0.1:1880',
+      'http://addon_a0d7b954_nodered:1880',
+      'http://a0d7b954_nodered:1880'
+    ].filter(Boolean);
+    
+    console.log('  Deploying via Node-RED Admin API...');
+    console.log(`  Updating ${updatedNodeIds.length} nodes with "nodes" deployment type`);
+    
+    for (const baseUrl of urls) {
+      try {
+        const url = `${baseUrl}/flows`;
+        console.log(`  Trying: ${url}`);
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Node-RED-Deployment-Type': 'nodes',
+            'Node-RED-API-Version': 'v2',
+            ...(this.haToken ? { 'Authorization': `Bearer ${this.haToken}` } : {})
+          },
+          body: JSON.stringify(flows),
+          timeout: 5000
+        });
+        
+        if (response.ok) {
+          const result = await response.text();
+          console.log('  ✓ Node-RED API deployment successful');
+          console.log(`  Response: ${result || 'OK'}`);
+          return true;
+        } else {
+          const text = await response.text();
+          console.log(`  ✗ Failed: ${response.status} ${response.statusText}`);
+          if (text && text.length < 200) {
+            console.log(`    Response: ${text}`);
+          }
+        }
+      } catch (error: any) {
+        console.log(`  ✗ Error: ${error.message}`);
+      }
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Deploy using file-based method with addon restart
+   */
+  private async deployViaFile(flows: any[]): Promise<boolean> {
+    try {
+      console.log('  Using file-based deployment...');
+      
+      // Write updated flows back to file
+      console.log('  Writing updated flows...');
+      fs.writeFileSync(this.config.flowsPath, JSON.stringify(flows, null, 2));
+      console.log('  ✓ Flows updated successfully');
+      
+      // Attempt to restart Node-RED addon
+      console.log('\nAttempting to restart Node-RED addon...');
+      const restartSuccess = await this.restartNodeRed();
+      
+      if (restartSuccess) {
+        console.log('✓ Node-RED addon restart initiated');
+        console.log('⏳ Please wait a few seconds for Node-RED to restart');
+      } else {
+        console.log('\n⚠️  Could not restart Node-RED automatically');
+        console.log('   Please restart manually:');
+        console.log('   - Go to: Settings → Add-ons → Node-RED → Restart');
+        console.log('   - Or use: ha addon restart a0d7b954_nodered');
+      }
+      
+      return true;
+    } catch (error) {
+      console.log('  ✗ File deployment error:', (error as any).message);
+      return false;
+    }
+  }
+  
+  async deploy(tsFiles: string[], options: { backup?: boolean; dryRun?: boolean; force?: boolean; useApi?: boolean } = {}): Promise<DeployResult> {
     const result: DeployResult = {
       success: true,
       deployed: [],
@@ -178,35 +274,43 @@ export class Deployer {
       
       if (!options.dryRun) {
         // Update nodes in the flows array
+        const updatedNodeIds: string[] = [];
         for (const { tsFile, mapping, code } of toBeDeployed) {
           const nodeIndex = flows.findIndex((n: any) => n.id === mapping.nodeId);
           if (nodeIndex >= 0) {
             flows[nodeIndex].func = code;
+            updatedNodeIds.push(mapping.nodeId);
             result.deployed.push(`${tsFile} → ${mapping.nodeName}`);
-            console.log(`✓ Updated ${mapping.nodeName}`);
+            console.log(`✓ Prepared update for ${mapping.nodeName}`);
           } else {
             result.failed.push(`${tsFile} → ${mapping.nodeName}`);
             console.error(`✗ Node ${mapping.nodeId} not found in flows`);
           }
         }
         
-        // Write updated flows back to file
-        console.log('\nWriting updated flows...');
-        fs.writeFileSync(this.config.flowsPath, JSON.stringify(flows, null, 2));
-        console.log('✓ Flows updated successfully');
+        // Try API deployment first, fallback to file-based
+        let deploySuccess = false;
         
-        // Attempt to restart Node-RED addon
-        console.log('\nAttempting to restart Node-RED addon...');
-        const restartSuccess = await this.restartNodeRed();
+        // Default to API method unless explicitly disabled
+        const useApi = options.useApi !== false;
         
-        if (restartSuccess) {
-          console.log('✓ Node-RED addon restart initiated');
-          console.log('⏳ Please wait a few seconds for Node-RED to restart');
-        } else {
-          console.log('\n⚠️  Could not restart Node-RED automatically');
-          console.log('   Please restart manually:');
-          console.log('   - Go to: Settings → Add-ons → Node-RED → Restart');
-          console.log('   - Or use: ha addon restart a0d7b954_nodered');
+        if (useApi) {
+          console.log('\nDeployment method: Node-RED Admin API');
+          deploySuccess = await this.deployViaAPI(flows, updatedNodeIds);
+          
+          if (!deploySuccess) {
+            console.log('\n⚠️  API deployment failed, falling back to file-based method...');
+          }
+        }
+        
+        // Fallback to file-based deployment
+        if (!deploySuccess) {
+          console.log('\nDeployment method: File-based with addon restart');
+          deploySuccess = await this.deployViaFile(flows);
+        }
+        
+        if (!deploySuccess) {
+          throw new Error('All deployment methods failed');
         }
       } else {
         for (const { tsFile, mapping } of toBeDeployed) {
@@ -324,9 +428,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       type: 'boolean',
       describe: 'Skip backup creation'
     })
+    .option('no-api', {
+      type: 'boolean',
+      describe: 'Use file-based deployment instead of Node-RED API'
+    })
     .example('$0 src/presence/presence.ts', 'Deploy a specific file')
     .example('$0 --all', 'Deploy all mapped functions')
     .example('$0 --dry-run src/**.ts', 'Preview deployment of multiple files')
+    .example('$0 --no-api', 'Use file-based deployment with restart')
     .help()
     .argv as any;
 
@@ -351,7 +460,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       const result = await deployer.deploy(filesToDeploy, {
         backup: !argv['no-backup'],
         dryRun: argv['dry-run'],
-        force: argv.force
+        force: argv.force,
+        useApi: !argv['no-api']
       });
       
       // Report results
