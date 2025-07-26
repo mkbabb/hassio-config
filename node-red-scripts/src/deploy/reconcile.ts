@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 
 // Configuration
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o";
 const CONFIDENCE_THRESHOLD = parseInt(process.env.AI_CONFIDENCE_THRESHOLD || '75');
 const MAX_TOKENS_PER_REQUEST = 12000; // Conservative limit for context
 const MAX_LINES_PER_FILE = 500;
@@ -42,6 +42,8 @@ interface ReconciliationResult {
   selectedFile: string | null;
   confidence: number;
   reasoning: string;
+  flowId?: string;
+  flowName?: string;
 }
 
 /**
@@ -66,17 +68,6 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-/**
- * Normalize code for better comparison
- */
-function normalizeCode(code: string): string {
-  return code
-    .replace(/\/\*[\s\S]*?\*\//g, '') // Remove block comments
-    .replace(/\/\/.*$/gm, '') // Remove line comments
-    .replace(/\s+/g, ' ') // Normalize whitespace
-    .replace(/['"`]/g, '"') // Normalize quotes
-    .trim();
-}
 
 /**
  * Get all TypeScript files that haven't been mapped yet
@@ -228,7 +219,9 @@ async function selectBestMatch(
       nodeName: node.name,
       selectedFile: null,
       confidence: 0,
-      reasoning: 'No candidates found'
+      reasoning: 'No candidates found',
+      flowId: node.flowId,
+      flowName: node.flowName
     };
   }
   
@@ -239,7 +232,9 @@ async function selectBestMatch(
       nodeName: node.name,
       selectedFile: candidates[0].file,
       confidence: candidates[0].confidence,
-      reasoning: candidates[0].reasoning
+      reasoning: candidates[0].reasoning,
+      flowId: node.flowId,
+      flowName: node.flowName
     };
   }
   
@@ -272,7 +267,9 @@ async function selectBestMatch(
       nodeName: node.name,
       selectedFile: result.selected_file,
       confidence: result.confidence || 0,
-      reasoning: result.reasoning || 'No suitable match found'
+      reasoning: result.reasoning || 'No suitable match found',
+      flowId: node.flowId,
+      flowName: node.flowName
     };
   } catch (error) {
     console.error(`Error selecting best match for ${node.name}:`, error);
@@ -281,7 +278,9 @@ async function selectBestMatch(
       nodeName: node.name,
       selectedFile: null,
       confidence: 0,
-      reasoning: 'Error in selection process'
+      reasoning: 'Error in selection process',
+      flowId: node.flowId,
+      flowName: node.flowName
     };
   }
 }
@@ -353,42 +352,57 @@ export async function reconcileUnmappedFunctions(
 }
 
 /**
- * Export reconciliation results to enhanced mappings file
+ * Export reconciliation results
  */
 export function exportReconciliationResults(
   results: ReconciliationResult[],
-  existingMappings: Record<string, any[]>,
-  outputPath: string
+  mappingsPath: string
 ): void {
-  const enhancedMappings = { ...existingMappings };
+  // Read current mappings
+  const mappingsData = JSON.parse(fs.readFileSync(mappingsPath, 'utf8'));
   
-  // Add AI reconciled mappings
+  // Update mappings with successful matches
+  let newMappings = 0;
   for (const result of results) {
     if (result.selectedFile && result.confidence >= CONFIDENCE_THRESHOLD) {
-      if (!enhancedMappings[result.selectedFile]) {
-        enhancedMappings[result.selectedFile] = [];
+      if (!mappingsData.mappings[result.selectedFile]) {
+        mappingsData.mappings[result.selectedFile] = [];
       }
       
-      enhancedMappings[result.selectedFile].push({
+      mappingsData.mappings[result.selectedFile].push({
         nodeId: result.nodeId,
         nodeName: result.nodeName,
+        flowId: result.flowId,
+        flowName: result.flowName,
         confidence: 'ai-reconciled',
-        aiConfidence: result.confidence,
-        reasoning: result.reasoning
+        aiConfidence: result.confidence
       });
+      
+      newMappings++;
     }
   }
   
-  // Create enhanced mappings file
-  const config = {
+  // Update stats
+  mappingsData.stats.unmapped -= newMappings;
+  mappingsData.stats['ai-reconciled'] = (mappingsData.stats['ai-reconciled'] || 0) + newMappings;
+  mappingsData.generated = new Date().toISOString();
+  
+  // Remove reconciled items from unmapped list
+  const reconciledIds = new Set(results.filter(r => r.selectedFile).map(r => r.nodeId));
+  mappingsData.unmapped = mappingsData.unmapped.filter((u: any) => !reconciledIds.has(u.nodeId));
+  
+  // Write updated mappings
+  fs.writeFileSync(mappingsPath, JSON.stringify(mappingsData, null, 2));
+  
+  // Write reconciliation results to separate file
+  const resultsPath = mappingsPath.replace('node-mappings.json', 'reconcile-results.json');
+  const resultsData = {
     generated: new Date().toISOString(),
     aiModel: OPENAI_MODEL,
     confidenceThreshold: CONFIDENCE_THRESHOLD,
-    mappings: enhancedMappings,
-    reconciliationResults: results
+    results: results
   };
-  
-  fs.writeFileSync(outputPath, JSON.stringify(config, null, 2));
+  fs.writeFileSync(resultsPath, JSON.stringify(resultsData, null, 2));
   
   // Summary
   const reconciled = results.filter(r => r.selectedFile !== null).length;
@@ -396,5 +410,6 @@ export function exportReconciliationResults(
   console.log(`  Total processed: ${results.length}`);
   console.log(`  Successfully matched: ${reconciled}`);
   console.log(`  Unable to match: ${results.length - reconciled}`);
-  console.log(`  Output: ${outputPath}`);
+  console.log(`  Updated mappings: ${mappingsPath}`);
+  console.log(`  Results saved to: ${resultsPath}`);
 }

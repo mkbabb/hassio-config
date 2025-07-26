@@ -43,7 +43,7 @@ export class Deployer {
   
   constructor() {
     // Direct file path to flows.json
-    const flowsPath = '/Volumes/addon_configs/a0d7b954_nodered/flows.json';
+    const flowsPath = process.env.NODE_RED_FLOWS_PATH || '/Volumes/addon_configs/a0d7b954_nodered/flows.json';
     
     // Node-RED URL and auth
     // Try direct Node-RED port first, then ingress
@@ -91,6 +91,7 @@ export class Deployer {
     // Try multiple Node-RED endpoints
     const urls = [
       process.env.NODE_RED_URL,
+      'http://homeassistant.local:1880',
       'http://localhost:1880',
       'http://127.0.0.1:1880',
       'http://addon_a0d7b954_nodered:1880',

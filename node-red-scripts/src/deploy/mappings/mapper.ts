@@ -43,10 +43,15 @@ function getCodeHash(code: string): string {
   return crypto.createHash('md5').update(normalizeCode(code)).digest('hex');
 }
 
-export async function mapFunctions(): Promise<Mapping[]> {
-  const flowsPath = '/Volumes/addon_configs/a0d7b954_nodered/flows.json';
-  const distDir = path.join(__dirname, '../../../dist');
-  const srcDir = path.join(__dirname, '../../../src');
+export async function mapFunctions(
+  flowsPath?: string,
+  distDir?: string, 
+  srcDir?: string
+): Promise<Mapping[]> {
+  // Use defaults if not provided
+  flowsPath = flowsPath || process.env.NODE_RED_FLOWS_PATH || '/Volumes/addon_configs/a0d7b954_nodered/flows.json';
+  distDir = distDir || path.join(__dirname, '../../../dist');
+  srcDir = srcDir || path.join(__dirname, '../../../src');
   
   // Load flows
   const flows = JSON.parse(fs.readFileSync(flowsPath, 'utf8'));
@@ -187,8 +192,26 @@ export async function mapFunctions(): Promise<Mapping[]> {
 
 import { reconcileUnmappedFunctions, exportReconciliationResults } from '../reconcile';
 
-export async function generateMappingFile(options: { useAI?: boolean } = {}): Promise<void> {
-  const mappings = await mapFunctions();
+export async function generateMappingFile(
+  options: { 
+    useAI?: boolean;
+    flowsPath?: string;
+    distDir?: string;
+    srcDir?: string;
+  } = {}
+): Promise<void> {
+  const mappings = await mapFunctions(options.flowsPath, options.distDir, options.srcDir);
+  
+  // Load flows to get function nodes for code preview
+  const flowsPath = options.flowsPath || process.env.NODE_RED_FLOWS_PATH || '/Volumes/addon_configs/a0d7b954_nodered/flows.json';
+  const flows = JSON.parse(fs.readFileSync(flowsPath, 'utf8'));
+  const functionNodes = flows
+    .filter((node: any) => node.type === 'function')
+    .map((node: any) => ({
+      id: node.id,
+      name: node.name || 'unnamed',
+      func: node.func || ''
+    }));
   
   // Group by confidence
   const exact = mappings.filter(m => m.confidence === 'exact');
@@ -221,7 +244,8 @@ export async function generateMappingFile(options: { useAI?: boolean } = {}): Pr
       nodeId: m.nodeId,
       nodeName: m.nodeName,
       flowId: m.flowId,
-      flowName: m.flowName
+      flowName: m.flowName,
+      codePreview: functionNodes.find(n => n.id === m.nodeId)?.func.substring(0, 200) + '...'
     }))
   };
   
@@ -254,42 +278,35 @@ export async function generateMappingFile(options: { useAI?: boolean } = {}): Pr
   if (unmapped.length > 0 && options.useAI) {
     console.log(`\nStarting AI reconciliation for ${unmapped.length} unmapped functions...`);
     
-    // Get function nodes for unmapped
-    const flowsPath = '/Volumes/addon_configs/a0d7b954_nodered/flows.json';
+    // Transform unmapped items to the format needed for reconciliation
+    const unmappedNodes = config.unmapped.map(u => ({
+      id: u.nodeId,
+      name: u.nodeName,
+      func: u.codePreview?.replace('...', '') || '', // Get the code preview
+      flowId: u.flowId,
+      flowName: u.flowName
+    }));
+    
+    // Need to get full function code for unmapped nodes
+    const flowsPath = options.flowsPath || process.env.NODE_RED_FLOWS_PATH || '/Volumes/addon_configs/a0d7b954_nodered/flows.json';
     const flows = JSON.parse(fs.readFileSync(flowsPath, 'utf8'));
-    const unmappedNodes = unmapped.map(m => {
-      const node = flows.find((n: any) => n.id === m.nodeId);
-      return {
-        id: m.nodeId,
-        name: m.nodeName,
-        func: node?.func || '',
-        flowId: m.flowId,
-        flowName: m.flowName
-      };
-    }).filter(n => n.func); // Only process nodes with function code
     
-    const srcDir = path.join(__dirname, '../../../src');
-    const baseMappings = mappings.reduce((acc, m) => {
-      if (m.confidence !== 'none') {
-        acc[m.tsFile] = acc[m.tsFile] || [];
-        acc[m.tsFile].push({
-          nodeId: m.nodeId,
-          nodeName: m.nodeName,
-          flowId: m.flowId,
-          flowName: m.flowName,
-          confidence: m.confidence
-        });
+    // Update with full function code
+    unmappedNodes.forEach(node => {
+      const flowNode = flows.find((n: any) => n.id === node.id);
+      if (flowNode && flowNode.func) {
+        node.func = flowNode.func;
       }
-      return acc;
-    }, {} as Record<string, any[]>);
+    });
     
-    const results = await reconcileUnmappedFunctions(unmappedNodes, srcDir, baseMappings);
-    
-    // Export enhanced mappings
-    exportReconciliationResults(
-      results,
-      baseMappings,
-      path.join(mappingsDir, 'node-mappings-ai-enhanced.json')
+    const srcDir = options.srcDir || path.join(__dirname, '../../../src');
+    const results = await reconcileUnmappedFunctions(
+      unmappedNodes.filter(n => n.func), // Only process nodes with function code
+      srcDir,
+      config.mappings
     );
+    
+    // Export results - this will update node-mappings.json and create reconcile-results.json
+    exportReconciliationResults(results, path.join(mappingsDir, 'node-mappings.json'));
   }
 }
