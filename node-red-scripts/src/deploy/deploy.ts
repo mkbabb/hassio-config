@@ -40,6 +40,8 @@ export class Deployer {
   private nodeHashes: Map<string, string> = new Map();
   private nodeRedUrl: string;
   private haToken: string | undefined;
+  private haUsername: string | undefined;
+  private haPassword: string | undefined;
   
   constructor() {
     // Direct file path to flows.json
@@ -49,6 +51,8 @@ export class Deployer {
     // Try direct Node-RED port first, then ingress
     this.nodeRedUrl = process.env.NODE_RED_URL || 'http://localhost:1880';
     this.haToken = process.env.HA_TOKEN;
+    this.haUsername = process.env.HA_USERNAME;
+    this.haPassword = process.env.HA_PASSWORD;
     
     // Load mappings
     const mappingsDir = path.join(__dirname, 'mappings');
@@ -106,15 +110,27 @@ export class Deployer {
         const url = `${baseUrl}/flows`;
         console.log(`  Trying: ${url}`);
         
+        // Build headers with proper authentication
+        const headers: any = {
+          'Content-Type': 'application/json',
+          'Node-RED-Deployment-Type': 'nodes',
+          'Node-RED-API-Version': 'v2'
+        };
+        
+        // Add authentication - prefer Basic auth for Node-RED
+        if (this.haUsername && this.haPassword) {
+          const auth = Buffer.from(`${this.haUsername}:${this.haPassword}`).toString('base64');
+          headers['Authorization'] = `Basic ${auth}`;
+        } else if (this.haToken) {
+          headers['Authorization'] = `Bearer ${this.haToken}`;
+        }
+        
         const response = await fetch(url, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Node-RED-Deployment-Type': 'nodes',
-            'Node-RED-API-Version': 'v2',
-            ...(this.haToken ? { 'Authorization': `Bearer ${this.haToken}` } : {})
-          },
-          body: JSON.stringify(flows),
+          headers,
+          body: JSON.stringify({
+            flows: flows
+          }),
           timeout: 5000
         });
         

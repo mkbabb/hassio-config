@@ -24,14 +24,14 @@ interface FunctionNode {
 /**
  * Convert file path to a consistent node name
  * Examples:
- * - src/presence/presence.ts -> Presence
- * - src/cache-states/cache-house-state.ts -> Cache House State
- * - src/get-domain-entities/filter-hidden-and-domains.ts -> Filter Hidden And Domains
+ * - src/presence/presence.ts -> presence
+ * - src/cache-states/cache-house-state.ts -> cache house state
+ * - src/get-domain-entities/filter-hidden-and-domains.ts -> filter hidden and domains
  */
 function filePathToNodeName(filePath: string): string {
   // Handle 'unmapped' case
   if (filePath === 'unmapped' || filePath === 'unknown' || !filePath) {
-    return 'Unknown';
+    return 'unknown';
   }
   
   // Remove src/ prefix and .ts extension
@@ -42,10 +42,10 @@ function filePathToNodeName(filePath: string): string {
   // Get just the filename (last part of path)
   const fileName = path.basename(cleanPath);
   
-  // Convert to readable format
+  // Convert to readable format - lowercase with spaces
   return fileName
     .replace(/-/g, ' ') // Replace hyphens with spaces
-    .replace(/\b\w/g, l => l.toUpperCase()); // Capitalize first letter of each word
+    .toLowerCase(); // Convert to lowercase
 }
 
 /**
@@ -77,16 +77,9 @@ export async function getSuggestedRenames(mappingsPath?: string): Promise<Map<st
       const suggestedName = filePathToNodeName(tsFile);
       
       for (const node of nodes as NodeMapping[]) {
-        // Only suggest renames for high-confidence matches
-        if (node.confidence === 'exact' || node.confidence === 'high' || 
-            (node.confidence === 'ai-reconciled' && (node as any).aiConfidence >= 90)) {
-          // Skip if the name is already similar
-          const currentNameNormalized = node.nodeName.toLowerCase().replace(/\s+/g, '-');
-          const suggestedNameNormalized = suggestedName.toLowerCase().replace(/\s+/g, '-');
-          
-          if (currentNameNormalized !== suggestedNameNormalized) {
-            renames.set(node.nodeId, suggestedName);
-          }
+        // Check if current name differs from suggested name
+        if (node.nodeName !== suggestedName) {
+          renames.set(node.nodeId, suggestedName);
         }
       }
     }
@@ -187,7 +180,9 @@ export async function renameFunctionNodes(
           ...headers,
           'Node-RED-Deployment-Type': 'nodes' // Only restart modified nodes
         },
-        body: JSON.stringify(flows)
+        body: JSON.stringify({
+          flows: flows
+        })
       });
       
       if (!deployResponse.ok) {

@@ -19,7 +19,7 @@ loadEnv();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const RETURN_MSG = "\nreturn msg;";
-const DEFAULT_BLACKLIST = ["node_modules", /\.d\.ts$/];
+const DEFAULT_BLACKLIST = ["node_modules", /\.d\.ts$/, "src/deploy"];
 const CACHE_FILE = ".build-cache.json";
 const CACHE_STALE_TIME = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
@@ -466,7 +466,12 @@ class BuildManager {
                 }
 
                 console.log(chalk.green(`Successfully built ${inputFile}`));
-                return path.join(this.outputDir, `${name}.js`);
+                
+                // Post-process to remove CommonJS wrapper for Node-RED compatibility
+                const outputPath = path.join(this.outputDir, `${name}.js`);
+                await this.stripCommonJSWrapper(outputPath);
+                
+                return outputPath;
             } catch (error) {
                 console.error(chalk.red(`Failed to build ${inputFile}:`), error);
 
@@ -520,12 +525,52 @@ class BuildManager {
                 console.log(
                     chalk.green(`Successfully built ${inputFile} (fallback method)`)
                 );
-                return path.join(this.outputDir, `${name}.js`);
+                
+                // Post-process to remove CommonJS wrapper for Node-RED compatibility
+                const outputPath = path.join(this.outputDir, `${name}.js`);
+                await this.stripCommonJSWrapper(outputPath);
+                
+                return outputPath;
             }
         } catch (error) {
             console.error(chalk.red(`Failed to build ${inputFile}:`), error);
         }
         return null;
+    }
+
+    /**
+     * Strip CommonJS wrapper from built files for Node-RED compatibility
+     * Node-RED function nodes don't have module/exports in their context
+     */
+    private async stripCommonJSWrapper(filePath: string): Promise<void> {
+        try {
+            let content = await fs.readFile(filePath, 'utf8');
+            
+            // Remove CommonJS wrapper added by esbuild
+            // Pattern 1: var __defProp = ... module.exports = __toCommonJS(...);
+            content = content.replace(/var __defProp[\s\S]*?module\.exports\s*=\s*__toCommonJS\([^)]+\);[\r\n]*/g, '');
+            
+            // Pattern 2: module.exports = ...
+            content = content.replace(/module\.exports\s*=\s*[^;]+;[\r\n]*/g, '');
+            
+            // Pattern 3: exports.something = ...
+            content = content.replace(/exports\.[a-zA-Z_$][a-zA-Z0-9_$]*\s*=\s*[^;]+;[\r\n]*/g, '');
+            
+            // Pattern 4: Object.defineProperty(exports, ...)
+            content = content.replace(/Object\.defineProperty\(exports,[\s\S]*?\);[\r\n]*/g, '');
+            
+            // Remove any remaining module-related artifacts
+            content = content.replace(/var [a-zA-Z_$][a-zA-Z0-9_$]*_exports\s*=\s*\{\};[\r\n]*/g, '');
+            
+            // Write the cleaned content back
+            await fs.writeFile(filePath, content, 'utf8');
+            
+            if (debug) {
+                console.log(chalk.gray(`Stripped CommonJS wrapper from ${path.basename(filePath)}`));
+            }
+        } catch (error) {
+            console.error(chalk.red(`Failed to strip CommonJS wrapper from ${filePath}:`), error);
+        }
     }
 
     async buildFiles(changedFile?: string): Promise<Map<string, string>> {

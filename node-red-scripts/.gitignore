@@ -32,4 +32,5 @@ Thumbs.db
 *.bak
 
 # Mapping files (generated)
-src/deploy/mappings/node-mappings.json
+node-mappings.json
+reconcile-results.json

@@ -4,3 +4,11 @@ nighttime:
 daytime:
     name: "Daytime"
     icon: mdi:weather-sunny
+plants_trigger_on:
+    name: "Trigger Plants On"
+    icon: mdi:leaf
+    initial: false
+plants_trigger_off:
+    name: "Trigger Plants Off"
+    icon: mdi:leaf-off
+    initial: false

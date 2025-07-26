@@ -46,7 +46,15 @@
 ## Automation Architecture
 
 **Node-RED**: TypeScript scripts compiled to JavaScript with custom build system. REST API at `localhost:1880/endpoint/remote/`
-**Node-RED Flows**: Located at `/Volumes/addon_configs/a0d7b954_nodered/`
+**Node-RED Flows**: Located at `/Volumes/addon_configs/a0d7b954_nodered/flows.json`
+**Node-RED Deploy**: Preferred: `POST http://localhost:1880/flows` with headers `Node-RED-Deployment-Type: nodes`, `Node-RED-API-Version: v2`, Basic auth. Only restarts modified nodes, no reload needed
+
+### Node-RED Standards
+**HA Server**: Always use `79544c2b.6ccc64` for all Home Assistant nodes
+**Node Versions**: `server-state-changed` v6, `api-call-service` v7, `api-current-state` v3
+**Naming**: Lowercase descriptive names (e.g., "state_changed: input_boolean.plants_trigger_on", "turn off plants_trigger_on")
+**Positioning**: Align nodes evenly - state nodes at x=680, current_state at x=1180, service calls at x=1610
+**Required Fields**: Set `outputs: 2` for state_changed, `entities` object structure (not `entityidfilter`), proper `ifState` conditions
 
 **Key Scripts**:
 - `presence.ts`: Dynamic cool-down (10-30min), exponential backoff based on dwell time

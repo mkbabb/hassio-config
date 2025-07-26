@@ -2,6 +2,10 @@ import OpenAI from 'openai';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { config as loadEnv } from 'dotenv';
+
+// Load environment variables
+loadEnv();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -287,6 +291,7 @@ async function selectBestMatch(
 
 /**
  * Reconcile unmapped functions using AI
+ * Note: Orphaned nodes (with compiled JS but no source TS) are excluded and require manual reconciliation
  */
 export async function reconcileUnmappedFunctions(
   unmappedNodes: FunctionNode[],
@@ -294,6 +299,7 @@ export async function reconcileUnmappedFunctions(
   existingMappings: Record<string, any[]>
 ): Promise<ReconciliationResult[]> {
   console.log(`\nStarting AI reconciliation for ${unmappedNodes.length} unmapped functions...`);
+  console.log(`Note: Orphaned nodes (with compiled JS but missing source TS) require manual reconciliation and are excluded from AI processing.`);
   
   // Get set of already mapped files
   const mappedFiles = new Set(Object.keys(existingMappings));

@@ -26,7 +26,7 @@ interface Mapping {
   distFile: string;
   flowId: string;
   flowName?: string;
-  confidence: 'exact' | 'high' | 'medium' | 'low' | 'none';
+  confidence: 'exact' | 'high' | 'medium' | 'low' | 'orphaned' | 'none';
 }
 
 function normalizeCode(code: string): string {
@@ -35,8 +35,9 @@ function normalizeCode(code: string): string {
     .replace(/\/\/.*$/gm, '') // Remove line comments  
     .replace(/\s+/g, ' ') // Normalize whitespace
     .replace(/\s*([{}();,])\s*/g, '$1') // Remove spaces around punctuation
-    .replace(/return msg;?$/g, '') // Remove Node-RED footer
-    .trim();
+    .replace(/return\s+msg\s*;?\s*$/g, '') // Remove Node-RED footer with flexible whitespace
+    .trim()
+    .toLowerCase(); // Convert to lowercase for consistent comparison
 }
 
 function getCodeHash(code: string): string {
@@ -93,15 +94,19 @@ export async function mapFunctions(
         distHashes.set(hash, relativePath);
         
         // Map to source TypeScript file
-        const tsPath = relativePath.replace(/\.js$/, '.ts').replace(/^dist\//, 'src/');
-        if (fs.existsSync(path.join(baseDir, '..', tsPath))) {
-          distToSrc.set(relativePath, tsPath);
+        const tsPath = relativePath.replace(/\.js$/, '.ts');
+        const srcPath = `src/${tsPath}`;
+        const fullSrcPath = path.join(baseDir, '..', 'src', tsPath);
+        if (fs.existsSync(fullSrcPath)) {
+          distToSrc.set(relativePath, srcPath);
         }
       }
     }
   }
   
+  console.log(`Scanning dist directory: ${distDir}`);
   scanDir(distDir, distDir);
+  console.log(`Found ${distHashes.size} JavaScript files in dist`);
   
   // Map function nodes to files
   const mappings: Mapping[] = [];
@@ -113,15 +118,30 @@ export async function mapFunctions(
     if (distFile) {
       // Exact match found
       const tsFile = distToSrc.get(distFile);
-      mappings.push({
-        nodeId: node.id,
-        nodeName: node.name,
-        tsFile: tsFile || 'unknown',
-        distFile,
-        flowId: node.z,
-        flowName: flowMap.get(node.z),
-        confidence: 'exact'
-      });
+      
+      if (tsFile) {
+        // We have both compiled JS and source TS - proper exact match
+        mappings.push({
+          nodeId: node.id,
+          nodeName: node.name,
+          tsFile,
+          distFile,
+          flowId: node.z,
+          flowName: flowMap.get(node.z),
+          confidence: 'exact'
+        });
+      } else {
+        // Compiled JS exists but no source TS - orphaned node requiring manual reconciliation
+        mappings.push({
+          nodeId: node.id,
+          nodeName: node.name,
+          tsFile: 'orphaned',
+          distFile: distFile, // Keep the JS file reference for manual reconciliation
+          flowId: node.z,
+          flowName: flowMap.get(node.z),
+          confidence: 'orphaned'
+        });
+      }
     } else {
       // Try to find by source file comment
       const sourceMatch = node.func.match(/\/\/\s*(?:src\/)?(.+\.ts)/);
@@ -217,6 +237,7 @@ export async function generateMappingFile(
   const exact = mappings.filter(m => m.confidence === 'exact');
   const high = mappings.filter(m => m.confidence === 'high');
   const medium = mappings.filter(m => m.confidence === 'medium');
+  const orphaned = mappings.filter(m => m.confidence === 'orphaned');
   const unmapped = mappings.filter(m => m.confidence === 'none');
   
   const config = {
@@ -226,10 +247,11 @@ export async function generateMappingFile(
       exact: exact.length,
       high: high.length,
       medium: medium.length,
+      orphaned: orphaned.length,
       unmapped: unmapped.length
     },
     mappings: mappings.reduce((acc, m) => {
-      if (m.confidence !== 'none') {
+      if (m.confidence !== 'none' && m.confidence !== 'orphaned') {
         acc[m.tsFile] = acc[m.tsFile] || [];
         acc[m.tsFile].push({
           nodeId: m.nodeId,
@@ -240,6 +262,15 @@ export async function generateMappingFile(
       }
       return acc;
     }, {} as Record<string, any[]>),
+    orphaned: orphaned.map(m => ({
+      nodeId: m.nodeId,
+      nodeName: m.nodeName,
+      flowId: m.flowId,
+      flowName: m.flowName,
+      orphanedJsFile: m.distFile,
+      codePreview: functionNodes.find((n: any) => n.id === m.nodeId)?.func.substring(0, 200) + '...',
+      requiresManualReconciliation: true
+    })),
     unmapped: unmapped.map(m => ({
       nodeId: m.nodeId,
       nodeName: m.nodeName,
@@ -264,7 +295,15 @@ export async function generateMappingFile(
   console.log(`  Exact matches: ${exact.length}`);
   console.log(`  High confidence: ${high.length}`);
   console.log(`  Medium confidence: ${medium.length}`);
+  console.log(`  Orphaned: ${orphaned.length}`);
   console.log(`  Unmapped: ${unmapped.length}`);
+  
+  if (orphaned.length > 0) {
+    console.log(`\nOrphaned functions (compiled JS exists, source TS missing):`);
+    orphaned.forEach(m => {
+      console.log(`  - ${m.nodeName} (${m.nodeId}) -> ${m.distFile} [MANUAL RECONCILIATION REQUIRED]`);
+    });
+  }
   
   if (unmapped.length > 0) {
     console.log(`\nUnmapped functions need manual review:`);

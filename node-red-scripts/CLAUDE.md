@@ -82,6 +82,62 @@ const BLACKLISTED_ENTITIES = [
 **API endpoint**: REST commands via `http://localhost:1880/endpoint/remote/`  
 **State persistence**: Flow-level context storage for timers, states, schedules  
 
+## Flow Deployment (Preferred)
+
+```bash
+# API deployment - only restarts modified nodes, no full reload
+curl -X POST http://localhost:1880/flows \
+  -H "Content-Type: application/json" \
+  -H "Node-RED-Deployment-Type: nodes" \
+  -H "Node-RED-API-Version: v2" \
+  -u "username:password" \
+  -d '{"flows": [...]}'
+```
+
+Alternative: Edit `/Volumes/addon_configs/a0d7b954_nodered/flows.json` + `ha addon restart a0d7b954_nodered`
+
+## Node-RED Development Standards
+
+### Home Assistant Node Configuration
+- **Server ID**: Always use `79544c2b.6ccc64` for the `server` field
+- **Node Versions**: 
+  - `server-state-changed`: version 6
+  - `api-call-service`: version 7
+  - `api-current-state`: version 3
+- **Entity Structure**: Use `entities: {entity: ["id"], substring: [], regex: []}` not `entityidfilter`
+
+### Node Naming & Positioning
+- **Names**: Lowercase, descriptive (e.g., "state_changed: sensor.motion", "turn off light")
+- **Positioning**: Maintain consistent x-coordinates:
+  - State/trigger nodes: x=680
+  - Current state nodes: x=1180
+  - Service call nodes: x=1610
+  - Vertical spacing: 200px between related nodes
+
+### Required Node Properties
+```json
+// server-state-changed
+{
+  "type": "server-state-changed",
+  "server": "79544c2b.6ccc64",
+  "version": 6,
+  "outputs": 2,
+  "ifState": "on",
+  "ifStateOperator": "is",
+  "outputOnlyOnStateChange": true
+}
+
+// api-call-service
+{
+  "type": "api-call-service",
+  "server": "79544c2b.6ccc64",
+  "version": 7,
+  "domain": "input_boolean",
+  "service": "turn_off",
+  "entityId": ["input_boolean.example"]
+}
+```  
+
 ## Dependencies
 
 Build: typescript@5.8.3, vite@6.3.2, esbuild@0.25.3, tsx@4.19.3  
