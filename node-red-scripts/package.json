@@ -27,7 +27,7 @@
         "prettier": "^3.5.3",
         "tsx": "^4.19.3",
         "typescript": "^5.8.3",
-        "vite": "^6.3.2",
+        "vite": "^6.3.4",
         "vite-plugin-commonjs": "^0.10.4",
         "yargs": "^17.7.2"
     },
