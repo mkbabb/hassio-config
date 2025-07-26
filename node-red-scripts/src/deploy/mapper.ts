@@ -132,37 +132,39 @@ export async function mapFunctions(): Promise<Mapping[]> {
           confidence: 'high'
         });
       } else {
-        // Try name-based matching
-        const possibleFiles = [
-          `src/${node.name.replace(/\s+/g, '-').toLowerCase()}.ts`,
-          `src/*/${node.name.replace(/\s+/g, '-').toLowerCase()}.ts`,
-          `src/presence/${node.name.replace(/\s+/g, '-').toLowerCase()}.ts`,
-          `src/cache-states/${node.name.replace(/\s+/g, '-').toLowerCase()}.ts`,
-          `src/plants/${node.name.replace(/\s+/g, '-').toLowerCase()}.ts`,
-        ];
-        
+        // Try name-based matching by searching all directories
+        const normalizedName = node.name.replace(/\s+/g, '-').toLowerCase();
         let found = false;
-        for (const pattern of possibleFiles) {
-          const files = pattern.includes('*') 
-            ? [] // Would need glob here, skipping for simplicity
-            : [pattern];
-            
+        
+        // Search for possible TypeScript files
+        function searchForFile(dir: string, baseName: string): string | null {
+          const files = fs.readdirSync(dir);
           for (const file of files) {
-            if (fs.existsSync(path.join(srcDir, '..', file))) {
-              mappings.push({
-                nodeId: node.id,
-                nodeName: node.name,
-                tsFile: file,
-                distFile: file.replace(/^src\//, 'dist/').replace(/\.ts$/, '.js'),
-                flowId: node.z,
-                flowName: flowMap.get(node.z),
-                confidence: 'medium'
-              });
-              found = true;
-              break;
+            const fullPath = path.join(dir, file);
+            const stat = fs.statSync(fullPath);
+            
+            if (stat.isDirectory() && !file.startsWith('.') && file !== 'node_modules') {
+              const result = searchForFile(fullPath, baseName);
+              if (result) return result;
+            } else if (file === `${baseName}.ts` || file === normalizedName + '.ts') {
+              return path.relative(srcDir, fullPath);
             }
           }
-          if (found) break;
+          return null;
+        }
+        
+        const foundPath = searchForFile(srcDir, normalizedName);
+        if (foundPath) {
+          mappings.push({
+            nodeId: node.id,
+            nodeName: node.name,
+            tsFile: `src/${foundPath}`,
+            distFile: `dist/${foundPath.replace(/\.ts$/, '.js')}`,
+            flowId: node.z,
+            flowName: flowMap.get(node.z),
+            confidence: 'medium'
+          });
+          found = true;
         }
         
         if (!found) {
@@ -222,8 +224,13 @@ export async function generateMappingFile(): Promise<void> {
     }))
   };
   
+  const mappingsDir = path.join(__dirname, 'mappings');
+  if (!fs.existsSync(mappingsDir)) {
+    fs.mkdirSync(mappingsDir, { recursive: true });
+  }
+  
   fs.writeFileSync(
-    path.join(__dirname, '../../node-mappings.json'),
+    path.join(mappingsDir, 'node-mappings.json'),
     JSON.stringify(config, null, 2)
   );
   

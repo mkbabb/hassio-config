@@ -8,8 +8,12 @@ import * as esbuild from "esbuild";
 import crypto from "crypto";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
+import { config as loadEnv } from "dotenv";
 import { generateMappingFile } from "./src/deploy/mapper";
 import { Deployer } from "./src/deploy/deploy";
+
+// Load environment variables
+loadEnv();
 
 // Constants
 const __filename = fileURLToPath(import.meta.url);
@@ -746,16 +750,25 @@ async function main(): Promise<void> {
         if (builtFiles.size === 0) {
             console.log(chalk.yellow("No files were built, nothing to deploy"));
         } else {
-            console.log(chalk.cyan("\nDeploying to Node-RED..."));
+            console.log(chalk.cyan("\nChecking for deployment..."));
             const deployer = new Deployer();
+            
+            // Only deploy the files that were actually built (changed)
             const tsFiles = Array.from(builtFiles.keys()).map(f => path.join(inputDir, f));
-            const result = await deployer.deploy(tsFiles, { backup: true, dryRun });
+            const result = await deployer.deploy(tsFiles, { 
+                backup: process.env.DEPLOY_BACKUP !== 'false', 
+                dryRun 
+            });
             
             if (result.success) {
-                console.log(chalk.green(`\n✓ Deployment successful`));
-                console.log(chalk.green(`  Deployed: ${result.deployed.length} files`));
+                if (result.deployed.length > 0) {
+                    console.log(chalk.green(`\n✓ Deployment successful`));
+                    console.log(chalk.green(`  Deployed: ${result.deployed.length} functions`));
+                    result.deployed.forEach(d => console.log(chalk.gray(`    - ${d}`)));
+                }
                 if (result.failed.length > 0) {
-                    console.log(chalk.yellow(`  Failed: ${result.failed.length} files`));
+                    console.log(chalk.yellow(`  Failed: ${result.failed.length} functions`));
+                    result.failed.forEach(f => console.log(chalk.gray(`    - ${f}`)));
                 }
             } else {
                 console.error(chalk.red(`\n✗ Deployment failed: ${result.error}`));
