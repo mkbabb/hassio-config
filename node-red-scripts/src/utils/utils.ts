@@ -273,6 +273,9 @@ export const domainToService = function (entity: Hass.State, domain: string) {
         case "fan": {
             return `turn_${entity.state}`;
         }
+        case "input_boolean": {
+            return entity.state === "on" ? "turn_on" : "turn_off";
+        }
         case "media_player": {
             switch (entity.state) {
                 case "standby":
@@ -294,8 +297,9 @@ export const domainToService = function (entity: Hass.State, domain: string) {
                     return "lock";
                 case "unlocked":
                     return "unlock";
+                default:
+                    return entity.state === "on" ? "lock" : "unlock";
             }
-            break;
         }
         case "cover": {
             switch (entity.state) {
@@ -303,14 +307,55 @@ export const domainToService = function (entity: Hass.State, domain: string) {
                     return "open_cover";
                 case "closed":
                     return "close_cover";
+                default:
+                    return entity.state === "on" ? "open_cover" : "close_cover";
             }
-            break;
         }
         case "climate": {
-            return "set_preset_mode";
+            switch (entity.state) {
+                case "off":
+                    return "turn_off";
+                case "heat":
+                case "cool":
+                case "heat_cool":
+                case "auto":
+                case "dry":
+                case "fan_only":
+                    return "set_hvac_mode";
+                default:
+                    return "set_preset_mode";
+            }
+        }
+        case "vacuum": {
+            switch (entity.state) {
+                case "cleaning":
+                    return "start";
+                case "docked":
+                    return "return_to_base";
+                case "paused":
+                    return "pause";
+                case "idle":
+                    return "stop";
+                default:
+                    return "stop";
+            }
+        }
+        case "input_select":
+        case "select":
+            return "select_option";
+        case "button":
+        case "number":
+        case "sensor":
+        case "binary_sensor":
+            // These domains don't support turn_on/turn_off
+            return undefined;
+        default: {
+            // Generic fallback for unknown domains
+            if (entity.state === "on") return "turn_on";
+            if (entity.state === "off") return "turn_off";
+            return undefined;
         }
     }
-    return undefined;
 };
 
 export const createServiceCall = (entity: Hass.State): Hass.Service | undefined => {
@@ -567,6 +612,91 @@ export function mapRange(
     return ((value - fromMin) * (toMax - toMin)) / (fromMax - fromMin) + toMin;
 }
 
+export function lerp(value: number, min: number, max: number): number {
+    // Linear interpolation: returns 0-1 representing where value falls between min and max
+    const t = (value - min) / (max - min);
+    return Math.min(1, Math.max(0, t));
+}
+
 export const parseFloatIfString = (value: string | number): number => {
     return typeof value === "string" ? parseFloat(value) : value;
 };
+
+// Simple TTL cache for expensive operations
+interface CacheEntry<T> {
+    data: T;
+    timestamp: number;
+}
+
+const cache: Map<string, CacheEntry<any>> = new Map();
+
+/**
+ * Simple TTL cache decorator
+ * @param key Cache key
+ * @param ttlMs Time to live in milliseconds
+ * @param fetcher Function to fetch data if cache miss
+ */
+export function withTTL<T>(key: string, ttlMs: number, fetcher: () => T): T {
+    const now = Date.now();
+    const cached = cache.get(key);
+    
+    if (cached && (now - cached.timestamp) < ttlMs) {
+        return cached.data;
+    }
+    
+    const data = fetcher();
+    cache.set(key, { data, timestamp: now });
+    return data;
+}
+
+/**
+ * Deserialize RegExp objects from Node-RED flow context
+ * Flow context serializes RegExp as {__enc__: true, type: "regexp", data: "/pattern/flags"}
+ */
+export function deserializeRegExp(obj: any): any {
+    if (obj && obj.__enc__ && obj.type === "regexp" && obj.data) {
+        // Extract pattern and flags from the serialized format
+        // Use a more permissive regex that handles escaped content
+        const match = obj.data.match(/^\/(.*)\/([gimuy]*)$/);
+        if (match) {
+            try {
+                // The pattern might have escaped backslashes from JSON serialization
+                // Replace \\ with \ to get the actual pattern
+                const pattern = match[1].replace(/\\\\/g, '\\');
+                return new RegExp(pattern, match[2] || '');
+            } catch (e) {
+                console.error('Failed to create RegExp:', e, 'Pattern:', match[1]);
+                // If RegExp construction fails, return original
+                return obj;
+            }
+        }
+    }
+    return obj;
+}
+
+/**
+ * Recursively deserialize an object, converting serialized RegExp objects
+ */
+export function deserializeObject<T = any>(obj: T): T {
+    if (obj === null || obj === undefined) return obj;
+    
+    if (Array.isArray(obj)) {
+        return obj.map(item => deserializeObject(item)) as any;
+    }
+    
+    if (typeof obj === 'object') {
+        // Check if it's a serialized RegExp
+        if ((obj as any).__enc__) {
+            return deserializeRegExp(obj) as any;
+        }
+        
+        // Recursively deserialize object properties
+        const result: any = {};
+        for (const [key, value] of Object.entries(obj)) {
+            result[key] = deserializeObject(value);
+        }
+        return result;
+    }
+    
+    return obj;
+}

@@ -76,25 +76,98 @@ const BLACKLISTED_ENTITIES = [
 2. **Processing**: TypeScript logic with state management via flow context
 3. **Output**: Grouped Home Assistant actions or modified message
 
-## Integration
+## TypeScript to Node-RED Deployment
 
-**Manual deployment**: Copy compiled JavaScript from `dist/` to Node-RED function nodes  
-**API endpoint**: REST commands via `http://localhost:1880/endpoint/remote/`  
-**State persistence**: Flow-level context storage for timers, states, schedules  
+**IMPORTANT**: Always use the automated deployment system when updating Node-RED functions from TypeScript files.
 
-## Flow Deployment (Preferred)
+### Quick Start
 
+1. **Setup** (one-time):
+   ```bash
+   # Generate function mappings
+   npm run map                # Basic mapping
+   npm run map -- --ai        # With AI reconciliation
+   
+   # Configure .env with Home Assistant credentials
+   ```
+
+2. **Deploy a single file**:
+   ```bash
+   npm run deploy -- src/chronos/cron.ts
+   ```
+
+3. **Deploy all mapped functions**:
+   ```bash
+   npm run deploy -- --all
+   ```
+
+### Deployment Workflow
+
+**IMPORTANT**: When modifying TypeScript files, you must build before deploying!
+
+1. **Edit**: Make changes to TypeScript files in `src/`
+2. **Build**: Run `npm run build` to compile TypeScript to JavaScript
+   - In development: Use `npm run watch` for automatic rebuilds
+   - The deployment system deploys the compiled JS files from `dist/`, NOT the TS files
+3. **Deploy**: Run `npm run deploy -- src/path/to/file.ts`
+   - This deploys the corresponding `dist/path/to/file.js` to Node-RED
+   - Uses hot reload via Node-RED Admin API (no restart needed)
+   - Automatically creates backups before deployment
+
+**Common workflow**:
 ```bash
-# API deployment - only restarts modified nodes, no full reload
-curl -X POST http://localhost:1880/flows \
-  -H "Content-Type: application/json" \
-  -H "Node-RED-Deployment-Type: nodes" \
-  -H "Node-RED-API-Version: v2" \
-  -u "username:password" \
-  -d '{"flows": [...]}'
+# Edit your TypeScript file
+# Then build and deploy:
+npm run build && npm run deploy -- src/chronos/cron.ts
+
+# Or use watch mode during development:
+npm run watch  # In one terminal
+npm run deploy -- src/chronos/cron.ts  # In another terminal when ready
 ```
 
-Alternative: Edit `/Volumes/addon_configs/a0d7b954_nodered/flows.json` + `ha addon restart a0d7b954_nodered`
+### Deployment Commands
+
+```bash
+# Deploy specific files
+npm run deploy -- src/presence/presence.ts src/time-of-use.ts
+
+# Deploy with options
+npm run deploy -- src/presence/presence.ts --force      # Skip change detection
+npm run deploy -- src/presence/presence.ts --dry-run    # Preview changes
+npm run deploy -- src/presence/presence.ts --no-backup  # Skip backup
+
+# Rename nodes to match filenames
+npm run deploy -- --all --rename
+npm run deploy -- --rename-only --dry-run
+```
+
+### Node Mapping
+
+The system maintains mappings between TypeScript files and Node-RED function nodes:
+- **Exact match**: Code hash matches after normalization
+- **AI reconciled**: GPT-4 matches unmapped functions (75%+ confidence)
+- **Manual mapping**: Edit `src/deploy/mappings/node-mappings.json`
+
+Mappings are stored with confidence levels to prevent accidental overwrites.
+
+### Authentication
+
+Configure in `.env`:
+- **HA_USERNAME** & **HA_PASSWORD**: Home Assistant credentials for Node-RED API
+- **HA_TOKEN**: Long-lived access token (fallback for addon restart)
+- **OPENAI_API_KEY**: Optional, for AI reconciliation
+
+### Why Use Deployment System?
+
+- **Speed**: Hot reload without Node-RED restart
+- **Safety**: Automatic backups, change detection
+- **Accuracy**: Guaranteed correct function updates
+- **Tracking**: Know exactly which TS files map to which nodes
+
+## Integration
+
+**API endpoint**: REST commands via `http://localhost:1880/endpoint/remote/`  
+**State persistence**: Flow-level context storage for timers, states, schedules
 
 ## Node-RED Development Standards
 

@@ -1,7 +1,7 @@
 import { groupActions, filterBlacklistedEntity } from "../utils/utils";
 
 const MAX_COOL_DOWN = 30 * 60; // 30 minutes max cool-down
-const DEFAULT_COOL_DOWN = 10 * 60; // 10 minutes
+const DEFAULT_COOL_DOWN = 5; // 5 seconds for debugging (was 10 * 60)
 
 // States for the presence state machine
 enum PresenceState {
@@ -39,9 +39,9 @@ const isInCoolDownPeriod = (flowInfo: any): boolean => {
 
 // Determine aggregate presence state from multiple sensors
 const determinePresenceState = (sensorStates: string[]): PresenceState => {
-    // If any sensor is unknown, state is unknown
+    // If all sensors are unknown, state is unknown
     if (
-        sensorStates.some(
+        sensorStates.every(
             (state) => state === "unknown" || state === "unavailable" || !state
         )
     ) {
@@ -72,7 +72,7 @@ const isOnUnknownOffSequence = (
 const message = msg;
 
 // Extract message properties
-const payload = message.payload;
+const state = message.state; // State of the sensor
 const data = message.data;
 const dataEntityId = data.entity_id;
 const topic: string = message.topic ?? dataEntityId;
@@ -114,7 +114,7 @@ let debounceInfo = flow.get(debounceKey) || {
 };
 
 // Validate and normalize the incoming sensor state
-const normalizedPayload = payload === "on" || payload === "off" ? payload : "unknown";
+const normalizedState = state === "on" || state === "off" ? state : "unknown";
 
 // Simple debouncing - ignore rapid state changes within 2 seconds
 const DEBOUNCE_TIME = 2000; // 2 seconds
@@ -124,10 +124,10 @@ const timeSinceLastUpdate = now - debounceInfo.lastUpdate;
 // Check if this is a rapid state change
 if (
     timeSinceLastUpdate < DEBOUNCE_TIME &&
-    presenceStates[dataEntityId] !== normalizedPayload
+    presenceStates[dataEntityId] !== normalizedState
 ) {
     // Store pending state but don't process yet
-    debounceInfo.pendingState = normalizedPayload;
+    debounceInfo.pendingState = normalizedState;
     debounceInfo.lastUpdate = now;
     // @ts-ignore
     flow.set(debounceKey, debounceInfo);
@@ -138,7 +138,7 @@ if (
     msg.delay = 1;
 } else {
     // Update the specific sensor's state
-    presenceStates[dataEntityId] = normalizedPayload;
+    presenceStates[dataEntityId] = normalizedState;
     debounceInfo.lastUpdate = now;
     debounceInfo.pendingState = null;
 
@@ -154,7 +154,11 @@ if (
     const inCoolDown = isInCoolDownPeriod(flowInfo);
 
     // Check for on→unknown→off sequence
-    const isProblematicSequence = isOnUnknownOffSequence(aggregateState, prevState, prevPrevState);
+    const isProblematicSequence = isOnUnknownOffSequence(
+        aggregateState,
+        prevState,
+        prevPrevState
+    );
 
     // Determine actual state considering cool-down
     let actualState = aggregateState;
@@ -212,7 +216,11 @@ if (
                 msg.delay = delayMs;
                 // @ts-ignore
                 msg.payload = createPayload(filteredEntities, "turn_off");
-            } else if (prevState === PresenceState.UNKNOWN && !inCoolDown && !isProblematicSequence) {
+            } else if (
+                prevState === PresenceState.UNKNOWN &&
+                !inCoolDown &&
+                !isProblematicSequence
+            ) {
                 // From unknown to off, no cool-down active, not problematic sequence
                 flowInfo.state = PresenceState.OFF;
                 flowInfo.lastOff = Date.now();
@@ -260,4 +268,21 @@ if (
     msg.aggregateState = aggregateState;
     // @ts-ignore
     msg.inCoolDown = inCoolDown;
+    // @ts-ignore
+    msg.debug = {
+        topic: topic,
+        sensorCount: Object.keys(presenceStates).length,
+        coolDownSeconds: coolDown,
+        // @ts-ignore
+        actualDelayMs: msg.delay,
+        stateTransition: `${prevState} → ${flowInfo.state}`,
+        timeSinceLastOn: flowInfo.lastOn ? Date.now() - flowInfo.lastOn : null,
+        timeSinceLastOff: flowInfo.lastOff ? Date.now() - flowInfo.lastOff : null,
+        // Debounce info
+        // @ts-ignore
+        debounceInfo: {
+            lastUpdate: debounceInfo.lastUpdate,
+            pendingState: debounceInfo.pendingState
+        }
+    };
 } // End of else block for debounce check

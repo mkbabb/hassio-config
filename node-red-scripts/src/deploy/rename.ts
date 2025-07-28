@@ -27,6 +27,7 @@ interface FunctionNode {
  * - src/presence/presence.ts -> presence
  * - src/cache-states/cache-house-state.ts -> cache house state
  * - src/get-domain-entities/filter-hidden-and-domains.ts -> filter hidden and domains
+ * - src/schedules/index.ts -> schedules
  */
 function filePathToNodeName(filePath: string): string {
   // Handle 'unmapped' case
@@ -39,8 +40,16 @@ function filePathToNodeName(filePath: string): string {
     .replace(/^src\//, '')
     .replace(/\.ts$/, '');
   
-  // Get just the filename (last part of path)
+  // Get the filename
   const fileName = path.basename(cleanPath);
+  
+  // If the file is named 'index', use the parent directory name
+  if (fileName === 'index') {
+    const parentDir = path.basename(path.dirname(cleanPath));
+    return parentDir
+      .replace(/-/g, ' ') // Replace hyphens with spaces
+      .toLowerCase(); // Convert to lowercase
+  }
   
   // Convert to readable format - lowercase with spaces
   return fileName
