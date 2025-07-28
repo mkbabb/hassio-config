@@ -1,5 +1,6 @@
 import { existsSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
+import { writeFile, readFile, mkdir } from "fs/promises";
 import chalk from "chalk";
 import chokidar from "chokidar";
 import * as esbuild from "esbuild";
@@ -23,8 +24,7 @@ import {
     getRelativePath,
     loadCache,
     removeOutputFile,
-    saveCache,
-    stripCommonJSWrapper
+    saveCache
 } from "./utils";
 
 // Load environment variables
@@ -227,6 +227,12 @@ class BuildManager {
             this.updateDependencies(inputFile, result.metafile);
         }
 
+        // Process and clean the output for incremental builds
+        const content = await readFile(outputPath, 'utf8');
+        const processedCode = await this.processNodeRedOutput(content);
+        await mkdir(dirname(outputPath), { recursive: true });
+        await writeFile(outputPath, processedCode, 'utf8');
+
         console.log(chalk.green(`Successfully rebuilt ${inputFile}`));
         return outputPath;
     }
@@ -237,12 +243,14 @@ class BuildManager {
                 entryPoints: [inputFile],
                 outfile: outputPath,
                 bundle: true,
-                format: "cjs",
+                format: "iife",
+                globalName: "nodeRedFunction",
                 platform: "node",
                 footer: { js: RETURN_MSG },
                 minify: false,
                 metafile: true,
-                target: "es2022"
+                target: "es2022",
+                write: false
             });
 
             this.esbuildContext.set(inputFile, context);
@@ -252,9 +260,14 @@ class BuildManager {
                 this.updateDependencies(inputFile, result.metafile);
             }
 
+            // Process and clean the output
+            if (result.outputFiles && result.outputFiles.length > 0) {
+                const processedCode = await this.processNodeRedOutput(result.outputFiles[0].text);
+                await mkdir(dirname(outputPath), { recursive: true });
+                await writeFile(outputPath, processedCode, 'utf8');
+            }
+
             console.log(chalk.green(`Successfully built ${inputFile}`));
-            await stripCommonJSWrapper(outputPath, debug);
-            
             return outputPath;
         } catch (error) {
             // Fallback to regular build
@@ -267,12 +280,14 @@ class BuildManager {
             entryPoints: [inputFile],
             outfile: outputPath,
             bundle: true,
-            format: "cjs",
+            format: "iife",
+            globalName: "nodeRedFunction",
             platform: "node",
             footer: { js: RETURN_MSG },
             minify: false,
             metafile: true,
-            target: "es2022"
+            target: "es2022",
+            write: false
         });
 
         // Process metafile
@@ -280,9 +295,14 @@ class BuildManager {
             this.updateDependencies(inputFile, buildResult.metafile);
         }
 
+        // Process and clean the output
+        if (buildResult.outputFiles && buildResult.outputFiles.length > 0) {
+            const processedCode = await this.processNodeRedOutput(buildResult.outputFiles[0].text);
+            await mkdir(dirname(outputPath), { recursive: true });
+            await writeFile(outputPath, processedCode, 'utf8');
+        }
+
         console.log(chalk.green(`Successfully built ${inputFile} (fallback method)`));
-        await stripCommonJSWrapper(outputPath, debug);
-        
         return outputPath;
     }
 
@@ -467,6 +487,45 @@ class BuildManager {
         if (debug) {
             console.log(chalk.gray(message));
         }
+    }
+
+    private async processNodeRedOutput(code: string): Promise<string> {
+        // First, check if we have an IIFE wrapped output
+        const iifeMatch = code.match(/^var\s+\w+\s*=\s*\(\(\)\s*=>\s*{([\s\S]*)}\)\(\);?\s*$/m);
+        
+        let processed: string;
+        if (iifeMatch) {
+            // Extract the content inside the IIFE
+            processed = iifeMatch[1];
+        } else {
+            // Try alternative IIFE patterns
+            processed = code
+                .replace(/^\s*\(\(\)\s*=>\s*{\s*/, '')
+                .replace(/\s*}\)\(\);?\s*$/, '')
+                .replace(/^\s*\(function\s*\(\)\s*{\s*/, '')
+                .replace(/\s*}\)\(\);?\s*$/, '');
+        }
+        
+        // Remove any module.exports or exports statements
+        processed = processed.replace(/module\.exports\s*=\s*[^;]+;/g, '');
+        processed = processed.replace(/exports\.[a-zA-Z_$][a-zA-Z0-9_$]*\s*=\s*[^;]+;/g, '');
+        
+        // Clean up any remaining CommonJS artifacts
+        processed = processed.replace(/var __defProp[\s\S]*?__toCommonJS\([^)]+\);/g, '');
+        processed = processed.replace(/Object\.defineProperty\(exports,[\s\S]*?\);/g, '');
+        
+        // Remove any 'use strict' declarations
+        processed = processed.replace(/^\s*["']use strict["'];?\s*\n?/gm, '');
+        
+        // Clean up empty lines at the beginning and end
+        processed = processed.trim();
+        
+        // Ensure proper ending
+        if (!processed.endsWith('return msg;')) {
+            processed += '\n\nreturn msg;';
+        }
+        
+        return processed;
     }
 }
 

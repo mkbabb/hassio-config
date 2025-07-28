@@ -1,3 +1,5 @@
+import { isInCoolDownPeriod, getRemainingCoolDownMs, PresenceState } from "./utils";
+
 // @ts-ignore
 const message = msg;
 
@@ -12,4 +14,29 @@ const topic: string = message.topic ?? dataEntityId;
 const flowInfoKey = `flowInfo.${topic}`;
 
 // @ts-ignore
-msg.data = flow.get(flowInfoKey) ?? {};
+const flowInfo = flow.get(flowInfoKey) ?? {};
+
+// Check if we're still in a cooldown period
+if (flowInfo.state === PresenceState.PENDING_OFF) {
+    // If we're in cooldown and state is pending off, set delay to remaining cooldown time
+    if (isInCoolDownPeriod(flowInfo)) {
+        // @ts-ignore
+        msg.delay = getRemainingCoolDownMs(flowInfo);
+    } else {
+        // If cooldown is over, reset state to OFF and clear delay
+        flowInfo.state = PresenceState.OFF;
+        flowInfo.delay = 0;
+        // @ts-ignore
+        flow.set(flowInfoKey, flowInfo);
+        // @ts-ignore
+        msg.delay = 0;
+    }
+} else {
+    // Otherwise, no delay and pass through current flow info state
+    // @ts-ignore
+    msg.delay = 0;
+}
+
+// Pass the flow info data
+// @ts-ignore
+msg.data = flowInfo;
