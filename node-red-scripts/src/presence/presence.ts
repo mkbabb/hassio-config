@@ -84,6 +84,12 @@ const isProblematicSequence = isOnUnknownOffSequence(
     prevPrevState
 );
 
+// Check for off→unknown→off sequence (should trigger immediate off)
+const isOffUnknownOffSequence =
+    prevPrevState === PresenceState.OFF &&
+    prevState === PresenceState.UNKNOWN &&
+    aggregateState === PresenceState.OFF;
+
 // Determine actual state considering cool-down
 let actualState = aggregateState;
 if (aggregateState === PresenceState.OFF && inCoolDown) {
@@ -148,8 +154,12 @@ switch (actualState) {
             flowInfo.state = PresenceState.OFF;
             flowInfo.lastOff = Date.now();
             flowInfo.lastOn = null;
-            // @ts-ignore
-            msg.payload = createPayload(filteredEntities, "turn_off");
+
+            // Special case: off→unknown→off should trigger immediate off
+            if (isOffUnknownOffSequence) {
+                // @ts-ignore
+                msg.payload = createPayload(filteredEntities, "turn_off");
+            }
         } else if (isProblematicSequence) {
             // On→Unknown→Off sequence detected - skip instant off, just update state
             flowInfo.state = PresenceState.OFF;
@@ -202,5 +212,6 @@ msg.debug = {
     timeSinceLastOn: flowInfo.lastOn ? Date.now() - flowInfo.lastOn : null,
     timeSinceLastOff: flowInfo.lastOff ? Date.now() - flowInfo.lastOff : null,
     prevState: flowInfo.prevState,
-    prevPrevState: flowInfo.prevPrevState
+    prevPrevState: flowInfo.prevPrevState,
+    isOffUnknownOffSequence: isOffUnknownOffSequence
 };

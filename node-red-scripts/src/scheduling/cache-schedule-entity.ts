@@ -1,3 +1,5 @@
+import { timeStringToDate, compareTime } from "../utils/utils";
+
 const weekdaySleepEntityId = "input_datetime.weekday_sleep";
 const weekendSleepEntityId = "input_datetime.weekend_sleep";
 
@@ -31,17 +33,22 @@ const dayStatus = msg.day_status;
 // @ts-ignore
 let entityId = msg.data.entity_id;
 
+const entityTime = timeStringToDate(payload);
+
 // @ts-ignore
 node.status({ fill: "blue", shape: "dot", text: entityId });
 
 // If the current day status is "night" and the entity is "sensor.sleep_time"
 // Or if the current day status is "day" and the entity is "sensor.wakeup_time"
+// OR if the current time is after entity's time
+
 // Then don't change the cached time
 const shouldSkip =
     // @ts-ignore
     msg?.should_skip ||
     (dayStatus === "night" && entityId === sleepEntityId) ||
-    (dayStatus === "day" && entityId === wakeupEntityId);
+    (dayStatus === "day" && entityId === wakeupEntityId) ||
+    compareTime(entityTime, now) < 0;
 
 if (shouldSkip) {
     // @ts-ignore

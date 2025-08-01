@@ -5,7 +5,7 @@ declare namespace Hass {
     export namespace Attributes {
         interface Switch {
             friendly_name: string;
-            supported_features: number;
+            supported_features?: number;
         }
 
         interface Light extends Switch {
@@ -43,6 +43,7 @@ declare namespace Hass {
 
         interface Group {
             entity_id: string | string[];
+            supported_features?: number;
         }
     }
 
@@ -110,10 +111,19 @@ declare namespace Hass {
         entity_id?: string;
         data?: {
             [s: string]: any;
-            entity_id: string;
+            entity_id?: string;
         };
         merge_context?: string;
         alternative_template_tags?: boolean;
         output_location?: string;
     }
+
+    // Type guards for specific entity types
+    interface LightState extends State {
+        attributes: Partial<Attributes.Light>;
+    }
+
+    // Helper type guards
+    function isLightEntity(entity: State): entity is LightState;
+    function hasLightAttributes(attributes: Partial<Attribute>): attributes is Partial<Attributes.Light>;
 }

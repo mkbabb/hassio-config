@@ -1,5 +1,5 @@
 // Home Assistant entity fetching utilities
-import { withTTL } from './utils';
+import { withTTL, getEntityDomain, filterBlacklistedEntity } from './utils';
 
 export interface EntityFilter {
     pattern?: string | RegExp;
@@ -77,7 +77,7 @@ export function getEntities(filter: EntityFilter): Hass.State[] {
         // Domain filtering
         if (filter.domain) {
             const domains = Array.isArray(filter.domain) ? filter.domain : [filter.domain];
-            const entityDomain = entity.entity_id.split('.')[0];
+            const entityDomain = getEntityDomain(entity.entity_id);
             if (!domains.includes(entityDomain)) return false;
         }
         
@@ -120,7 +120,7 @@ export function getEntitiesByDomain(domain: string | string[]): Hass.State[] {
         
         // Single pass through all entities
         for (const [entityId, state] of Object.entries(allStates)) {
-            const entityDomain = entityId.split('.')[0];
+            const entityDomain = getEntityDomain(entityId);
             if (domains.includes(entityDomain)) {
                 result.push(state);
             }
@@ -190,12 +190,13 @@ export function matchEntitiesMultiple(patterns: (string | RegExp)[]): Hass.State
 }
 
 /**
- * Filter out unavailable or unknown entities
+ * Filter out unavailable, unknown, or blacklisted entities
  */
 export function filterAvailableEntities(entities: Hass.State[]): Hass.State[] {
     return entities.filter(entity => 
         entity.state !== 'unavailable' && 
-        entity.state !== 'unknown'
+        entity.state !== 'unknown' &&
+        filterBlacklistedEntity(entity)
     );
 }
 
@@ -204,7 +205,7 @@ export function filterAvailableEntities(entities: Hass.State[]): Hass.State[] {
  */
 export function groupEntitiesByDomain(entities: Hass.State[]): Record<string, Hass.State[]> {
     return entities.reduce((acc, entity) => {
-        const domain = entity.entity_id.split('.')[0];
+        const domain = getEntityDomain(entity.entity_id);
         if (!acc[domain]) acc[domain] = [];
         acc[domain].push(entity);
         return acc;

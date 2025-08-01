@@ -1,4 +1,7 @@
 // Types for our schedule system
+
+// Global configuration
+export const PRESENCE_STATE_ENTITY_ID = "input_select.home_status";
 export type EntityMatch = string | RegExp | string[] | RegExp[] | EntityConfig;
 
 export type EntityConfig = {
@@ -41,7 +44,7 @@ export type Schedule = {
     entities?: EntityMatch[];
     tags?: string[];
     start: string | { entity_id: string };
-    end: string | { entity_id: string };
+    end?: string | { entity_id: string };  // Optional for trigger schedules
     precedence: number;
     type?: "continuous" | "trigger";  // Default to "trigger"
     conditions?: ScheduleCondition[];
@@ -81,6 +84,10 @@ export type NormalizedSchedule = {
         postamble_minutes?: number;
         events?: boolean;
     };
+    defaultStates?: {
+        on?: EntityState;
+        off?: EntityState;
+    };
 };
 
 export type NormalizedEntityConfig = {
@@ -93,9 +100,9 @@ export type NormalizedEntityConfig = {
 
 export type ScheduleEvent = {
     schedule: string;
-    type: "active" | "ramp_up" | "ramp_down_before_end" | "ramp_down";
+    type: "active" | "inactive" | "ramp_up" | "ramp_down_before_end" | "ramp_down";
     t: number;  // 0-1 interpolation value
     time: Date;
-    phase?: "sunrise" | "active" | "sunset_prep" | "sunset";
+    phase?: "sunrise" | "active" | "sunset_prep" | "sunset" | "inactive";
     entity_id?: string;  // Optional entity this event applies to
 };

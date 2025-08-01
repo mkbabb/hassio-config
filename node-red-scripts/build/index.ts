@@ -7,8 +7,8 @@ import * as esbuild from "esbuild";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { config as loadEnv } from "dotenv";
-import { generateMappingFile } from "../src/deploy/mappings/mapper";
-import { Deployer } from "../src/deploy/deploy";
+import { generateMappingFile } from "./deploy/mappings/mapper";
+import { Deployer } from "./deploy/deploy";
 import { DependencyGraph } from "./dependency-graph";
 import {
     BuildCache,
@@ -138,7 +138,6 @@ class BuildManager {
 
         if (!cacheEntry) {
             this.logDebug(`${filePath} needs rebuild: No cache entry`);
-            this.updateCache(filePath, currentHash, []);
             return true;
         }
 
@@ -146,7 +145,6 @@ class BuildManager {
         
         if (reasons.length > 0) {
             reasons.forEach(reason => this.logDebug(`${filePath} needs rebuild: ${reason}`));
-            this.updateCache(filePath, currentHash, cacheEntry.dependencies);
             return true;
         }
 
@@ -206,13 +204,24 @@ class BuildManager {
             const name = getRelativePath(inputFile, this.inputDir).replace(/\.ts$/, "");
             const outputPath = join(this.outputDir, `${name}.js`);
 
+            let result: string | null;
+            
             // Try incremental build first
             if (this.esbuildContext.has(inputFile)) {
-                return await this.incrementalBuild(inputFile, outputPath);
+                result = await this.incrementalBuild(inputFile, outputPath);
+            } else {
+                // Create new build context
+                result = await this.createAndBuild(inputFile, outputPath);
             }
-
-            // Create new build context
-            return await this.createAndBuild(inputFile, outputPath);
+            
+            // Update cache after successful build
+            if (result) {
+                const currentHash = calculateHash(inputFile);
+                const dependencies = this.cache[inputFile]?.dependencies || [];
+                this.updateCache(inputFile, currentHash, dependencies);
+            }
+            
+            return result;
         } catch (error) {
             console.error(chalk.red(`Failed to build ${inputFile}:`), error);
             return null;
@@ -519,6 +528,13 @@ class BuildManager {
         
         // Clean up empty lines at the beginning and end
         processed = processed.trim();
+        
+        // Check if the processed code is empty or only contains minimal content
+        // This happens when a file is a pure utility module (only exports, no executable code)
+        if (!processed || processed.length < 10) {
+            console.warn('Warning: File appears to be a utility module with no executable code. Skipping Node-RED processing.');
+            return '// This file appears to be a utility module and should not be deployed to Node-RED function nodes\n\nreturn msg;';
+        }
         
         // Ensure proper ending
         if (!processed.endsWith('return msg;')) {

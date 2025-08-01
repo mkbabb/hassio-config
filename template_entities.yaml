@@ -61,23 +61,8 @@
         {{ (off_lights | length / lights | length * 100) | round(1) }}
       {% endif %}
 
-  - name: "Sun Next Setting"
-    unique_id: sun_next_setting
-    state: >
-      {% set next_setting = state_attr('sun.sun', 'next_setting') %}
-      {% if next_setting %}
-        {{ as_timestamp(next_setting) | timestamp_custom('%H:%M:%S') }}
-      {% else %}
-        18:00:00
-      {% endif %}
-    icon: mdi:weather-sunset-down
-    attributes:
-      friendly_name: "Next Sunset Time"
-      timestamp: >
-        {{ state_attr('sun.sun', 'next_setting') }}
-
-  - name: "Sun Next Rising"
-    unique_id: sun_next_rising
+  - name: "Sunrise"
+    unique_id: sunrise
     state: >
       {% set next_rising = state_attr('sun.sun', 'next_rising') %}
       {% if next_rising %}
@@ -86,7 +71,14 @@
         06:00:00
       {% endif %}
     icon: mdi:weather-sunset-up
-    attributes:
-      friendly_name: "Next Sunrise Time"
-      timestamp: >
-        {{ state_attr('sun.sun', 'next_rising') }}
+
+  - name: "Sunset"
+    unique_id: sunset
+    state: >
+      {% set next_setting = state_attr('sun.sun', 'next_setting') %}
+      {% if next_setting %}
+        {{ as_timestamp(next_setting) | timestamp_custom('%H:%M:%S') }}
+      {% else %}
+        18:00:00
+      {% endif %}
+    icon: mdi:weather-sunset-down

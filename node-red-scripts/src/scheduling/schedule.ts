@@ -7,8 +7,7 @@ import {
     compareTime,
     getEntityDomain,
     lerp,
-    domainToService,
-    deserializeObject
+    domainToService
 } from "../utils/utils";
 import {
     getScheduleEntities,
@@ -18,7 +17,7 @@ import {
     getEntity,
     getEntitiesById
 } from "../utils/ha-entities";
-import { DomainStates } from "./types";
+import { DomainStates, PRESENCE_STATE_ENTITY_ID } from "./types";
 import type {
     NormalizedSchedule,
     Schedule,
@@ -30,8 +29,7 @@ import type {
     EntityState
 } from "./types";
 
-// Global constants
-const PRESENCE_STATE_ENTITY_ID = "input_select.home_status";
+// Using global presence entity ID from types
 
 function checkConditions(
     conditions: ScheduleCondition[] | undefined,
@@ -78,7 +76,9 @@ function normalizeEntityMatch(match: EntityMatch): NormalizedEntityConfig[] {
             // Plain string entity ID
             return [
                 {
-                    pattern: new RegExp(`^${match.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`)
+                    pattern: new RegExp(
+                        `^${match.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`
+                    )
                 }
             ];
         }
@@ -189,7 +189,8 @@ function calculateScheduleEvents(
     const events: ScheduleEvent[] = [];
 
     // Check if we're in the active window
-    if (isTimeInRange(now, schedule.start, schedule.end)) {
+    const inActiveWindow = isTimeInRange(now, schedule.start, schedule.end);
+    if (inActiveWindow) {
         const t = calculateTValue(now, schedule.start, schedule.end);
         events.push({
             schedule: schedule.name,
@@ -197,6 +198,15 @@ function calculateScheduleEvents(
             t,
             time: now,
             phase: "active"
+        });
+    } else if (schedule.type === "continuous") {
+        // For continuous schedules, emit inactive events so users can track current state
+        events.push({
+            schedule: schedule.name,
+            type: "inactive",
+            t: now < schedule.start ? 0 : 1, // 0 before start, 1 after end
+            time: now,
+            phase: "inactive"
         });
     }
 
@@ -238,7 +248,7 @@ function calculateScheduleEvents(
     // Check for postamble events if interpolation is enabled
     if (schedule.interpolation?.enabled && schedule.interpolation.postamble_minutes) {
         const postambleMinutes = schedule.interpolation.postamble_minutes;
-        
+
         // Ramp down after end (sunset)
         const rampDownEnd = new Date(
             schedule.end.getTime() + postambleMinutes * 60 * 1000
@@ -315,10 +325,18 @@ function determineEntityAction(
 
     // Get the appropriate state config
     const stateKey = isActive ? "on" : "off";
-    const stateConfig =
+    let stateConfig =
         entityConfig?.states?.[stateKey] || schedule.defaultStates?.[stateKey];
-    
+
+    // If no state config is defined, provide default turn_on/turn_off behavior
+    if (!stateConfig) {
+        stateConfig = {
+            service: isActive ? "turn_on" : "turn_off"
+        };
+    }
+
     // For unidirectional schedules: if schedule is inactive and no "off" state is defined, skip
+    // (This check is now after we've provided defaults, so only applies to explicitly null configs)
     if (!isActive && !stateConfig) {
         return null;
     }
@@ -363,6 +381,8 @@ const staticStates = flow.get("staticStates") ?? {};
 // @ts-ignore
 const tagDefinitions = flow.get("tagDefinitions") ?? {};
 // @ts-ignore
+const triggeredSchedules = flow.get("triggeredSchedules") ?? {};
+// @ts-ignore
 const message: Hass.Message = msg;
 
 const now = new Date();
@@ -394,29 +414,56 @@ const normalizedSchedules: NormalizedSchedule[] = schedules
                 }
                 return time;
             } else {
-                const entity = scheduleEntities?.[time.entity_id];
-                return entity ? entity.state : "00:00";
+                // First try schedule entities (input_datetime)
+                let entity = scheduleEntities?.[time.entity_id];
+                if (entity) {
+                    const state = entity.state;
+                    console.log(`Resolved ${time.entity_id} from scheduleEntities: ${state}`);
+                    return state;
+                }
+                
+                // If not found, try direct entity access for sensors, etc.
+                entity = getEntity(time.entity_id);
+                if (entity) {
+                    const state = entity.state;
+                    console.log(`Resolved ${time.entity_id} via direct access: ${state}`);
+                    return state;
+                } 
+                
+                // Error: entity not found
+                console.error(`ERROR: Schedule entity '${time.entity_id}' not found! This will cause incorrect scheduling.`);
+                throw new Error(`Schedule entity '${time.entity_id}' not found`);
             }
         };
 
         const startTimeString = resolveTime(start);
-        const endTimeString = resolveTime(end);
+        const endTimeString = end ? resolveTime(end) : null;
 
         const startTime = timeStringToDate(startTimeString);
-        const endTime = timeStringToDate(endTimeString);
+        let endTime = endTimeString ? timeStringToDate(endTimeString) : null;
 
         startTime.setDate(now.getDate());
-        endTime.setDate(now.getDate());
 
-        // Handle schedules that span midnight
-        if (compareTime(startTime, endTime) >= 0) {
-            if (compareTime(now, endTime) < 1) {
-                startTime.setDate(startTime.getDate() - 1);
-            } else {
-                endTime.setDate(endTime.getDate() + 1);
+        // For trigger schedules without end time, create a 10-minute window
+        if (!endTime && schedule.type === "trigger") {
+            const endTimeDate = new Date(startTime.getTime() + 10 * 60 * 1000); // 10 minutes after start
+            endTime = endTimeDate;
+        } else if (endTime) {
+            endTime.setDate(now.getDate());
+
+            // Handle schedules that span midnight
+            if (compareTime(startTime, endTime) >= 0) {
+                if (compareTime(now, endTime) < 1) {
+                    startTime.setDate(startTime.getDate() - 1);
+                } else {
+                    endTime.setDate(endTime.getDate() + 1);
+                }
+            } else if (compareTime(now, endTime) > 1) {
+                startTime.setDate(startTime.getDate() + 1);
             }
-        } else if (compareTime(now, endTime) > 1) {
-            startTime.setDate(startTime.getDate() + 1);
+        } else {
+            // Continuous schedule without end time - invalid
+            return null;
         }
 
         return {
@@ -424,17 +471,20 @@ const normalizedSchedules: NormalizedSchedule[] = schedules
             entities: entities?.filter((e) => e != null).flatMap(normalizeEntityMatch),
             tags,
             start: startTime,
-            end: endTime,
+            end: endTime as Date,
             startTime: dateToTimeString(startTime),
-            endTime: dateToTimeString(endTime),
+            endTime: endTime ? dateToTimeString(endTime) : undefined,
             precedence,
             conditions,
             interpolation: interpolation || { enabled: true }, // Enable t calculation by default
             defaultStates: schedule.defaultStates,
-            type: schedule.type || "trigger"  // Default to trigger
+            type: schedule.type || "trigger" // Default to trigger
         };
     })
-    .filter((s) => checkConditions(s.conditions, message));
+    .filter(
+        (s): s is NormalizedSchedule =>
+            s !== null && checkConditions(s.conditions, message)
+    );
 
 // Get entities to check - either from payload or by fetching all controlled entities
 let entitiesToCheck: Hass.State[] = [];
@@ -531,7 +581,7 @@ entitiesToCheck.forEach((entity) => {
         : null;
 
     const isActive = isTimeInRange(now, activeSchedule.start, activeSchedule.end);
-    
+
     // Handle continuous vs trigger schedules
     if (activeSchedule.type === "continuous") {
         // Continuous schedules: enforce state during entire active period
@@ -545,24 +595,6 @@ entitiesToCheck.forEach((entity) => {
 
             if (action) {
                 serviceActions.push(action);
-            } else {
-                // For continuous schedules, include entity even if already in desired state
-                const domain = getEntityDomain(entity.entity_id);
-                const stateKey = "on";
-                const stateConfig = entityConfig?.states?.[stateKey] || activeSchedule.defaultStates?.[stateKey];
-                const targetState = getTargetState(domain, true, stateConfig);
-                const service = getServiceForState(domain, targetState, stateConfig?.service);
-                
-                if (service && service !== "set_state") {
-                    serviceActions.push({
-                        domain: stateConfig?.domain || domain,
-                        service,
-                        data: {
-                            entity_id: entity.entity_id,
-                            ...(stateConfig?.data || {})
-                        }
-                    });
-                }
             }
         } else {
             // Schedule not active - enforce OFF state for continuous schedules
@@ -570,16 +602,34 @@ entitiesToCheck.forEach((entity) => {
                 entity as Hass.State,
                 activeSchedule,
                 entityConfig,
-                false  // Force OFF state
+                false // Force OFF state
             );
 
             if (action) {
                 serviceActions.push(action);
             }
         }
-    } else {
-        // Trigger schedules: only act at transitions (handled elsewhere)
-        // Don't continuously enforce state
+    } else if (activeSchedule.type === "trigger") {
+        // Trigger schedules: fire once when becoming active
+        const dateKey = now.toISOString().split("T")[0]; // YYYY-MM-DD
+        const scheduleKey = `${activeSchedule.name}_${entity.entity_id}_${dateKey}`;
+        const alreadyTriggered = triggeredSchedules[scheduleKey];
+
+        if (isActive && !alreadyTriggered) {
+            // We're in the active period and haven't triggered today
+            const action = determineEntityAction(
+                entity as Hass.State,
+                activeSchedule,
+                entityConfig,
+                true // Turn ON
+            );
+
+            if (action) {
+                serviceActions.push(action);
+                // Mark as triggered for today
+                triggeredSchedules[scheduleKey] = now.toISOString();
+            }
+        }
     }
 
     // Track match info
@@ -613,6 +663,20 @@ const debugInfo = {
             endTime: s.endTime
         }))
 };
+
+// Clean up old date entries from triggeredSchedules (keep only today)
+const today = now.toISOString().split("T")[0];
+const cleanedTriggeredSchedules: Record<string, any> = {};
+
+Object.entries(triggeredSchedules).forEach(([key, value]) => {
+    if (key.endsWith(`_${today}`)) {
+        cleanedTriggeredSchedules[key] = value;
+    }
+});
+
+// Save triggered schedules back to flow context
+// @ts-ignore
+flow.set("triggeredSchedules", cleanedTriggeredSchedules);
 
 // Output
 // @ts-ignore
