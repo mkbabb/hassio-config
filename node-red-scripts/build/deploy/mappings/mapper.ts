@@ -30,7 +30,7 @@ interface Mapping {
 }
 
 function normalizeCode(code: string): string {
-  return code
+  const normalized = code
     .replace(/\/\*[\s\S]*?\*\//g, '') // Remove block comments
     .replace(/\/\/.*$/gm, '') // Remove line comments  
     .replace(/\s+/g, ' ') // Normalize whitespace
@@ -38,6 +38,14 @@ function normalizeCode(code: string): string {
     .replace(/return\s+msg\s*;?\s*$/g, '') // Remove Node-RED footer with flexible whitespace
     .trim()
     .toLowerCase(); // Convert to lowercase for consistent comparison
+  
+  // If normalization results in empty string, use original code for hashing
+  // This prevents hash collisions between different empty/placeholder functions
+  if (normalized === '') {
+    return code.trim().toLowerCase();
+  }
+  
+  return normalized;
 }
 
 function getCodeHash(code: string): string {
@@ -75,8 +83,8 @@ export async function mapFunctions(
       flowMap.set(flow.id, flow.label || flow.type);
     });
   
-  // Build dist file hash map
-  const distHashes = new Map<string, string>();
+  // Build dist file hash map with collision detection
+  const distHashes = new Map<string, string[]>(); // Hash -> array of file paths
   const distToSrc = new Map<string, string>();
   
   function scanDir(dir: string, baseDir: string) {
@@ -91,7 +99,12 @@ export async function mapFunctions(
         const content = fs.readFileSync(fullPath, 'utf8');
         const hash = getCodeHash(content);
         const relativePath = path.relative(baseDir, fullPath);
-        distHashes.set(hash, relativePath);
+        
+        // Handle hash collisions by storing arrays of paths
+        if (!distHashes.has(hash)) {
+          distHashes.set(hash, []);
+        }
+        distHashes.get(hash)!.push(relativePath);
         
         // Map to source TypeScript file
         const tsPath = relativePath.replace(/\.js$/, '.ts');
@@ -106,29 +119,61 @@ export async function mapFunctions(
   
   console.log(`Scanning dist directory: ${distDir}`);
   scanDir(distDir, distDir);
-  console.log(`Found ${distHashes.size} JavaScript files in dist`);
+  const totalFiles = Array.from(distHashes.values()).reduce((sum, files) => sum + files.length, 0);
+  console.log(`Found ${totalFiles} JavaScript files in dist (${distHashes.size} unique hashes)`);
   
   // Map function nodes to files
   const mappings: Mapping[] = [];
   
   for (const node of functionNodes) {
     const nodeHash = getCodeHash(node.func);
-    const distFile = distHashes.get(nodeHash);
+    const distFiles = distHashes.get(nodeHash);
     
-    if (distFile) {
-      // Exact match found
-      const tsFile = distToSrc.get(distFile);
+    if (distFiles && distFiles.length > 0) {
+      // Found potential matches
+      let bestMatch: string | null = null;
+      let confidence: 'exact' | 'high' | 'medium' = 'exact';
+      
+      if (distFiles.length === 1) {
+        // Single match - use it
+        bestMatch = distFiles[0];
+      } else {
+        // Multiple matches (hash collision) - try to find best match
+        console.log(`Hash collision detected for node "${node.name}" (${node.id}): ${distFiles.length} candidates`);
+        
+        // Try to match by node name similarity
+        const normalizedNodeName = node.name.replace(/\s+/g, '-').toLowerCase();
+        const candidateScores = distFiles.map(file => {
+          const fileName = path.basename(file, '.js').toLowerCase();
+          const score = fileName.includes(normalizedNodeName) ? 10 : 
+                       normalizedNodeName.includes(fileName) ? 5 : 0;
+          return { file, score };
+        });
+        
+        const bestCandidate = candidateScores.sort((a, b) => b.score - a.score)[0];
+        if (bestCandidate.score > 0) {
+          bestMatch = bestCandidate.file;
+          confidence = 'high'; // Lower confidence due to collision resolution
+        } else {
+          // No good name match - use first file but mark as medium confidence
+          bestMatch = distFiles[0];
+          confidence = 'medium';
+          console.log(`  No clear best match for "${node.name}", using first candidate: ${bestMatch}`);
+        }
+      }
+      
+      const tsFile = distToSrc.get(bestMatch);
       
       if (tsFile) {
-        // We have both compiled JS and source TS - proper exact match
+        // We have both compiled JS and source TS
         mappings.push({
           nodeId: node.id,
           nodeName: node.name,
           tsFile,
-          distFile,
+          distFile: bestMatch,
           flowId: node.z,
           flowName: flowMap.get(node.z),
-          confidence: 'exact'
+          confidence
         });
       } else {
         // Compiled JS exists but no source TS - orphaned node requiring manual reconciliation
@@ -136,7 +181,7 @@ export async function mapFunctions(
           nodeId: node.id,
           nodeName: node.name,
           tsFile: 'orphaned',
-          distFile: distFile, // Keep the JS file reference for manual reconciliation
+          distFile: bestMatch, // Keep the JS file reference for manual reconciliation
           flowId: node.z,
           flowName: flowMap.get(node.z),
           confidence: 'orphaned'

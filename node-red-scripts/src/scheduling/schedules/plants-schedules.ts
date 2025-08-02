@@ -16,7 +16,7 @@ const warocqueanumSchedules: Schedule[] = [
         tags: ["warocqueanum"],
         start: "06:00",
         end: "10:00",
-        precedence: 40,
+        precedence: 120,
         conditions: [{ type: "presence", value: "home" }],
         type: "continuous",
         interpolation: { enabled: true, preamble_minutes: 15 }
@@ -35,7 +35,7 @@ const warocqueanumSchedules: Schedule[] = [
         tags: ["warocqueanum"],
         start: "12:00",
         end: "14:00",
-        precedence: 40,
+        precedence: 120,
         conditions: [{ type: "presence", value: "home" }],
         type: "continuous"
     },
@@ -52,8 +52,8 @@ const warocqueanumSchedules: Schedule[] = [
         ],
         tags: ["warocqueanum"],
         start: "16:00",
-        end: "18:00",
-        precedence: 40,
+        end: "18:30",
+        precedence: 120,
         conditions: [{ type: "presence", value: "home" }],
         type: "continuous"
     },
@@ -71,7 +71,7 @@ const warocqueanumSchedules: Schedule[] = [
         tags: ["warocqueanum"],
         start: "20:00",
         end: "22:00",
-        precedence: 40,
+        precedence: 120,
         conditions: [{ type: "presence", value: "home" }],
         type: "continuous"
     },
