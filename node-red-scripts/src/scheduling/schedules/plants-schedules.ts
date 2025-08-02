@@ -106,12 +106,12 @@ export const plantSchedules: Schedule[] = [
         type: "continuous" // Enforce state continuously
     },
 
-    // Bedroom plants - tied to wakeup/sleep schedule
+    // Bedroom plants - tied to dynamic wakeup/sleep schedule
     {
         name: "bedroom_plants",
         entities: ["regex:(switch|light)\\.(.*bedroom.*grow.*)"],
-        start: { entity_id: "input_datetime.weekday_wakeup" },
-        end: { entity_id: "input_datetime.weekday_sleep" },
+        start: { entity_id: "sensor.wakeup_time" },
+        end: { entity_id: "sensor.sleep_time" },
         precedence: 110, // HIGHER - bedroom plants override global
         type: "continuous"
     },
