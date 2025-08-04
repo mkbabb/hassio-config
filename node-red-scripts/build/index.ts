@@ -218,6 +218,12 @@ class BuildManager {
                 result = await this.createAndBuild(inputFile, outputPath);
             }
             
+            // Check if the file was skipped (utility module)
+            if (result === 'skipped') {
+                console.log(StyleHelper.info(`Skipped utility module: ${relativePath}`, 'No executable code'));
+                return null; // Don't update cache for skipped files
+            }
+            
             // Update cache after successful build
             if (result) {
                 const buildTime = Date.now() - startTime;
@@ -244,9 +250,17 @@ class BuildManager {
 
         // Process and clean the output for incremental builds
         const content = await readFile(outputPath, 'utf8');
-        const processedCode = await this.processNodeRedOutput(content);
+        const processedResult = await this.processNodeRedOutput(content);
+        
+        // Check if this is a utility module that should be skipped
+        if (processedResult === null) {
+            // Remove the output file if it exists
+            await removeOutputFile(outputPath);
+            return 'skipped';
+        }
+        
         await mkdir(dirname(outputPath), { recursive: true });
-        await writeFile(outputPath, processedCode, 'utf8');
+        await writeFile(outputPath, processedResult, 'utf8');
 
         // Success message handled in buildFile method
         return outputPath;
@@ -277,9 +291,17 @@ class BuildManager {
 
             // Process and clean the output
             if (result.outputFiles && result.outputFiles.length > 0) {
-                const processedCode = await this.processNodeRedOutput(result.outputFiles[0].text);
+                const processedResult = await this.processNodeRedOutput(result.outputFiles[0].text);
+                
+                // Check if this is a utility module that should be skipped
+                if (processedResult === null) {
+                    // Remove the output file if it exists
+                    await removeOutputFile(outputPath);
+                    return 'skipped';
+                }
+                
                 await mkdir(dirname(outputPath), { recursive: true });
-                await writeFile(outputPath, processedCode, 'utf8');
+                await writeFile(outputPath, processedResult, 'utf8');
             }
 
             // Success message handled in buildFile method
@@ -312,9 +334,17 @@ class BuildManager {
 
         // Process and clean the output
         if (buildResult.outputFiles && buildResult.outputFiles.length > 0) {
-            const processedCode = await this.processNodeRedOutput(buildResult.outputFiles[0].text);
+            const processedResult = await this.processNodeRedOutput(buildResult.outputFiles[0].text);
+            
+            // Check if this is a utility module that should be skipped
+            if (processedResult === null) {
+                // Remove the output file if it exists
+                await removeOutputFile(outputPath);
+                return 'skipped';
+            }
+            
             await mkdir(dirname(outputPath), { recursive: true });
-            await writeFile(outputPath, processedCode, 'utf8');
+            await writeFile(outputPath, processedResult, 'utf8');
         }
 
         console.log(chalk.green(`Successfully built ${inputFile} (fallback method)`));
@@ -529,7 +559,7 @@ class BuildManager {
         }
     }
 
-    private async processNodeRedOutput(code: string): Promise<string> {
+    private async processNodeRedOutput(code: string): Promise<string | null> {
         // First, check if we have an IIFE wrapped output
         const iifeMatch = code.match(/^var\s+\w+\s*=\s*\(\(\)\s*=>\s*{([\s\S]*)}\)\(\);?\s*$/m);
         
@@ -563,8 +593,8 @@ class BuildManager {
         // Check if the processed code is empty or only contains minimal content
         // This happens when a file is a pure utility module (only exports, no executable code)
         if (!processed || processed.length < 10) {
-            console.warn('Warning: File appears to be a utility module with no executable code. Skipping Node-RED processing.');
-            return '// This file appears to be a utility module and should not be deployed to Node-RED function nodes\n\nreturn msg;';
+            // Return null to indicate this file should be skipped
+            return null;
         }
         
         // Ensure proper ending
