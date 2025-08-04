@@ -30,6 +30,7 @@ Thumbs.db
 # Backup files
 *.backup
 *.bak
+backups/
 
 # Mapping files (generated)
 node-mappings.json

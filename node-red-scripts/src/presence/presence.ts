@@ -4,7 +4,6 @@ import {
     calculateCoolDown,
     isInCoolDownPeriod,
     determinePresenceState,
-    isOnUnknownOffSequence,
     DEFAULT_COOL_DOWN
 } from "./utils";
 
@@ -36,6 +35,7 @@ const filteredEntities = entities.filter((e) => filterBlacklistedEntity(e));
 // Flow context keys
 const presenceStatesKey = `presenceStates.${topic}`;
 const flowInfoKey = `flowInfo.${topic}`;
+const historyKey = `transitionHistory.${topic}`;
 
 // Initialize presence states if needed
 // @ts-ignore
@@ -47,15 +47,18 @@ flow.set(presenceStatesKey, presenceStates);
 // @ts-ignore
 let flowInfo = flow.get(flowInfoKey) || {
     state: PresenceState.OFF,
-    prevState: PresenceState.OFF,
-    prevPrevState: PresenceState.OFF,
     lastOn: null,
     lastOff: null,
     delay: 0
 };
 
+// Get transition history (last 10 transitions)
+// @ts-ignore
+let transitionHistory = flow.get(historyKey) || [];
+
 // Validate and normalize the incoming sensor state
-const normalizedState = state === "on" || state === "off" ? state : "unknown";
+// Handle 'reset' and 'ignored' states from debouncer
+const normalizedState = state === "on" || state === "off" || state === "reset" || state === "ignored" ? state : "unknown";
 
 // Update the specific sensor's state
 presenceStates[dataEntityId] = normalizedState;
@@ -64,46 +67,45 @@ presenceStates[dataEntityId] = normalizedState;
 const presenceStatesValues = Object.values(presenceStates);
 const aggregateState = determinePresenceState(presenceStatesValues);
 
-// Check if we're in cool-down period
+// Simple reset handling: only act when we get 'off' after a 'reset'
+const prevState = transitionHistory.length > 0 ? transitionHistory[transitionHistory.length - 1].state : 'off';
 const inCoolDown = isInCoolDownPeriod(flowInfo);
 
-// Get previous states
-// If we aren't in a cool-down, and the previous state was PENDING_OFF,
-// we consider it as OFF for the next state transition
-const prevState =
-    flowInfo.state === PresenceState.PENDING_OFF && !inCoolDown
-        ? PresenceState.OFF
-        : flowInfo.state;
+if (normalizedState === "off" && prevState === "reset") {
+    // This is reset→off, turn off lights
+    flowInfo.state = PresenceState.OFF;
+    flowInfo.lastOff = Date.now();
+    flowInfo.lastOn = null;
+    flowInfo.delay = 0;
+    
+    // @ts-ignore
+    msg.delay = 1;
+    // @ts-ignore
+    msg.payload = createPayload(filteredEntities, "turn_off");
+} else if (normalizedState === "reset") {
+    // Reset state from sensor, just set state but don't act
+    flowInfo.state = PresenceState.RESET;
+    // @ts-ignore
+    msg.payload = null;
+} else if (normalizedState === "ignored") {
+    // Debounced reset - do nothing
+    // @ts-ignore
+    msg.payload = null;
+} else {
+    // Normal state processing
+    let actualState = aggregateState;
+    if (aggregateState === PresenceState.OFF && inCoolDown) {
+        actualState = PresenceState.PENDING_OFF;
+    }
 
-const prevPrevState = flowInfo.prevState as PresenceState;
+    // Initialize output
+    // @ts-ignore
+    msg.delay = 1;
+    // @ts-ignore
+    msg.payload = null;
 
-// Check for on→unknown→off sequence
-const isProblematicSequence = isOnUnknownOffSequence(
-    aggregateState,
-    prevState,
-    prevPrevState
-);
-
-// Check for off→unknown→off sequence (should trigger immediate off)
-const isOffUnknownOffSequence =
-    prevPrevState === PresenceState.OFF &&
-    prevState === PresenceState.UNKNOWN &&
-    aggregateState === PresenceState.OFF;
-
-// Determine actual state considering cool-down
-let actualState = aggregateState;
-if (aggregateState === PresenceState.OFF && inCoolDown) {
-    actualState = PresenceState.PENDING_OFF;
-}
-
-// Initialize output
-// @ts-ignore
-msg.delay = 1;
-// @ts-ignore
-msg.payload = null;
-
-// State machine logic - simplified and clear
-switch (actualState) {
+    // State machine logic - simplified and clear
+    switch (actualState) {
     case PresenceState.ON:
         if (prevState === PresenceState.OFF) {
             // Transition from OFF to ON
@@ -145,24 +147,11 @@ switch (actualState) {
             msg.delay = delayMs;
             // @ts-ignore
             msg.payload = createPayload(filteredEntities, "turn_off");
-        } else if (
-            prevState === PresenceState.UNKNOWN &&
-            !inCoolDown &&
-            !isProblematicSequence
-        ) {
-            // From unknown to off, no cool-down active, not problematic sequence
+        } else if (prevState === PresenceState.UNKNOWN && !inCoolDown) {
+            // From unknown to off, no cool-down active
             flowInfo.state = PresenceState.OFF;
             flowInfo.lastOff = Date.now();
             flowInfo.lastOn = null;
-
-            // Special case: off→unknown→off should trigger immediate off
-            if (isOffUnknownOffSequence) {
-                // @ts-ignore
-                msg.payload = createPayload(filteredEntities, "turn_off");
-            }
-        } else if (isProblematicSequence) {
-            // On→Unknown→Off sequence detected - skip instant off, just update state
-            flowInfo.state = PresenceState.OFF;
         }
         // If already OFF or in cool-down, do nothing
         break;
@@ -176,17 +165,22 @@ switch (actualState) {
         // Set state but don't control entities
         flowInfo.state = PresenceState.UNKNOWN;
         break;
+    }
 }
 
-// Update state history before saving
-flowInfo.prevPrevState = flowInfo.prevState;
-flowInfo.prevState = prevState;
+// Update transition history
+transitionHistory.push({ state: flowInfo.state, time: Date.now() });
+if (transitionHistory.length > 10) {
+    transitionHistory = transitionHistory.slice(-10);
+}
 
 // Update flow context
 // @ts-ignore
 flow.set(flowInfoKey, flowInfo);
 // @ts-ignore
 flow.set(presenceStatesKey, presenceStates);
+// @ts-ignore
+flow.set(historyKey, transitionHistory);
 
 // Add debug information to message
 // @ts-ignore
@@ -206,12 +200,9 @@ msg.debug = {
     coolDownSeconds: coolDown,
     // @ts-ignore
     actualDelayMs: msg.delay,
-    stateTransition: flowInfo.prevPrevState
-        ? `${flowInfo.prevPrevState} -> ${prevState} → ${flowInfo.state}`
-        : `${prevState} → ${flowInfo.state}`,
+    currentState: flowInfo.state,
+    transitionHistory: transitionHistory.slice(-3), // Last 3 transitions
     timeSinceLastOn: flowInfo.lastOn ? Date.now() - flowInfo.lastOn : null,
     timeSinceLastOff: flowInfo.lastOff ? Date.now() - flowInfo.lastOff : null,
-    prevState: flowInfo.prevState,
-    prevPrevState: flowInfo.prevPrevState,
-    isOffUnknownOffSequence: isOffUnknownOffSequence
+    resetHandled: normalizedState === "reset" || (normalizedState === "off" && prevState === "reset")
 };

@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { StyleHelper } from '../../style';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,7 +16,8 @@ interface FunctionNode {
 
 interface FlowNode {
   id: string;
-  label?: string;
+  label?: string;  // For regular flows (tabs)
+  name?: string;   // For subflows
   type: string;
 }
 
@@ -80,7 +82,11 @@ export async function mapFunctions(
   flows
     .filter((node: any) => node.type === 'tab' || node.type === 'subflow')
     .forEach((flow: FlowNode) => {
-      flowMap.set(flow.id, flow.label || flow.type);
+      // Use appropriate property based on flow type
+      const flowName = flow.type === 'subflow' 
+        ? (flow.name || flow.type)     // Subflows use 'name' property
+        : (flow.label || flow.type);   // Regular flows use 'label' property
+      flowMap.set(flow.id, flowName);
     });
   
   // Build dist file hash map with collision detection
@@ -117,10 +123,10 @@ export async function mapFunctions(
     }
   }
   
-  console.log(`Scanning dist directory: ${distDir}`);
+  console.log(StyleHelper.info(`Scanning dist directory: ${distDir}`));
   scanDir(distDir, distDir);
   const totalFiles = Array.from(distHashes.values()).reduce((sum, files) => sum + files.length, 0);
-  console.log(`Found ${totalFiles} JavaScript files in dist (${distHashes.size} unique hashes)`);
+  console.log(StyleHelper.info(`Found ${totalFiles} JavaScript files in dist (${distHashes.size} unique hashes)`));
   
   // Map function nodes to files
   const mappings: Mapping[] = [];
@@ -139,7 +145,7 @@ export async function mapFunctions(
         bestMatch = distFiles[0];
       } else {
         // Multiple matches (hash collision) - try to find best match
-        console.log(`Hash collision detected for node "${node.name}" (${node.id}): ${distFiles.length} candidates`);
+        console.log(StyleHelper.warning(`Hash collision detected for node "${node.name}"`, `${distFiles.length} candidates`));
         
         // Try to match by node name similarity
         const normalizedNodeName = node.name.replace(/\s+/g, '-').toLowerCase();
@@ -158,7 +164,7 @@ export async function mapFunctions(
           // No good name match - use first file but mark as medium confidence
           bestMatch = distFiles[0];
           confidence = 'medium';
-          console.log(`  No clear best match for "${node.name}", using first candidate: ${bestMatch}`);
+          console.log(StyleHelper.colors.muted(`  No clear best match for "${node.name}", using first candidate: ${bestMatch}`));
         }
       }
       
@@ -335,32 +341,90 @@ export async function generateMappingFile(
     JSON.stringify(config, null, 2)
   );
   
-  console.log(`\nMapping Summary:`);
-  console.log(`  Total functions: ${mappings.length}`);
-  console.log(`  Exact matches: ${exact.length}`);
-  console.log(`  High confidence: ${high.length}`);
-  console.log(`  Medium confidence: ${medium.length}`);
-  console.log(`  Orphaned: ${orphaned.length}`);
-  console.log(`  Unmapped: ${unmapped.length}`);
+  console.log(StyleHelper.section("Mapping Summary"));
+  console.log(StyleHelper.summary({
+    total: mappings.length,
+    built: exact.length + high.length + medium.length,
+    cached: exact.length,
+    failed: orphaned.length + unmapped.length
+  }));
+  
+  console.log(StyleHelper.info("Confidence levels:"));
+  console.log(StyleHelper.colors.success(`  ✓ Exact matches: ${exact.length}`));
+  console.log(StyleHelper.colors.success(`  ✓ High confidence: ${high.length}`));
+  console.log(StyleHelper.colors.warning(`  ~ Medium confidence: ${medium.length}`));
+  if (orphaned.length > 0) {
+    console.log(StyleHelper.colors.error(`  ⚠ Orphaned: ${orphaned.length}`));
+  }
+  if (unmapped.length > 0) {
+    console.log(StyleHelper.colors.error(`  ✗ Unmapped: ${unmapped.length}`));
+  }
+  
+  // Check for multiple nodes mapped to same file and warn
+  const fileNodeCounts = new Map<string, number>();
+  mappings.forEach(m => {
+    if (m.confidence !== 'none' && m.confidence !== 'orphaned') {
+      fileNodeCounts.set(m.tsFile, (fileNodeCounts.get(m.tsFile) || 0) + 1);
+    }
+  });
+  
+  const multiNodeFiles = Array.from(fileNodeCounts.entries()).filter(([_, count]) => count > 1);
+  if (multiNodeFiles.length > 0) {
+    console.log('\n' + StyleHelper.section("Shared Functions"));
+    console.log(StyleHelper.colors.muted("Multiple nodes mapped to single files - verify this is intentional for reusable functions"));
+    
+    multiNodeFiles.forEach(([file, count]) => {
+      const nodesForFile = mappings.filter(m => m.tsFile === file);
+      const panelContent = [
+        StyleHelper.keyValue('File', StyleHelper.colors.bold(file)),
+        StyleHelper.keyValue('Count', StyleHelper.colors.italic(count.toString()) + ' nodes'),
+        '',
+        StyleHelper.colors.muted('Mapped Nodes:'),
+        ...nodesForFile.map(node => 
+          `  ${StyleHelper.symbols.bullet} ${StyleHelper.colors.bold(node.nodeName)} ${StyleHelper.colors.muted(`• ${node.flowName}`)}`
+        )
+      ];
+      console.log(StyleHelper.panel(panelContent, `${StyleHelper.symbols.warning} Shared Function`));
+    });
+  }
   
   if (orphaned.length > 0) {
-    console.log(`\nOrphaned functions (compiled JS exists, source TS missing):`);
+    console.log('\n' + StyleHelper.section("Orphaned Functions"));
+    console.log(StyleHelper.colors.muted("Compiled JS exists, source TS missing - requires manual reconciliation"));
+    
     orphaned.forEach(m => {
-      console.log(`  - ${m.nodeName} (${m.nodeId}) -> ${m.distFile} [MANUAL RECONCILIATION REQUIRED]`);
+      const orphanContent = [
+        StyleHelper.keyValue('Function', StyleHelper.colors.bold(m.nodeName)),
+        StyleHelper.keyValue('Node ID', m.nodeId, StyleHelper.colors.muted, StyleHelper.colors.muted),
+        StyleHelper.keyValue('Flow', m.flowName || 'Unknown'),
+        StyleHelper.keyValue('JS File', m.distFile, StyleHelper.colors.muted, StyleHelper.colors.error),
+        '',
+        StyleHelper.colors.warning('Manual reconciliation required')
+      ];
+      console.log(StyleHelper.panel(orphanContent, `${StyleHelper.symbols.error} Orphaned Function`));
     });
   }
   
   if (unmapped.length > 0) {
-    console.log(`\nUnmapped functions need manual review:`);
+    console.log('\n' + StyleHelper.section("Unmapped Functions"));
+    console.log(StyleHelper.colors.muted("Functions needing manual review or AI reconciliation"));
+    
     unmapped.forEach(m => {
-      console.log(`  - ${m.nodeName} (${m.nodeId}) in ${m.flowName}`);
+      const unmappedContent = [
+        StyleHelper.keyValue('Function', StyleHelper.colors.bold(m.nodeName)),
+        StyleHelper.keyValue('Node ID', m.nodeId, StyleHelper.colors.muted, StyleHelper.colors.muted),
+        StyleHelper.keyValue('Flow', m.flowName || 'Unknown')
+      ];
+      console.log(StyleHelper.panel(unmappedContent, `${StyleHelper.symbols.warning} Unmapped Function`));
     });
-    console.log('\nRun with --ai flag to attempt AI reconciliation');
+    
+    console.log('\n' + StyleHelper.info("Run with --ai flag to attempt AI reconciliation"));
   }
   
   // AI reconciliation for unmapped functions
   if (unmapped.length > 0 && options.useAI) {
-    console.log(`\nStarting AI reconciliation for ${unmapped.length} unmapped functions...`);
+    console.log(StyleHelper.section("AI Reconciliation"));
+    console.log(StyleHelper.info(`Starting AI reconciliation for ${unmapped.length} unmapped functions`));
     
     // Transform unmapped items to the format needed for reconciliation
     const unmappedNodes = config.unmapped.map(u => ({

@@ -18,12 +18,14 @@ You are analyzing a Node-RED function node to find its corresponding TypeScript 
 ## Instructions:
 1. Analyze the function code for patterns, imports, exports, function names, and logic
 2. Compare against the provided TypeScript files
-3. Look for matching:
+3. Consider the file path structure as important context - file paths often indicate the module's purpose
+4. Look for matching:
    - Function signatures and names
    - Business logic patterns
    - Variable names and constants
    - Comments or documentation
    - Import statements or dependencies
+   - File path relevance to the function's domain (e.g., presence/ for presence functions)
 
 ## Output Format:
 For each file, provide a confidence score (0-100) and reasoning:

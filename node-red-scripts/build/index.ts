@@ -2,6 +2,7 @@ import { existsSync } from "fs";
 import { join, dirname } from "path";
 import { writeFile, readFile, mkdir } from "fs/promises";
 import chalk from "chalk";
+import { StyleHelper } from "./style";
 import chokidar from "chokidar";
 import * as esbuild from "esbuild";
 import yargs from "yargs";
@@ -199,9 +200,12 @@ class BuildManager {
     }
 
     async buildFile(inputFile: string): Promise<string | null> {
+        const startTime = Date.now();
+        const relativePath = getRelativePath(inputFile, this.inputDir);
+        
         try {
-            console.log(chalk.blue(`Building ${inputFile}...`));
-            const name = getRelativePath(inputFile, this.inputDir).replace(/\.ts$/, "");
+            console.log(StyleHelper.building(relativePath));
+            const name = relativePath.replace(/\.ts$/, "");
             const outputPath = join(this.outputDir, `${name}.js`);
 
             let result: string | null;
@@ -216,14 +220,16 @@ class BuildManager {
             
             // Update cache after successful build
             if (result) {
+                const buildTime = Date.now() - startTime;
                 const currentHash = calculateHash(inputFile);
                 const dependencies = this.cache[inputFile]?.dependencies || [];
                 this.updateCache(inputFile, currentHash, dependencies);
+                console.log(StyleHelper.built(relativePath, buildTime));
             }
             
             return result;
         } catch (error) {
-            console.error(chalk.red(`Failed to build ${inputFile}:`), error);
+            console.log(StyleHelper.error(`Failed to build ${relativePath}`, error instanceof Error ? error.message : String(error)));
             return null;
         }
     }
@@ -242,7 +248,7 @@ class BuildManager {
         await mkdir(dirname(outputPath), { recursive: true });
         await writeFile(outputPath, processedCode, 'utf8');
 
-        console.log(chalk.green(`Successfully rebuilt ${inputFile}`));
+        // Success message handled in buildFile method
         return outputPath;
     }
 
@@ -276,7 +282,7 @@ class BuildManager {
                 await writeFile(outputPath, processedCode, 'utf8');
             }
 
-            console.log(chalk.green(`Successfully built ${inputFile}`));
+            // Success message handled in buildFile method
             return outputPath;
         } catch (error) {
             // Fallback to regular build
@@ -330,37 +336,56 @@ class BuildManager {
     }
 
     async buildFiles(changedFile?: string): Promise<Map<string, string>> {
+        const startTime = Date.now();
+        
         if (!changedFile) {
             await this.initialize();
         }
 
         if (emptyOutDir && !changedFile) {
+            console.log(StyleHelper.cacheOperation("Cleaning output directory"));
             await this.cleanOutputDirectory();
         }
 
         const filesToBuild = await this.getFilesToBuild(changedFile);
 
         if (filesToBuild.length === 0) {
-            console.log(chalk.gray("No files need rebuilding"));
+            console.log(StyleHelper.info("No files need rebuilding", "All files are up to date"));
             return new Map();
         }
 
-        console.log(chalk.blue(`Building ${filesToBuild.length} files...`));
+        console.log(StyleHelper.section("Building Files"));
+        console.log(StyleHelper.info(`Found ${filesToBuild.length} file(s) to build`));
 
         const builtFiles = new Map<string, string>();
+        let successCount = 0;
+        let failCount = 0;
 
         for (const file of filesToBuild) {
             const outputPath = await this.buildFile(file);
             if (outputPath) {
                 const relativePath = getRelativePath(file, this.inputDir);
                 builtFiles.set(relativePath, outputPath);
+                successCount++;
+            } else {
+                failCount++;
             }
         }
 
         await saveCache(this.cache, debug);
+        
+        const buildTime = Date.now() - startTime;
+        
+        // Show summary
+        console.log(StyleHelper.summary({
+            total: filesToBuild.length,
+            built: successCount,
+            failed: failCount > 0 ? failCount : undefined,
+            time: buildTime
+        }));
 
         if (debug) {
-            console.log(chalk.cyan("Final dependency graph:"));
+            console.log(StyleHelper.section("Dependency Graph"));
             this.dependencyGraph.printGraph();
         }
 
@@ -374,7 +399,7 @@ class BuildManager {
             this.dependencyGraph.clear();
             await this.disposeContexts();
         } catch (error) {
-            console.error(chalk.red("Failed to empty output directory:"), error);
+            console.log(StyleHelper.error("Failed to empty output directory", error instanceof Error ? error.message : String(error)));
         }
     }
 
@@ -383,9 +408,11 @@ class BuildManager {
             const affectedFiles = this.dependencyGraph.getAffectedFiles(changedFile, debug);
             const files = [changedFile, ...affectedFiles];
             
-            console.log(chalk.blue(
-                `File changed: ${changedFile}, rebuilding ${files.length} affected files`
-            ));
+            const relativePath = getRelativePath(changedFile, this.inputDir);
+            console.log(StyleHelper.fileChanged(relativePath, 'changed'));
+            if (files.length > 1) {
+                console.log(StyleHelper.info(`Rebuilding ${files.length} affected files`));
+            }
             
             return files;
         }
@@ -410,18 +437,21 @@ class BuildManager {
             })
             .on("add", async (path) => {
                 if (path.endsWith(".ts")) {
-                    console.log(chalk.blue(`New file detected: ${path}`));
+                    const relativePath = getRelativePath(path, this.inputDir);
+                    console.log(StyleHelper.fileChanged(relativePath, 'added'));
                     await this.buildFiles(path);
                 }
             })
             .on("unlink", async (path) => {
+                if (path.endsWith(".ts")) {
+                    const relativePath = getRelativePath(path, this.inputDir);
+                    console.log(StyleHelper.fileChanged(relativePath, 'removed'));
+                }
                 await this.handleFileDeleted(path);
             })
             .on("error", (error) => {
-                console.error(chalk.red("Watcher error:"), error);
+                console.log(StyleHelper.error("Watcher error", error instanceof Error ? error.message : String(error)));
             });
-
-        console.log(chalk.cyan(`Watching for changes in ${this.inputDir}...`));
 
         // Periodically clean up stale cache entries
         setInterval(() => this.cleanupStaleCache(), this.cacheTime);
@@ -447,7 +477,8 @@ class BuildManager {
         }
 
         await saveCache(this.cache, debug);
-        console.log(chalk.yellow(`Removed cache entry for deleted file: ${path}`));
+        const relativePath = getRelativePath(path, this.inputDir);
+        console.log(StyleHelper.cacheOperation("Removed cache entry", `deleted file: ${relativePath}`));
 
         // Remove output file
         const outputPath = getOutputPath(path, this.inputDir, this.outputDir);
@@ -469,7 +500,7 @@ class BuildManager {
 
         if (hasChanges) {
             await saveCache(this.cache, debug);
-            console.log(chalk.gray("Cleaned up stale cache entries"));
+            console.log(StyleHelper.cacheOperation("Cleaned up stale cache entries"));
         }
     }
 
@@ -550,11 +581,12 @@ async function deployIfRequested(builtFiles: Map<string, string>): Promise<void>
     if (!(deploy || dryRun) || watch) return;
 
     if (builtFiles.size === 0) {
-        console.log(chalk.yellow("No files were built, nothing to deploy"));
+        console.log(StyleHelper.info("No files were built, nothing to deploy"));
         return;
     }
 
-    console.log(chalk.cyan("\nChecking for deployment..."));
+    console.log(StyleHelper.section("Deployment"));
+    console.log(StyleHelper.info(`Deploying ${builtFiles.size} built file(s)...`));
     const deployer = new Deployer();
     
     // Only deploy the files that were actually built
@@ -566,25 +598,37 @@ async function deployIfRequested(builtFiles: Map<string, string>): Promise<void>
     
     if (result.success) {
         if (result.deployed.length > 0) {
-            console.log(chalk.green(`\n✓ Deployment successful`));
-            console.log(chalk.green(`  Deployed: ${result.deployed.length} functions`));
-            result.deployed.forEach(d => console.log(chalk.gray(`    - ${d}`)));
+            const deployedContent = result.deployed.map(deployment => {
+                const [file, nodeName] = deployment.split(' \u2192 ');
+                return `${StyleHelper.colors.success(StyleHelper.symbols.success)} ${StyleHelper.colors.bold(file)} \u2192 ${StyleHelper.colors.bold(nodeName)}`;
+            });
+            
+            console.log(StyleHelper.panel(deployedContent, `${StyleHelper.colors.success('Auto-Deployed')} ${StyleHelper.colors.bold(result.deployed.length.toString())} Functions`));
         }
         if (result.failed.length > 0) {
-            console.log(chalk.yellow(`  Failed: ${result.failed.length} functions`));
-            result.failed.forEach(f => console.log(chalk.gray(`    - ${f}`)));
+            const failedContent = result.failed.map(f => 
+                `${StyleHelper.colors.error(StyleHelper.symbols.error)} ${StyleHelper.colors.bold(f)}`
+            );
+            
+            console.log(StyleHelper.panel(failedContent, `${StyleHelper.colors.error('Auto-Deploy Failed')} ${StyleHelper.colors.bold(result.failed.length.toString())} Functions`));
         }
     } else {
-        console.error(chalk.red(`\n✗ Deployment failed: ${result.error}`));
+        console.error('\n' + StyleHelper.error(`Deployment failed: ${result.error}`));
         process.exit(1);
     }
 }
 
 // Main function
 async function main(): Promise<void> {
+    const startTime = Date.now();
+    
+    // Print banner
+    console.log(StyleHelper.banner('Node-RED TypeScript Builder', 'Compiling automation functions'));
+
     // Generate mappings if requested
     if (map) {
-        console.log(chalk.cyan("Generating Node-RED function mappings..."));
+        console.log(StyleHelper.section("Function Mapping"));
+        console.log(StyleHelper.info("Generating Node-RED function mappings..."));
         await generateMappingFile({ useAI: ai });
         return;
     }
@@ -599,16 +643,22 @@ async function main(): Promise<void> {
     // Start watching or cleanup
     if (watch) {
         if (deploy) {
-            console.log(chalk.yellow("\nNote: Deployment is disabled in watch mode"));
+            console.log(StyleHelper.warning("Deployment is disabled in watch mode"));
         }
+        console.log(StyleHelper.watching(inputDir));
         await buildManager.startWatching();
     } else {
+        const totalTime = Date.now() - startTime;
+        console.log(StyleHelper.timing("Total build time", totalTime));
         await buildManager.dispose();
     }
 }
 
 // Run the main function
 main().catch((error) => {
-    console.error(chalk.red("Fatal error:"), error);
+    console.log(StyleHelper.error("Fatal build error", error instanceof Error ? error.message : String(error)));
+    if (debug && error instanceof Error && error.stack) {
+        console.log(StyleHelper.colors.muted(error.stack));
+    }
     process.exit(1);
 });

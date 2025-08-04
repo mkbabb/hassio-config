@@ -31,7 +31,16 @@ const payload = msg.payload;
 const dayStatus = msg.day_status;
 
 // @ts-ignore
-let entityId = msg.data.entity_id;
+let entityId = msg.data?.entity_id || msg.payload?.entity_id || msg.entity_id;
+
+// Validate entity_id is not empty
+if (!entityId || entityId.trim() === '') {
+    // @ts-ignore
+    node.status({ fill: "red", shape: "ring", text: "Empty entity_id" });
+    // @ts-ignore
+    msg.should_skip = true;
+    entityId = "invalid"; // Set to prevent further processing
+}
 
 const entityTime = timeStringToDate(payload);
 

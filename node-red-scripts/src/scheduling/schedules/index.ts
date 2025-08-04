@@ -24,7 +24,7 @@ const schedules: Schedule[] = [
 const tagDefinitions = {
     plants: [".*grow.*"],
     bedroom_plants: [".*bedroom.*grow.*", ".*master.*grow.*"],
-    warocqueanum: [".*warocqueanum.*", "light\.titanic_light"],
+    warocqueanum: ["light\.titanic_light"],
 };
 
 // @ts-ignore

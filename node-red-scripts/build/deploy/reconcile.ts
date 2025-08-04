@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { config as loadEnv } from 'dotenv';
+import { StyleHelper } from '../style';
 
 // Load environment variables
 loadEnv();
@@ -298,35 +299,42 @@ export async function reconcileUnmappedFunctions(
   srcDir: string,
   existingMappings: Record<string, any[]>
 ): Promise<ReconciliationResult[]> {
-  console.log(`\nStarting AI reconciliation for ${unmappedNodes.length} unmapped functions...`);
-  console.log(`Note: Orphaned nodes (with compiled JS but missing source TS) require manual reconciliation and are excluded from AI processing.`);
+  console.log(StyleHelper.section("AI Function Reconciliation"));
+  console.log(StyleHelper.info(`Processing ${unmappedNodes.length} unmapped functions`));
+  console.log(StyleHelper.colors.muted("Note: Orphaned nodes require manual reconciliation and are excluded"));
   
   // Get set of already mapped files
   const mappedFiles = new Set(Object.keys(existingMappings));
   
   // Get unmapped TypeScript files
   const unmappedFiles = await getUnmappedTypeScriptFiles(srcDir, mappedFiles);
-  console.log(`Found ${unmappedFiles.length} unmapped TypeScript files`);
+  console.log(StyleHelper.info(`Found ${unmappedFiles.length} unmapped TypeScript files`));
   
   if (unmappedFiles.length === 0) {
-    console.log('No unmapped TypeScript files to match against');
+    console.log(StyleHelper.warning("No unmapped TypeScript files to match against"));
     return [];
   }
   
   // Create file chunks
   const fileChunks = createFileChunks(unmappedFiles, MAX_TOKENS_PER_REQUEST);
-  console.log(`Created ${fileChunks.length} file chunks for analysis`);
+  console.log(StyleHelper.info(`Created ${fileChunks.length} file chunks for analysis`));
   
   const results: ReconciliationResult[] = [];
   
   // Process each unmapped node
   for (const node of unmappedNodes) {
-    console.log(`\nProcessing: ${node.name}`);
+    const processingContent = [
+      `Function: ${StyleHelper.colors.bold(node.name)}`,
+      StyleHelper.keyValue('Flow', node.flowName || 'Unknown'),
+      StyleHelper.keyValue('Node ID', node.id, StyleHelper.colors.muted, StyleHelper.colors.muted)
+    ];
+    
+    console.log(StyleHelper.panel(processingContent, 'AI Processing'));
     const allMatches: MatchResult[] = [];
     
     // Check against each chunk
     for (let i = 0; i < fileChunks.length; i++) {
-      console.log(`  Checking chunk ${i + 1}/${fileChunks.length} (${fileChunks[i].length} files)`);
+      console.log(`    ${StyleHelper.colors.muted('◦')} Checking chunk ${StyleHelper.colors.bold(`${i + 1}/${fileChunks.length}`)} ${StyleHelper.colors.muted(`(${fileChunks[i].length} files)`)}`);
       const matches = await matchFunctionToFiles(node, fileChunks[i]);
       
       // Filter by confidence threshold
@@ -335,7 +343,7 @@ export async function reconcileUnmappedFunctions(
       
       // Early exit if we found a very high confidence match
       if (goodMatches.some(m => m.confidence >= 95)) {
-        console.log(`  Found high confidence match, skipping remaining chunks`);
+        console.log(`    ${StyleHelper.colors.success(StyleHelper.symbols.success)} Found high confidence match, skipping remaining chunks`);
         break;
       }
     }
@@ -345,10 +353,17 @@ export async function reconcileUnmappedFunctions(
     results.push(result);
     
     if (result.selectedFile) {
-      console.log(`  ✓ Matched to ${result.selectedFile} (${result.confidence}%)`);
+      const resultContent = [
+        `${StyleHelper.colors.success(StyleHelper.symbols.success)} ${StyleHelper.colors.success('Match found')}`,
+        StyleHelper.keyValue('File', result.selectedFile),
+        StyleHelper.keyValue('Confidence', `${result.confidence}%`, StyleHelper.colors.muted, StyleHelper.colors.success)
+      ];
+      console.log(StyleHelper.panel(resultContent));
     } else {
-      console.log(`  ✗ No suitable match found`);
+      console.log(`    ${StyleHelper.colors.muted('✗ No suitable match found')}`);
     }
+    
+    console.log(''); // Add spacing between nodes
     
     // Add small delay to avoid rate limits
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -410,12 +425,55 @@ export function exportReconciliationResults(
   };
   fs.writeFileSync(resultsPath, JSON.stringify(resultsData, null, 2));
   
+  // Check for multiple nodes mapped to same file after reconciliation and warn
+  const allMappings = mappingsData.mappings;
+  const fileNodeCounts = new Map<string, number>();
+  Object.entries(allMappings).forEach(([file, nodes]: [string, any[]]) => {
+    fileNodeCounts.set(file, nodes.length);
+  });
+  
+  const multiNodeFiles = Array.from(fileNodeCounts.entries()).filter(([_, count]) => count > 1);
+  if (multiNodeFiles.length > 0) {
+    console.log('\n' + StyleHelper.warning("Post-Reconciliation Shared Functions"));
+    console.log(StyleHelper.colors.muted("Multiple nodes mapped to single files after AI reconciliation"));
+    
+    multiNodeFiles.forEach(([file, count]) => {
+      const nodesForFile = allMappings[file];
+      const sharedContent = [
+        StyleHelper.keyValue('File', StyleHelper.colors.bold(file)),
+        StyleHelper.keyValue('Nodes', StyleHelper.colors.italic(count.toString())),
+        '',
+        StyleHelper.colors.muted('Mapped Functions:'),
+        ...nodesForFile.map((node: any) => 
+          `  ${StyleHelper.symbols.bullet} ${StyleHelper.colors.bold(node.nodeName)} ${StyleHelper.colors.muted(`• ${node.flowName || 'Unknown'}`)}`
+        ),
+        '',
+        StyleHelper.colors.muted('This is acceptable for reusable functions - verify intentional')
+      ];
+      console.log(StyleHelper.panel(sharedContent, `${StyleHelper.symbols.info} AI Reconciliation Result`));
+    });
+  }
+  
   // Summary
   const reconciled = results.filter(r => r.selectedFile !== null).length;
-  console.log(`\nAI Reconciliation Summary:`);
-  console.log(`  Total processed: ${results.length}`);
-  console.log(`  Successfully matched: ${reconciled}`);
-  console.log(`  Unable to match: ${results.length - reconciled}`);
-  console.log(`  Updated mappings: ${mappingsPath}`);
-  console.log(`  Results saved to: ${resultsPath}`);
+  const failed = results.length - reconciled;
+  
+  console.log('\n' + StyleHelper.section("AI Reconciliation Summary"));
+  
+  const summaryContent = [
+    StyleHelper.keyValue('Total Functions', StyleHelper.colors.bold(results.length.toString())),
+    StyleHelper.keyValue('Successfully Matched', StyleHelper.colors.bold(reconciled.toString()), StyleHelper.colors.muted, StyleHelper.colors.success),
+    failed > 0 ? StyleHelper.keyValue('Unmatched', StyleHelper.colors.bold(failed.toString()), StyleHelper.colors.muted, StyleHelper.colors.warning) : null,
+    '',
+    StyleHelper.keyValue('Mappings File', mappingsPath, StyleHelper.colors.muted, StyleHelper.colors.muted),
+    StyleHelper.keyValue('Results File', resultsPath, StyleHelper.colors.muted, StyleHelper.colors.muted)
+  ].filter(Boolean) as string[];
+  
+  console.log(StyleHelper.panel(summaryContent, 'Final Results'));
+  
+  console.log(StyleHelper.summary({
+    total: results.length,
+    built: reconciled,
+    failed: failed > 0 ? failed : undefined
+  }));
 }

@@ -6,7 +6,8 @@ export enum PresenceState {
     OFF = "off",
     ON = "on",
     UNKNOWN = "unknown",
-    PENDING_OFF = "pending_off" // New state for cool-down period
+    PENDING_OFF = "pending_off", // New state for cool-down period
+    RESET = "reset" // New state for reset sequences
 }
 
 // Calculate exponential backoff with gentler curve
@@ -60,15 +61,4 @@ export const determinePresenceState = (sensorStates: string[]): PresenceState =>
     return PresenceState.OFF;
 };
 
-// Check if we have the on→unknown→off sequence
-export const isOnUnknownOffSequence = (
-    currentState: PresenceState,
-    prevState: PresenceState,
-    prevPrevState: PresenceState
-): boolean => {
-    return (
-        prevPrevState === PresenceState.ON &&
-        prevState === PresenceState.UNKNOWN &&
-        currentState === PresenceState.OFF
-    );
-};
+// Note: Problematic sequence detection moved to reset-handler.ts

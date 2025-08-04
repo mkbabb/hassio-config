@@ -33,4 +33,35 @@ frontend:
 
 homeassistant: !include customize.yaml
 
-light_guard:
+influxdb:
+  host: !secret influxdb_host
+  port: !secret influxdb_port
+  database: !secret influxdb_database
+  username: !secret influxdb_username
+  password: !secret influxdb_password
+  max_retries: 3
+  default_measurement: state
+  include:
+    domains:
+      - sensor
+      - binary_sensor
+      - climate
+      - light
+      - switch
+      - cover
+      - fan
+      - lock
+      - input_boolean
+      - input_number
+      - input_select
+    entities:
+      - person.mike
+  exclude:
+    entity_globs:
+      - sensor.*_battery_temperature
+      - sensor.espresense_*_*
+    entities:
+      - sensor.last_boot
+      - sensor.date
+
+

@@ -4,10 +4,11 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { config as loadEnv } from 'dotenv';
-import { createBackup } from './backup';
+import { createBackup, selectAndRestoreBackup, restoreBackup, getBackupInfo } from './backup';
 import { renameFunctionNodes } from './rename';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
+import { StyleHelper } from '../style';
 
 // Load environment variables
 loadEnv();
@@ -102,8 +103,8 @@ export class Deployer {
       'http://a0d7b954_nodered:1880'
     ].filter(Boolean);
     
-    console.log('  Deploying via Node-RED Admin API...');
-    console.log(`  Updating ${updatedNodeIds.length} nodes with "nodes" deployment type`);
+    console.log(StyleHelper.info("Deploying via Node-RED Admin API"));
+    console.log(StyleHelper.info(`Updating ${updatedNodeIds.length} nodes with hot reload`));
     
     for (const baseUrl of urls) {
       try {
@@ -136,18 +137,20 @@ export class Deployer {
         
         if (response.ok) {
           const result = await response.text();
-          console.log('  ✓ Node-RED API deployment successful');
-          console.log(`  Response: ${result || 'OK'}`);
+          console.log(StyleHelper.success("Node-RED API deployment successful"));
+          if (result) {
+            console.log(StyleHelper.colors.muted(`Response: ${result}`));
+          }
           return true;
         } else {
           const text = await response.text();
-          console.log(`  ✗ Failed: ${response.status} ${response.statusText}`);
+          console.log(StyleHelper.error(`Failed: ${response.status} ${response.statusText}`));
           if (text && text.length < 200) {
-            console.log(`    Response: ${text}`);
+            console.log(StyleHelper.colors.muted(`Response: ${text}`));
           }
         }
       } catch (error: any) {
-        console.log(`  ✗ Error: ${error.message}`);
+        console.log(StyleHelper.error("Connection error", error.message));
       }
     }
     
@@ -159,30 +162,31 @@ export class Deployer {
    */
   private async deployViaFile(flows: any[]): Promise<boolean> {
     try {
-      console.log('  Using file-based deployment...');
+      console.log(StyleHelper.info("Using file-based deployment"));
       
       // Write updated flows back to file
-      console.log('  Writing updated flows...');
+      console.log(StyleHelper.info("Writing updated flows to file"));
       fs.writeFileSync(this.config.flowsPath, JSON.stringify(flows, null, 2));
-      console.log('  ✓ Flows updated successfully');
+      console.log(StyleHelper.success("Flows updated successfully"));
       
       // Attempt to restart Node-RED addon
-      console.log('\nAttempting to restart Node-RED addon...');
+      console.log(StyleHelper.section("Addon Restart"));
+      console.log(StyleHelper.info("Attempting to restart Node-RED addon"));
       const restartSuccess = await this.restartNodeRed();
       
       if (restartSuccess) {
-        console.log('✓ Node-RED addon restart initiated');
-        console.log('⏳ Please wait a few seconds for Node-RED to restart');
+        console.log(StyleHelper.success("Node-RED addon restart initiated"));
+        console.log(StyleHelper.info("Please wait a few seconds for Node-RED to restart"));
       } else {
-        console.log('\n⚠️  Could not restart Node-RED automatically');
-        console.log('   Please restart manually:');
-        console.log('   - Go to: Settings → Add-ons → Node-RED → Restart');
-        console.log('   - Or use: ha addon restart a0d7b954_nodered');
+        console.log(StyleHelper.warning("Could not restart Node-RED automatically"));
+        console.log(StyleHelper.colors.muted("Please restart manually:"));
+        console.log(StyleHelper.colors.muted("  - Go to: Settings → Add-ons → Node-RED → Restart"));
+        console.log(StyleHelper.colors.muted("  - Or use: ha addon restart a0d7b954_nodered"));
       }
       
       return true;
     } catch (error) {
-      console.log('  ✗ File deployment error:', (error as any).message);
+      console.log(StyleHelper.error("File deployment error", (error as any).message));
       return false;
     }
   }
@@ -201,11 +205,11 @@ export class Deployer {
         if (!backupResult.success) {
           throw new Error(`Backup failed: ${backupResult.error}`);
         }
-        console.log(`✓ Backup created: ${backupResult.filename}`);
+        console.log(`${StyleHelper.colors.success(StyleHelper.symbols.success)} Backup created: ${StyleHelper.colors.bold(backupResult.filename)}`);
       }
       
       // Read flows directly from file
-      console.log(`Reading flows from: ${this.config.flowsPath}`);
+      console.log(StyleHelper.colors.muted(`${StyleHelper.symbols.info} Reading flows from: ${StyleHelper.colors.italic(this.config.flowsPath)}`));
       const flowsContent = fs.readFileSync(this.config.flowsPath, 'utf8');
       const flows = JSON.parse(flowsContent);
       
@@ -238,7 +242,7 @@ export class Deployer {
         const mappings = this.config.mappings[relativePath];
         
         if (!mappings || mappings.length === 0) {
-          console.log(`No mappings found for ${relativePath}`);
+          console.log(StyleHelper.colors.muted(`${StyleHelper.symbols.warning} No mappings found for ${StyleHelper.colors.italic(relativePath)}`));
           continue;
         }
         
@@ -248,7 +252,7 @@ export class Deployer {
         );
         
         if (validMappings.length === 0) {
-          console.log(`Skipping ${relativePath} - only low confidence mappings`);
+          console.log(StyleHelper.colors.muted(`${StyleHelper.symbols.info} Skipping ${StyleHelper.colors.italic(relativePath)} - only low confidence mappings`));
           continue;
         }
         
@@ -259,7 +263,7 @@ export class Deployer {
         
         if (!fs.existsSync(jsFile)) {
           result.failed.push(tsFile);
-          console.error(`Compiled file not found: ${jsFile}`);
+          console.error(StyleHelper.colors.error(`${StyleHelper.symbols.error} Compiled file not found: ${StyleHelper.colors.bold(jsFile)}`));
           continue;
         }
         
@@ -274,10 +278,11 @@ export class Deployer {
             toBeDeployed.push({ tsFile: relativePath, mapping, code });
             if (options.dryRun) {
               const reason = options.force ? 'forced' : 'code changed';
-              console.log(`Would deploy ${relativePath} to ${mapping.nodeName} (${mapping.nodeId}) - ${reason}`);
+              const reasonColor = options.force ? StyleHelper.colors.warning : StyleHelper.colors.info;
+              console.log(`${StyleHelper.colors.primary(StyleHelper.symbols.progress)} Would deploy ${StyleHelper.colors.bold(relativePath)} → ${StyleHelper.colors.bold(mapping.nodeName)} ${StyleHelper.colors.muted(`(${mapping.nodeId})`)} - ${reasonColor(reason)}`);
             }
           } else {
-            console.log(`Skipping ${relativePath} → ${mapping.nodeName} - no changes`);
+            console.log(StyleHelper.colors.muted(`${StyleHelper.symbols.info} Skipping ${StyleHelper.colors.italic(relativePath)} → ${StyleHelper.colors.italic(mapping.nodeName)} - no changes`));
           }
         }
       }
@@ -288,7 +293,8 @@ export class Deployer {
       }
       
       // Deploy only changed functions
-      console.log(`\nDeploying ${toBeDeployed.length} changed functions...`);
+      console.log(StyleHelper.section("Function Deployment"));
+      console.log(StyleHelper.info(`Deploying ${toBeDeployed.length} changed functions`));
       
       if (!options.dryRun) {
         // Update nodes in the flows array
@@ -299,10 +305,10 @@ export class Deployer {
             flows[nodeIndex].func = code;
             updatedNodeIds.push(mapping.nodeId);
             result.deployed.push(`${tsFile} → ${mapping.nodeName}`);
-            console.log(`✓ Prepared update for ${mapping.nodeName}`);
+            console.log(`${StyleHelper.colors.success(StyleHelper.symbols.success)} Prepared update for ${StyleHelper.colors.bold(mapping.nodeName)}`);
           } else {
             result.failed.push(`${tsFile} → ${mapping.nodeName}`);
-            console.error(`✗ Node ${mapping.nodeId} not found in flows`);
+            console.error(`${StyleHelper.colors.error(StyleHelper.symbols.error)} Node ${StyleHelper.colors.bold(mapping.nodeName)} ${StyleHelper.colors.muted(`(${mapping.nodeId})`)} not found in flows`);
           }
         }
         
@@ -313,17 +319,17 @@ export class Deployer {
         const useApi = options.useApi !== false;
         
         if (useApi) {
-          console.log('\nDeployment method: Node-RED Admin API');
+          console.log(StyleHelper.section("API Deployment"));
           deploySuccess = await this.deployViaAPI(flows, updatedNodeIds);
           
           if (!deploySuccess) {
-            console.log('\n⚠️  API deployment failed, falling back to file-based method...');
+            console.log(StyleHelper.warning("API deployment failed, falling back to file-based method"));
           }
         }
         
         // Fallback to file-based deployment
         if (!deploySuccess) {
-          console.log('\nDeployment method: File-based with addon restart');
+          console.log(StyleHelper.section("File Deployment"));
           deploySuccess = await this.deployViaFile(flows);
         }
         
@@ -459,22 +465,130 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       type: 'boolean',
       describe: 'Only rename nodes without deploying code'
     })
+    .option('list-backups', {
+      type: 'boolean',
+      describe: 'List available backup files'
+    })
+    .option('restore-backup', {
+      type: 'string',
+      describe: 'Restore from a specific backup file'
+    })
+    .option('restore-interactive', {
+      type: 'boolean',
+      describe: 'Interactively select and restore from available backups'
+    })
     .example('$0 src/presence/presence.ts', 'Deploy a specific file')
     .example('$0 --all', 'Deploy all mapped functions')
     .example('$0 --all --rename', 'Deploy and rename all functions')
     .example('$0 --rename-only', 'Only rename nodes without deploying')
     .example('$0 --dry-run src/**.ts', 'Preview deployment of multiple files')
     .example('$0 --no-api', 'Use file-based deployment with restart')
+    .example('$0 --list-backups', 'List all available backup files')
+    .example('$0 --restore-backup flows_2025-08-02T19-10-25-224Z.json', 'Restore from specific backup')
+    .example('$0 --restore-interactive', 'Interactively select and restore backup')
     .help()
     .argv as any;
 
   async function main() {
     try {
+      // Handle backup-related operations first (they don't need a Deployer instance)
+      if (argv['list-backups']) {
+        const backups = getBackupInfo();
+        if (backups.length === 0) {
+          console.log(StyleHelper.warning('No backups found'));
+          process.exit(0);
+        }
+        
+        console.log(StyleHelper.section('Available Backups'));
+        console.log(StyleHelper.info(`Found ${StyleHelper.colors.bold(backups.length.toString())} backup file(s)`));
+        console.log(''); // Add spacing
+        
+        // Group recent backups (last 7) and older ones
+        const recentBackups = backups.slice(0, 7);
+        const olderBackups = backups.slice(7);
+        
+        if (recentBackups.length > 0) {
+          console.log(StyleHelper.colors.bold('Recent Backups'));
+          
+          recentBackups.forEach((backup, index) => {
+            const sizeKB = Math.round(backup.size / 1024);
+            const ageColor = backup.relativeTime.includes('hour') ? StyleHelper.colors.success : 
+                           backup.relativeTime.includes('day') ? StyleHelper.colors.warning : StyleHelper.colors.muted;
+            
+            const backupContent = [
+              StyleHelper.keyValue('Date', StyleHelper.colors.bold(backup.humanDate)),
+              StyleHelper.keyValue('Age', backup.relativeTime, StyleHelper.colors.muted, ageColor),
+              StyleHelper.keyValue('Size', `${StyleHelper.colors.italic(sizeKB.toString())}KB`)
+            ];
+            
+            console.log(StyleHelper.panel(backupContent, `${StyleHelper.colors.bold(`${index + 1}.`)} ${backup.filename}`));
+          });
+        }
+        
+        if (olderBackups.length > 0) {
+          console.log('\n' + StyleHelper.colors.bold('Older Backups'));
+          
+          const olderContent = olderBackups.map((backup, index) => {
+            const sizeKB = Math.round(backup.size / 1024);
+            return `${StyleHelper.colors.muted(`${recentBackups.length + index + 1}.`)} ${StyleHelper.colors.bold(backup.filename)} ${StyleHelper.colors.muted(`(${backup.relativeTime}, ${sizeKB}KB)`)}`;
+          });
+          
+          console.log(StyleHelper.panel(olderContent, 'Archive'));
+        }
+        
+        process.exit(0);
+      }
+      
+      if (argv['restore-backup']) {
+        const filename = argv['restore-backup'] as string;
+        console.log(StyleHelper.section('Backup Restoration'));
+        
+        const restoreContent = [
+          StyleHelper.keyValue('Action', 'Restore backup'),
+          StyleHelper.keyValue('File', StyleHelper.colors.bold(filename))
+        ];
+        console.log(StyleHelper.panel(restoreContent, 'Restoration Details'));
+        
+        const result = await restoreBackup(filename);
+        
+        if (result.success) {
+          const successContent = [
+            `${StyleHelper.colors.success(StyleHelper.symbols.success)} Backup restored successfully`,
+            StyleHelper.keyValue('From', filename),
+            '',
+            StyleHelper.colors.muted('Note: You may need to restart Node-RED for changes to take effect')
+          ];
+          console.log(StyleHelper.panel(successContent, 'Restoration Complete'));
+        } else {
+          console.log(StyleHelper.error(`Restore failed: ${result.error}`));
+          process.exit(1);
+        }
+        
+        process.exit(0);
+      }
+      
+      if (argv['restore-interactive']) {
+        console.log(StyleHelper.section('Interactive Backup Restoration'));
+        const result = await selectAndRestoreBackup();
+        
+        if (result.success) {
+          console.log(StyleHelper.success('Backup restored successfully'));
+          console.log(StyleHelper.colors.muted('Note: You may need to restart the Node-RED addon for changes to take effect.'));
+        } else {
+          console.log(StyleHelper.error(`Restore failed: ${result.error}`));
+          process.exit(1);
+        }
+        
+        process.exit(0);
+      }
+      
       const deployer = new Deployer();
       
       // Handle rename-only mode
       if (argv['rename-only']) {
-        console.log('Renaming function nodes...');
+        console.log(StyleHelper.section('Function Node Renaming'));
+        console.log(StyleHelper.info('Renaming function nodes to match file names'));
+        
         const auth = process.env.HA_USERNAME && process.env.HA_PASSWORD
           ? { username: process.env.HA_USERNAME, password: process.env.HA_PASSWORD }
           : undefined;
@@ -485,21 +599,32 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         });
         
         if (!renameResult.success) {
-          console.error(`✗ Rename failed: ${renameResult.error}`);
+          console.log(StyleHelper.error(`Rename failed: ${renameResult.error}`));
           process.exit(1);
         }
         
         if (renameResult.renamed.length === 0) {
-          console.log('No nodes need renaming');
+          console.log(StyleHelper.info('No nodes need renaming', 'All nodes already match their file names'));
         } else {
-          console.log(`\n${argv['dry-run'] ? 'Would rename' : 'Renamed'} ${renameResult.renamed.length} function node(s):`);
-          renameResult.renamed.forEach(r => console.log(`  ${r.oldName} → ${r.newName}`));
+          const verb = argv['dry-run'] ? 'Would rename' : 'Renamed';
+          console.log(StyleHelper.success(`${verb} ${renameResult.renamed.length} function node(s):`));
+          renameResult.renamed.forEach(r => 
+            console.log(StyleHelper.colors.muted(`  ${r.oldName} ${StyleHelper.symbols.arrow} ${r.newName}`))
+          );
         }
         
         if (renameResult.failed.length > 0) {
-          console.log(`\nFailed to rename ${renameResult.failed.length} node(s):`);
-          renameResult.failed.forEach(f => console.log(`  ${f.nodeId}: ${f.error}`));
+          console.log(StyleHelper.warning(`Failed to rename ${renameResult.failed.length} node(s):`));
+          renameResult.failed.forEach(f => 
+            console.log(StyleHelper.colors.error(`  ${f.nodeId}: ${f.error}`))
+          );
         }
+        
+        console.log(StyleHelper.summary({
+          total: renameResult.renamed.length + renameResult.failed.length,
+          built: renameResult.renamed.length,
+          failed: renameResult.failed.length > 0 ? renameResult.failed.length : undefined
+        }));
         
         process.exit(0);
       }
@@ -511,9 +636,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         // Get all mapped files
         const mappings = deployer.getAllMappedFiles();
         filesToDeploy = mappings;
-        console.log(`Deploying all ${mappings.length} mapped functions...`);
+        console.log(StyleHelper.info(`Deploying all ${mappings.length} mapped functions`));
       } else if (filesToDeploy.length === 0) {
-        console.error('Error: No files specified. Use --all to deploy all mapped functions.');
+        console.log(StyleHelper.error("No files specified", "Use --all to deploy all mapped functions"));
         process.exit(1);
       }
       
@@ -528,21 +653,28 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       // Report results
       if (result.success) {
         if (result.deployed.length > 0) {
-          console.log(`\n✓ Deployment successful`);
-          console.log(`  Deployed: ${result.deployed.length} functions`);
-          result.deployed.forEach(d => console.log(`    - ${d}`));
+          const deployedContent = result.deployed.map(deployment => {
+            const [file, nodeName] = deployment.split(' → ');
+            return `${StyleHelper.colors.success(StyleHelper.symbols.success)} ${StyleHelper.colors.bold(file)} → ${StyleHelper.colors.bold(nodeName)}`;
+          });
+          
+          console.log(StyleHelper.panel(deployedContent, `${StyleHelper.colors.success('Deployed')} ${StyleHelper.colors.bold(result.deployed.length.toString())} Functions`));
         } else {
-          console.log('\n✓ No functions needed deployment');
+          console.log(StyleHelper.info("No functions needed deployment", "All functions are up to date"));
         }
         
         if (result.failed.length > 0) {
-          console.log(`\n⚠️  Failed: ${result.failed.length} functions`);
-          result.failed.forEach(f => console.log(`    - ${f}`));
+          const failedContent = result.failed.map(f => 
+            `${StyleHelper.colors.error(StyleHelper.symbols.error)} ${StyleHelper.colors.bold(f)}`
+          );
+          
+          console.log(StyleHelper.panel(failedContent, `${StyleHelper.colors.error('Failed')} ${StyleHelper.colors.bold(result.failed.length.toString())} Functions`));
         }
         
         // Handle rename option after successful deployment
         if (argv.rename && result.deployed.length > 0 && !argv['dry-run']) {
-          console.log('\nRenaming deployed function nodes...');
+          console.log(StyleHelper.section("Node Renaming"));
+          console.log(StyleHelper.info("Renaming deployed function nodes"));
           const auth = process.env.HA_USERNAME && process.env.HA_PASSWORD
             ? { username: process.env.HA_USERNAME, password: process.env.HA_PASSWORD }
             : undefined;
@@ -553,16 +685,16 @@ if (import.meta.url === `file://${process.argv[1]}`) {
           });
           
           if (renameResult.success && renameResult.renamed.length > 0) {
-            console.log(`✓ Renamed ${renameResult.renamed.length} function node(s):`);
-            renameResult.renamed.forEach(r => console.log(`  ${r.oldName} → ${r.newName}`));
+            console.log(StyleHelper.success(`Renamed ${renameResult.renamed.length} function node(s):`));
+            renameResult.renamed.forEach(r => console.log(StyleHelper.colors.muted(`  ${r.oldName} → ${r.newName}`)));
           }
         }
       } else {
-        console.error(`\n✗ Deployment failed: ${result.error}`);
+        console.log(StyleHelper.error("Deployment failed", result.error || "Unknown error"));
         process.exit(1);
       }
     } catch (error) {
-      console.error('Fatal error:', error);
+      console.log(StyleHelper.error("Fatal deployment error", error instanceof Error ? error.message : String(error)));
       process.exit(1);
     }
   }
