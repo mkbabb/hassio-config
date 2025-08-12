@@ -1,7 +1,11 @@
 /**
  * Base InfluxDB logging utilities
  * Shared across all flow loggers for consistency
+ * Note: This is a utility module - msg is provided by Node-RED context when used
  */
+
+// @ts-ignore - msg is provided by Node-RED runtime
+declare const msg: any;
 
 export interface LogEvent {
   measurement: string;

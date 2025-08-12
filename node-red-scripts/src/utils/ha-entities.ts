@@ -82,15 +82,15 @@ export function getEntities(filter: EntityFilter): Hass.State[] {
         }
         
         // Area filtering (if area_id is in attributes)
-        if (filter.area && entity.attributes.area_id) {
+        if (filter.area && (entity.attributes as any)?.area_id) {
             const areas = Array.isArray(filter.area) ? filter.area : [filter.area];
-            if (!areas.includes(entity.attributes.area_id)) return false;
+            if (!areas.includes((entity.attributes as any).area_id)) return false;
         }
         
         // Device class filtering
-        if (filter.device_class && entity.attributes.device_class) {
+        if (filter.device_class && (entity.attributes as any)?.device_class) {
             const classes = Array.isArray(filter.device_class) ? filter.device_class : [filter.device_class];
-            if (!classes.includes(entity.attributes.device_class)) return false;
+            if (!classes.includes((entity.attributes as any).device_class)) return false;
         }
         
         // Attribute matching

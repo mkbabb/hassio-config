@@ -63,7 +63,7 @@ const batteryEntities = entities.filter(isBatteryEntity).map((entity) => {
 
     return {
         entity_id: entity.entity_id,
-        friendly_name: entity.attributes.friendly_name || entity.entity_id,
+        friendly_name: (entity.attributes as any)?.friendly_name || entity.entity_id,
         state: batteryState,
         // Include all other original keys
         ...entity

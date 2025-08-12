@@ -315,13 +315,6 @@ export const domainToService = function (entity: Hass.State, domain: string) {
             switch (entity.state) {
                 case "off":
                     return "turn_off";
-                case "heat":
-                case "cool":
-                case "heat_cool":
-                case "auto":
-                case "dry":
-                case "fan_only":
-                    return "set_hvac_mode";
                 default:
                     return "set_preset_mode";
             }
@@ -374,7 +367,7 @@ export const createServiceCall = (entity: Hass.State): Hass.Service | undefined 
         data: {
             entity_id: entity.entity_id,
             // state: entity.state,
-            ...filterAttributes(domain, service, entity.attributes)
+            ...filterAttributes(domain, service, entity.attributes as Hass.Attribute)
         }
     };
 };
@@ -639,11 +632,11 @@ const cache: Map<string, CacheEntry<any>> = new Map();
 export function withTTL<T>(key: string, ttlMs: number, fetcher: () => T): T {
     const now = Date.now();
     const cached = cache.get(key);
-    
-    if (cached && (now - cached.timestamp) < ttlMs) {
+
+    if (cached && now - cached.timestamp < ttlMs) {
         return cached.data;
     }
-    
+
     const data = fetcher();
     cache.set(key, { data, timestamp: now });
     return data;
@@ -662,10 +655,10 @@ export function deserializeRegExp(obj: any): any {
             try {
                 // The pattern might have escaped backslashes from JSON serialization
                 // Replace \\ with \ to get the actual pattern
-                const pattern = match[1].replace(/\\\\/g, '\\');
-                return new RegExp(pattern, match[2] || '');
+                const pattern = match[1].replace(/\\\\/g, "\\");
+                return new RegExp(pattern, match[2] || "");
             } catch (e) {
-                console.error('Failed to create RegExp:', e, 'Pattern:', match[1]);
+                console.error("Failed to create RegExp:", e, "Pattern:", match[1]);
                 // If RegExp construction fails, return original
                 return obj;
             }
@@ -679,17 +672,17 @@ export function deserializeRegExp(obj: any): any {
  */
 export function deserializeObject<T = any>(obj: T): T {
     if (obj === null || obj === undefined) return obj;
-    
+
     if (Array.isArray(obj)) {
-        return obj.map(item => deserializeObject(item)) as any;
+        return obj.map((item) => deserializeObject(item)) as any;
     }
-    
-    if (typeof obj === 'object') {
+
+    if (typeof obj === "object") {
         // Check if it's a serialized RegExp
         if ((obj as any).__enc__) {
             return deserializeRegExp(obj) as any;
         }
-        
+
         // Recursively deserialize object properties
         const result: any = {};
         for (const [key, value] of Object.entries(obj)) {
@@ -697,6 +690,6 @@ export function deserializeObject<T = any>(obj: T): T {
         }
         return result;
     }
-    
+
     return obj;
 }

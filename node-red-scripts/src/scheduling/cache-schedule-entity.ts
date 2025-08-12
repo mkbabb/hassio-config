@@ -1,4 +1,4 @@
-import { timeStringToDate, compareTime } from "../utils/utils";
+import { timeStringToDate, compareTime } from "../utils/datetime";
 
 const weekdaySleepEntityId = "input_datetime.weekday_sleep";
 const weekendSleepEntityId = "input_datetime.weekend_sleep";

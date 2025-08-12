@@ -4,3 +4,9 @@ nighttime:
 daytime:
     name: "Daytime"
     icon: mdi:weather-sunny
+schedule_pause:
+    name: "Schedule Pause"
+    icon: mdi:pause
+presence_pause:
+    name: "Presence Pause"
+    icon: mdi:account-off

@@ -1,14 +1,20 @@
 import {
     groupActions,
-    isTimeInRange,
-    timeStringToDate,
     serviceToActionCall,
-    dateToTimeString,
-    compareTime,
     getEntityDomain,
-    lerp,
     domainToService
 } from "../utils/utils";
+import {
+    isTimeInRange,
+    timeStringToDate,
+    dateToTimeString,
+    compareTime,
+    calculateProgress,
+    resolveEntityTime,
+    calculateScheduleTimes,
+    isWithinWindow,
+    cleanupOldEntries
+} from "../utils/datetime";
 import {
     getScheduleEntities,
     getEntitiesByPattern,
@@ -178,8 +184,8 @@ function matchesEntityByTag(
 }
 
 function calculateTValue(now: Date, start: Date, end: Date): number {
-    // Using lerp function: returns 0-1 representing progress from start to end
-    return lerp(now.getTime(), start.getTime(), end.getTime());
+    // Returns 0-1 representing progress from start to end
+    return calculateProgress(now, start, end);
 }
 
 function calculateScheduleEvents(
@@ -373,6 +379,85 @@ function determineEntityAction(
     };
 }
 
+function processContinuousSchedule(
+    entity: Hass.State,
+    schedule: NormalizedSchedule,
+    entityConfig: NormalizedEntityConfig | null,
+    isActive: boolean
+): Partial<Hass.Service> | null {
+    // Continuous schedules: enforce state during entire active period
+    // Always returns an action to ensure state matches schedule
+    return determineEntityAction(entity, schedule, entityConfig, isActive);
+}
+
+function processTriggerSchedule(
+    entity: Hass.State,
+    schedule: NormalizedSchedule,
+    entityConfig: NormalizedEntityConfig | null,
+    now: Date,
+    triggeredSchedules: Record<string, any>
+): { action: Partial<Hass.Service> | null; updateTriggerState: boolean } {
+    const scheduleKey = `${schedule.name}_${entity.entity_id}`;
+    const triggerState: { on: string | null; off: string | null } = 
+        triggeredSchedules[scheduleKey] || { on: null, off: null };
+    
+    const triggerWindowMs = 10 * 60 * 1000; // 10 minutes
+    
+    // Use datetime utilities for window checking
+    const inStartWindow = isWithinWindow(now, schedule.start, triggerWindowMs);
+    const inEndWindow = isWithinWindow(now, schedule.end, triggerWindowMs);
+    const pastEndWindow = now.getTime() > (schedule.end.getTime() + triggerWindowMs);
+    
+    let action: Partial<Hass.Service> | null = null;
+    let updateTriggerState = false;
+    
+    // Handle ON trigger: trigger within start window
+    if (inStartWindow && !triggerState.on) {
+        action = determineEntityAction(entity, schedule, entityConfig, true);
+        if (action) {
+            triggerState.on = now.toISOString();
+            triggeredSchedules[scheduleKey] = triggerState;
+            updateTriggerState = true;
+        }
+    }
+    
+    // Handle OFF trigger: trigger within end window
+    if (inEndWindow && !triggerState.off) {
+        const offAction = determineEntityAction(entity, schedule, entityConfig, false);
+        if (offAction) {
+            // If we already have an ON action, OFF takes precedence in same cycle
+            action = offAction;
+            triggerState.off = now.toISOString();
+            triggeredSchedules[scheduleKey] = triggerState;
+            updateTriggerState = true;
+        }
+    }
+    
+    // Reset state when we're past the schedule for next cycle
+    // Only reset if we've passed the end window AND both triggers have fired
+    if (pastEndWindow && triggerState.on && triggerState.off) {
+        delete triggeredSchedules[scheduleKey];
+        updateTriggerState = true;
+    }
+    
+    return { action, updateTriggerState };
+}
+
+// Schedule time resolution helper
+function resolveScheduleTime(
+    time: string | { entity_id: string },
+    scheduleEntities: Record<string, Hass.State>
+): string {
+    return resolveEntityTime(time, (entityId: string) => {
+        // First try schedule entities collection
+        if (scheduleEntities[entityId]) {
+            return scheduleEntities[entityId];
+        }
+        // Fallback to direct entity access
+        return getEntity(entityId);
+    });
+}
+
 // Main scheduling logic
 // @ts-ignore
 const schedules: Schedule[] = flow.get("schedules") ?? [];
@@ -405,64 +490,21 @@ const normalizedSchedules: NormalizedSchedule[] = schedules
             interpolation
         } = schedule;
 
-        // Resolve time based on its format
-        const resolveTime = (time: string | { entity_id: string }): string => {
-            if (typeof time === "string") {
-                // Check if it matches schedule entity pattern
-                if (time.includes("_schedule_") && scheduleEntities?.[time]) {
-                    return scheduleEntities[time].state;
-                }
-                return time;
-            } else {
-                // First try schedule entities (input_datetime)
-                let entity = scheduleEntities?.[time.entity_id];
-                if (entity) {
-                    const state = entity.state;
-                    console.log(`Resolved ${time.entity_id} from scheduleEntities: ${state}`);
-                    return state;
-                }
-                
-                // If not found, try direct entity access for sensors, etc.
-                entity = getEntity(time.entity_id);
-                if (entity) {
-                    const state = entity.state;
-                    console.log(`Resolved ${time.entity_id} via direct access: ${state}`);
-                    return state;
-                } 
-                
-                // Error: entity not found
-                console.error(`ERROR: Schedule entity '${time.entity_id}' not found! This will cause incorrect scheduling.`);
-                throw new Error(`Schedule entity '${time.entity_id}' not found`);
-            }
-        };
+        // Resolve time strings from entities
+        const startTimeString = resolveScheduleTime(start, scheduleEntities);
+        const endTimeString = end ? resolveScheduleTime(end, scheduleEntities) : null;
 
-        const startTimeString = resolveTime(start);
-        const endTimeString = end ? resolveTime(end) : null;
+        // Calculate actual schedule times with proper date handling
+        const scheduleType = schedule.type || "trigger";
+        const { start: startTime, end: endTime } = calculateScheduleTimes(
+            startTimeString,
+            endTimeString,
+            now,
+            scheduleType === "trigger" ? 10 : 0 // 10-minute window for triggers
+        );
 
-        const startTime = timeStringToDate(startTimeString);
-        let endTime = endTimeString ? timeStringToDate(endTimeString) : null;
-
-        startTime.setDate(now.getDate());
-
-        // For trigger schedules without end time, create a 10-minute window
-        if (!endTime && schedule.type === "trigger") {
-            const endTimeDate = new Date(startTime.getTime() + 10 * 60 * 1000); // 10 minutes after start
-            endTime = endTimeDate;
-        } else if (endTime) {
-            endTime.setDate(now.getDate());
-
-            // Handle schedules that span midnight
-            if (compareTime(startTime, endTime) >= 0) {
-                if (compareTime(now, endTime) < 1) {
-                    startTime.setDate(startTime.getDate() - 1);
-                } else {
-                    endTime.setDate(endTime.getDate() + 1);
-                }
-            } else if (compareTime(now, endTime) > 1) {
-                startTime.setDate(startTime.getDate() + 1);
-            }
-        } else {
-            // Continuous schedule without end time - invalid
+        if (!endTime) {
+            // Invalid schedule configuration
             return null;
         }
 
@@ -482,9 +524,9 @@ const normalizedSchedules: NormalizedSchedule[] = schedules
         };
     })
     .filter(
-        (s): s is NormalizedSchedule =>
+        (s) =>
             s !== null && checkConditions(s.conditions, message)
-    );
+    ) as NormalizedSchedule[];
 
 // Get entities to check - either from payload or by fetching all controlled entities
 let entitiesToCheck: Hass.State[] = [];
@@ -527,10 +569,12 @@ if (message.payload && Array.isArray(message.payload)) {
 
     // Add tagged entities
     Object.entries(tagDefinitions).forEach(([tag, patterns]) => {
-        patterns.forEach((pattern) => {
-            const matches = getEntitiesByPattern(pattern);
-            entitiesToCheck.push(...matches);
-        });
+        if (Array.isArray(patterns)) {
+            patterns.forEach((pattern: string) => {
+                const matches = getEntitiesByPattern(pattern);
+                entitiesToCheck.push(...matches);
+            });
+        }
     });
 
     // Remove duplicates using Map for better performance
@@ -542,7 +586,7 @@ if (message.payload && Array.isArray(message.payload)) {
 }
 
 // Process entities and determine actions
-const serviceActions: Hass.Service[] = [];
+const serviceActions: Partial<Hass.Service>[] = [];
 const entityScheduleMatches: any[] = [];
 
 entitiesToCheck.forEach((entity) => {
@@ -584,51 +628,29 @@ entitiesToCheck.forEach((entity) => {
 
     // Handle continuous vs trigger schedules
     if (activeSchedule.type === "continuous") {
-        // Continuous schedules: enforce state during entire active period
-        if (isActive) {
-            const action = determineEntityAction(
-                entity as Hass.State,
-                activeSchedule,
-                entityConfig,
-                isActive
-            );
+        // Use the abstracted continuous schedule processor
+        const action = processContinuousSchedule(
+            entity as Hass.State,
+            activeSchedule,
+            entityConfig,
+            isActive
+        );
 
-            if (action) {
-                serviceActions.push(action);
-            }
-        } else {
-            // Schedule not active - enforce OFF state for continuous schedules
-            const action = determineEntityAction(
-                entity as Hass.State,
-                activeSchedule,
-                entityConfig,
-                false // Force OFF state
-            );
-
-            if (action) {
-                serviceActions.push(action);
-            }
+        if (action) {
+            serviceActions.push(action);
         }
     } else if (activeSchedule.type === "trigger") {
-        // Trigger schedules: fire once when becoming active
-        const dateKey = now.toISOString().split("T")[0]; // YYYY-MM-DD
-        const scheduleKey = `${activeSchedule.name}_${entity.entity_id}_${dateKey}`;
-        const alreadyTriggered = triggeredSchedules[scheduleKey];
+        // Use the abstracted trigger schedule processor
+        const { action } = processTriggerSchedule(
+            entity as Hass.State,
+            activeSchedule,
+            entityConfig,
+            now,
+            triggeredSchedules
+        );
 
-        if (isActive && !alreadyTriggered) {
-            // We're in the active period and haven't triggered today
-            const action = determineEntityAction(
-                entity as Hass.State,
-                activeSchedule,
-                entityConfig,
-                true // Turn ON
-            );
-
-            if (action) {
-                serviceActions.push(action);
-                // Mark as triggered for today
-                triggeredSchedules[scheduleKey] = now.toISOString();
-            }
+        if (action) {
+            serviceActions.push(action);
         }
     }
 
@@ -664,15 +686,22 @@ const debugInfo = {
         }))
 };
 
-// Clean up old date entries from triggeredSchedules (keep only today)
-const today = now.toISOString().split("T")[0];
-const cleanedTriggeredSchedules: Record<string, any> = {};
-
-Object.entries(triggeredSchedules).forEach(([key, value]) => {
-    if (key.endsWith(`_${today}`)) {
-        cleanedTriggeredSchedules[key] = value;
-    }
-});
+// Clean up old trigger states using datetime utility
+const cleanedTriggeredSchedules = cleanupOldEntries(
+    triggeredSchedules,
+    (value) => {
+        if (value && typeof value === 'object' && 'on' in value && 'off' in value) {
+            const triggerObj = value as { on: string | null; off: string | null };
+            // Return the most recent activity timestamp
+            const timestamps = [triggerObj.on, triggerObj.off].filter(t => t !== null);
+            if (timestamps.length > 0) {
+                return timestamps.sort().pop() || null;
+            }
+        }
+        return null;
+    },
+    24 * 60 * 60 * 1000 // Keep entries for 24 hours
+);
 
 // Save triggered schedules back to flow context
 // @ts-ignore

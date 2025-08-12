@@ -2,6 +2,48 @@
 
 **Version**: 2025.7.2 | **Platform**: macOS Darwin 25.0.0 ARM64 | **Location**: 35.804°N, 78.794°W
 
+## Connection Information
+
+### Home Assistant API
+- **URL**: `http://homeassistant.local:8123`
+- **API Base**: `http://homeassistant.local:8123/api/`
+- **States**: `GET /api/states` - List all entity states
+- **Services**: `POST /api/services/<domain>/<service>` - Call services
+- **Note**: Requires authentication Bearer token in headers
+
+### InfluxDB Access
+- **Host**: `http://homeassistant.local:8086` or `http://a0d7b954-influxdb:8086`
+- **Credentials**: Username and password stored in `secrets.yaml` (see `influxdb_username`, `influxdb_password`)
+- **Environment Variables**: Also available as `INFLUXDB_USERNAME` and `INFLUXDB_PASSWORD`
+- **Databases**:
+  - `homeassistant` - Home Assistant state history
+  - `nodered` - Node-RED automation metrics (presence_events, schedule_events, etc.)
+  - `_internal` - InfluxDB internal metrics
+
+### Querying InfluxDB
+```bash
+# Show databases
+curl -G "http://homeassistant.local:8086/query" \
+  --data-urlencode "u=${INFLUXDB_USERNAME}" \
+  --data-urlencode "p=${INFLUXDB_PASSWORD}" \
+  --data-urlencode "q=SHOW DATABASES"
+
+# Query Node-RED presence events
+curl -G "http://homeassistant.local:8086/query" \
+  --data-urlencode "u=${INFLUXDB_USERNAME}" \
+  --data-urlencode "p=${INFLUXDB_PASSWORD}" \
+  --data-urlencode "db=nodered" \
+  --data-urlencode "q=SELECT * FROM presence_events WHERE time > now() - 1h"
+```
+
+### Node-RED Measurements
+The `nodered` database contains:
+- `presence_events` - Motion/presence detection state changes
+- `schedule_events` - Schedule execution logs
+- `plant_events` - Grow light automation events
+- `cache_events` - State caching operations
+- `remote_events` - IR/RF remote control logs
+
 ## Directory Structure
 
 ```
@@ -86,3 +128,42 @@ Node-RED scripts use custom `build.ts` with esbuild, dependency tracking, increm
 ## Energy Optimization
 
 Time-of-use scheduling with peak/off-peak rates. Pre-cooling triggers 30min before peak periods. Climate setpoints adjust based on occupancy and rate schedule.
+
+## Development Guidelines & Edicts
+
+### Service Call Updates (2025-08-04)
+- **DEPRECATED**: Separate `domain` and `service` properties in Home Assistant service calls
+- **USE**: Single `action` property in format `"domain.service"` (e.g., `"light.turn_on"`)
+- **VALIDATION**: Always check service names aren't `"unavailable"` or empty
+- **FALLBACK**: Support both formats for backward compatibility
+
+### Presence Detection State Machine
+- **CRITICAL**: Treat `pending_off` state as `off` for re-triggering lights
+- **LOGGING**: Store last 10 state transitions in flow history for debugging
+- **DEBUG**: Include `wasPendingOffTreatedAsOff` and `coolDownCancelled` flags
+
+### InfluxDB Data Types
+- **BOOLEANS**: Convert to integers (0/1) using `safeBooleanAsInt()`
+- **OBJECTS**: Convert to counts or JSON strings, never store raw objects
+- **STRINGS**: Use `safeString()` to ensure proper encoding
+- **NUMBERS**: Use `safeNumber()` to handle null/undefined values
+
+### Debugging Presence Issues
+1. Check `nodered.presence_events` for state transitions
+2. Look for `action: "none"` entries - indicates detection without action
+3. Verify `previous_state` and `previous_previous_state` for state history
+4. Check `sensor_states` JSON field for individual sensor status
+5. Monitor `was_pending_off_treated_as_off` flag for re-trigger behavior
+
+### Common Queries
+```sql
+-- Recent presence events for a room
+SELECT time, presence_state, previous_state, action, sensor_states 
+FROM nodered.presence_events 
+WHERE topic =~ /bathroom/ AND time > now() - 1h
+
+-- Failed light activations
+SELECT time, presence_state, action, sensor_states 
+FROM nodered.presence_events 
+WHERE action = 'none' AND presence_state = 'on'
+```

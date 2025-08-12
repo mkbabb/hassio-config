@@ -1,4 +1,4 @@
-import { getTimeString } from "./utils/utils";
+import { getTimeString } from "./utils/datetime";
 
 //@ts-expect-error
 const message: Hass.Message = msg;

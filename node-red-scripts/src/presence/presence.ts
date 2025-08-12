@@ -71,7 +71,7 @@ const aggregateState = determinePresenceState(presenceStatesValues);
 const prevState = transitionHistory.length > 0 ? transitionHistory[transitionHistory.length - 1].state : 'off';
 const inCoolDown = isInCoolDownPeriod(flowInfo);
 
-if (normalizedState === "off" && prevState === "reset") {
+if (normalizedState === "off" && prevState === "reset" && !inCoolDown) {
     // This is reset→off, turn off lights
     flowInfo.state = PresenceState.OFF;
     flowInfo.lastOff = Date.now();
@@ -104,23 +104,17 @@ if (normalizedState === "off" && prevState === "reset") {
     // @ts-ignore
     msg.payload = null;
 
-    // State machine logic - simplified and clear
+    // State machine logic - treat pending_off as off for re-triggering
     switch (actualState) {
     case PresenceState.ON:
-        if (prevState === PresenceState.OFF) {
-            // Transition from OFF to ON
+        if (prevState === PresenceState.OFF || prevState === PresenceState.PENDING_OFF) {
+            // Transition from OFF/PENDING_OFF to ON - treat pending_off as off for re-triggering
             flowInfo.lastOn = Date.now();
             flowInfo.lastOff = null;
             flowInfo.state = PresenceState.ON;
             flowInfo.delay = 0;
             // @ts-ignore
             msg.payload = createPayload(filteredEntities, "turn_on");
-        } else if (prevState === PresenceState.PENDING_OFF) {
-            // Cancel pending off - presence detected during cool-down
-            flowInfo.state = PresenceState.ON;
-            flowInfo.lastOn = Date.now();
-            flowInfo.delay = 0;
-            // Don't update lastOn - maintain dwell time calculation
         } else if (prevState === PresenceState.UNKNOWN && !inCoolDown) {
             // Recover from unknown to on, no cool-down active
             flowInfo.state = PresenceState.ON;
@@ -194,15 +188,27 @@ msg.aggregateState = aggregateState;
 // @ts-ignore
 msg.inCoolDown = inCoolDown;
 // @ts-ignore
-msg.debug = {
+msg.debug = msg.debug || {}; // Preserve any existing debug info
+// @ts-ignore
+Object.assign(msg.debug, {
     topic: topic,
     sensorCount: Object.keys(presenceStates).length,
     coolDownSeconds: coolDown,
     // @ts-ignore
     actualDelayMs: msg.delay,
     currentState: flowInfo.state,
-    transitionHistory: transitionHistory.slice(-3), // Last 3 transitions
+    stateTransition: transitionHistory.length > 0 ? 
+        `${transitionHistory[transitionHistory.length - 1]?.state || 'unknown'} → ${flowInfo.state}` : 
+        `unknown → ${flowInfo.state}`,
+    transitionHistory: transitionHistory.slice(-10), // Last 10 transitions for full history
     timeSinceLastOn: flowInfo.lastOn ? Date.now() - flowInfo.lastOn : null,
     timeSinceLastOff: flowInfo.lastOff ? Date.now() - flowInfo.lastOff : null,
-    resetHandled: normalizedState === "reset" || (normalizedState === "off" && prevState === "reset")
-};
+    resetHandled: normalizedState === "reset" || (normalizedState === "off" && prevState === "reset"),
+    normalizedState: normalizedState,
+    prevState: prevState,
+    sequenceType: normalizedState === "reset" ? "reset" : 
+                 normalizedState === "ignored" ? "debounced" : "normal",
+    // State machine behavior flags
+    wasPendingOffTreatedAsOff: (flowInfo.state === PresenceState.ON && prevState === PresenceState.PENDING_OFF),
+    coolDownCancelled: (flowInfo.state === PresenceState.ON && prevState === PresenceState.PENDING_OFF)
+});
