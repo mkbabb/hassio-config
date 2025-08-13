@@ -1,3 +1,25 @@
+/**
+ * Schedule Management System for Node-RED
+ * 
+ * Handles time-based entity control with support for:
+ * - Continuous schedules (enforce state during time window)
+ * - Trigger schedules (fire once at start/end)
+ * - Entity matching via patterns and tags
+ * - Schedule precedence and conditions
+ * - Static state overrides and blacklisting
+ * 
+ * Pipeline Overview:
+ * 1. Load configurations (schedules, tags, blacklists)
+ * 2. Resolve schedule times from entities
+ * 3. Normalize and validate schedules
+ * 4. Determine entities to process
+ * 5. Match entities to schedules and generate actions
+ * 6. Calculate interpolation events
+ * 7. Prepare debug information
+ * 8. Clean up stale state
+ * 9. Return formatted actions
+ */
+
 import {
     groupActions,
     serviceToActionCall,
@@ -23,6 +45,9 @@ import {
     getEntity,
     getEntitiesById
 } from "../utils/ha-entities";
+import {
+    shouldFilterEntity
+} from "../utils/static-states";
 import { DomainStates, PRESENCE_STATE_ENTITY_ID } from "./types";
 import type {
     NormalizedSchedule,
@@ -35,8 +60,16 @@ import type {
     EntityState
 } from "./types";
 
-// Using global presence entity ID from types
+// ============================================================================
+// CONDITION CHECKING
+// ============================================================================
 
+/**
+ * Evaluates schedule conditions against current state
+ * @param conditions - Array of conditions to check (presence, entity states)
+ * @param msg - Node-RED message for context
+ * @returns true if all conditions pass or no conditions defined
+ */
 function checkConditions(
     conditions: ScheduleCondition[] | undefined,
     msg: any
@@ -63,6 +96,15 @@ function checkConditions(
     });
 }
 
+// ============================================================================
+// ENTITY MATCHING & NORMALIZATION
+// ============================================================================
+
+/**
+ * Normalizes various entity match formats into consistent config objects
+ * @param match - String, regex, array, or config object to normalize
+ * @returns Array of normalized entity configurations with patterns
+ */
 function normalizeEntityMatch(match: EntityMatch): NormalizedEntityConfig[] {
     if (!match) {
         return [{ pattern: new RegExp("(?!)") }];
@@ -140,6 +182,12 @@ function normalizeEntityMatch(match: EntityMatch): NormalizedEntityConfig[] {
     return [{ pattern: new RegExp("(?!)") }];
 }
 
+/**
+ * Checks if entity ID matches any configured patterns
+ * @param entityId - Entity to check
+ * @param entityConfigs - Normalized configurations to match against
+ * @returns Matching config or null
+ */
 function matchesEntity(
     entityId: string,
     entityConfigs: NormalizedEntityConfig[] | undefined
@@ -154,6 +202,14 @@ function matchesEntity(
     return null;
 }
 
+/**
+ * Checks if entity matches any defined tags
+ * @param entityId - Entity to check
+ * @param tags - Tag names to match
+ * @param tagDefinitions - Map of tag names to entity patterns
+ * @param allowedDomains - Domains allowed for tag matching
+ * @returns true if entity matches any tag
+ */
 function matchesEntityByTag(
     entityId: string,
     tags: string[] | undefined,
@@ -183,11 +239,27 @@ function matchesEntityByTag(
     return false;
 }
 
+// ============================================================================
+// TIME CALCULATIONS
+// ============================================================================
+
+/**
+ * Calculates interpolation value (0-1) for current time in schedule window
+ * @param now - Current time
+ * @param start - Schedule start time
+ * @param end - Schedule end time
+ * @returns Progress value from 0 (at start) to 1 (at end)
+ */
 function calculateTValue(now: Date, start: Date, end: Date): number {
-    // Returns 0-1 representing progress from start to end
     return calculateProgress(now, start, end);
 }
 
+/**
+ * Generates schedule events based on current time and schedule configuration
+ * @param schedule - Normalized schedule with timing and interpolation settings
+ * @param now - Current time for event calculation
+ * @returns Array of active events (active, ramp_up, ramp_down, etc.)
+ */
 function calculateScheduleEvents(
     schedule: NormalizedSchedule,
     now: Date
@@ -274,6 +346,17 @@ function calculateScheduleEvents(
     return events;
 }
 
+// ============================================================================
+// STATE DETERMINATION
+// ============================================================================
+
+/**
+ * Determines target state for entity based on domain and schedule state
+ * @param domain - Entity domain (light, switch, climate, etc.)
+ * @param isActive - Whether schedule is active
+ * @param customState - Optional custom state configuration
+ * @returns Target state string (on/off/heat/cool/etc.)
+ */
 function getTargetState(
     domain: string,
     isActive: boolean,
@@ -294,6 +377,13 @@ function getTargetState(
     return isActive ? "on" : "off";
 }
 
+/**
+ * Maps entity state to appropriate service call
+ * @param domain - Entity domain
+ * @param state - Target state
+ * @param customService - Optional custom service override
+ * @returns Service name (turn_on, turn_off, set_hvac_mode, etc.)
+ */
 function getServiceForState(
     domain: string,
     state: string,
@@ -321,6 +411,14 @@ function getServiceForState(
     return "set_state";
 }
 
+/**
+ * Builds service call for entity based on schedule and current state
+ * @param entity - Current entity state
+ * @param schedule - Active schedule configuration
+ * @param entityConfig - Entity-specific configuration
+ * @param isActive - Whether schedule is in active period
+ * @returns Service call object or null if no action needed
+ */
 function determineEntityAction(
     entity: Hass.State,
     schedule: NormalizedSchedule,
@@ -379,17 +477,37 @@ function determineEntityAction(
     };
 }
 
+// ============================================================================
+// SCHEDULE PROCESSORS
+// ============================================================================
+
+/**
+ * Processes continuous schedule - enforces state throughout active period
+ * @param entity - Entity to control
+ * @param schedule - Schedule configuration
+ * @param entityConfig - Entity-specific settings
+ * @param isActive - Whether in active time window
+ * @returns Service call to enforce correct state
+ */
 function processContinuousSchedule(
     entity: Hass.State,
     schedule: NormalizedSchedule,
     entityConfig: NormalizedEntityConfig | null,
     isActive: boolean
 ): Partial<Hass.Service> | null {
-    // Continuous schedules: enforce state during entire active period
-    // Always returns an action to ensure state matches schedule
+    // Continuous: Always enforce state during active period
     return determineEntityAction(entity, schedule, entityConfig, isActive);
 }
 
+/**
+ * Processes trigger schedule - fires once at start and once at end
+ * @param entity - Entity to control
+ * @param schedule - Schedule configuration
+ * @param entityConfig - Entity-specific settings
+ * @param now - Current time
+ * @param triggeredSchedules - State tracking for fired triggers
+ * @returns Action to execute and whether trigger state was updated
+ */
 function processTriggerSchedule(
     entity: Hass.State,
     schedule: NormalizedSchedule,
@@ -443,7 +561,16 @@ function processTriggerSchedule(
     return { action, updateTriggerState };
 }
 
-// Schedule time resolution helper
+// ============================================================================
+// TIME RESOLUTION
+// ============================================================================
+
+/**
+ * Resolves time from string or entity reference
+ * @param time - Time string or entity reference object
+ * @param scheduleEntities - Map of schedule entities for lookup
+ * @returns Resolved time string
+ */
 function resolveScheduleTime(
     time: string | { entity_id: string },
     scheduleEntities: Record<string, Hass.State>
@@ -458,27 +585,32 @@ function resolveScheduleTime(
     });
 }
 
-// Main scheduling logic
+// ============================================================================
+// MAIN SCHEDULING PIPELINE
+// ============================================================================
+
+// STEP 1: Initialize context and load configurations
 // @ts-ignore
 const schedules: Schedule[] = flow.get("schedules") ?? [];
-// @ts-ignore
-const staticStates = flow.get("staticStates") ?? {};
 // @ts-ignore
 const tagDefinitions = flow.get("tagDefinitions") ?? {};
 // @ts-ignore
 const triggeredSchedules = flow.get("triggeredSchedules") ?? {};
 // @ts-ignore
 const message: Hass.Message = msg;
+// @ts-ignore
+const additionalBlacklist: string[] = msg.blacklist || [];
 
 const now = new Date();
 
-// Get schedule entities using new utility
+// STEP 2: Load schedule entities (input_datetime, sensors) for time resolution
 const allScheduleEntities = getScheduleEntities();
 const scheduleEntities = entitiesToObject(allScheduleEntities);
 
-// Normalize schedules
+// STEP 3: Normalize and validate schedules
 const normalizedSchedules: NormalizedSchedule[] = schedules
     .map((schedule) => {
+        // STEP 3a: Extract schedule properties
         const {
             name,
             entities,
@@ -490,11 +622,11 @@ const normalizedSchedules: NormalizedSchedule[] = schedules
             interpolation
         } = schedule;
 
-        // Resolve time strings from entities
+        // STEP 3b: Resolve times from entities or static strings
         const startTimeString = resolveScheduleTime(start, scheduleEntities);
         const endTimeString = end ? resolveScheduleTime(end, scheduleEntities) : null;
 
-        // Calculate actual schedule times with proper date handling
+        // STEP 3c: Calculate actual datetime with midnight handling
         const scheduleType = schedule.type || "trigger";
         const { start: startTime, end: endTime } = calculateScheduleTimes(
             startTimeString,
@@ -504,10 +636,10 @@ const normalizedSchedules: NormalizedSchedule[] = schedules
         );
 
         if (!endTime) {
-            // Invalid schedule configuration
-            return null;
+            return null; // Invalid schedule
         }
 
+        // STEP 3d: Build normalized schedule object
         return {
             name,
             entities: entities?.filter((e) => e != null).flatMap(normalizeEntityMatch),
@@ -526,9 +658,9 @@ const normalizedSchedules: NormalizedSchedule[] = schedules
     .filter(
         (s) =>
             s !== null && checkConditions(s.conditions, message)
-    ) as NormalizedSchedule[];
+    ) as NormalizedSchedule[]; // STEP 3e: Filter by conditions
 
-// Get entities to check - either from payload or by fetching all controlled entities
+// STEP 4: Determine which entities to process
 let entitiesToCheck: Hass.State[] = [];
 let entityIdsToFetch = new Set<string>();
 let patternsToMatch: RegExp[] = [];
@@ -577,7 +709,7 @@ if (message.payload && Array.isArray(message.payload)) {
         }
     });
 
-    // Remove duplicates using Map for better performance
+    // STEP 4a: Remove duplicate entities
     const entityMap = new Map<string, Hass.State>();
     entitiesToCheck.forEach((entity) => {
         entityMap.set(entity.entity_id, entity);
@@ -585,13 +717,22 @@ if (message.payload && Array.isArray(message.payload)) {
     entitiesToCheck = Array.from(entityMap.values());
 }
 
-// Process entities and determine actions
+// STEP 5: Process each entity against matching schedules
 const serviceActions: Partial<Hass.Service>[] = [];
 const entityScheduleMatches: any[] = [];
 
 entitiesToCheck.forEach((entity) => {
-    // Skip static overrides
-    if (staticStates[entity.entity_id] != null) return;
+    // Skip entities that are:
+    // 1. In msg.blacklist (temporary blacklist)
+    // 2. In global blacklist (any namespace)
+    // 3. Have static state overrides (any namespace)
+    if (shouldFilterEntity(entity.entity_id, {
+        checkBlacklist: true,
+        checkStaticState: true,
+        additionalBlacklist: additionalBlacklist
+    })) {
+        return;
+    }
 
     // Find matching schedules
     const matchingSchedules = normalizedSchedules
@@ -628,7 +769,7 @@ entitiesToCheck.forEach((entity) => {
 
     // Handle continuous vs trigger schedules
     if (activeSchedule.type === "continuous") {
-        // Use the abstracted continuous schedule processor
+        // Continuous: Enforce state throughout active period
         const action = processContinuousSchedule(
             entity as Hass.State,
             activeSchedule,
@@ -663,14 +804,14 @@ entitiesToCheck.forEach((entity) => {
     });
 });
 
-// Calculate all schedule events (including t values)
+// STEP 6: Calculate schedule events for interpolation and monitoring
 const allScheduleEvents: ScheduleEvent[] = [];
 normalizedSchedules.forEach((schedule) => {
     const events = calculateScheduleEvents(schedule, now);
     allScheduleEvents.push(...events);
 });
 
-// Simplified debug information
+// STEP 7: Prepare debug information
 const debugInfo = {
     schedulesFound: schedules.length,
     entitiesChecked: entitiesToCheck.length,
@@ -686,7 +827,7 @@ const debugInfo = {
         }))
 };
 
-// Clean up old trigger states using datetime utility
+// STEP 8: Clean up stale trigger states (>24 hours old)
 const cleanedTriggeredSchedules = cleanupOldEntries(
     triggeredSchedules,
     (value) => {
@@ -707,7 +848,7 @@ const cleanedTriggeredSchedules = cleanupOldEntries(
 // @ts-ignore
 flow.set("triggeredSchedules", cleanedTriggeredSchedules);
 
-// Output
+// STEP 9: Format and return results
 // @ts-ignore
 msg.payload = groupActions(serviceActions.map(serviceToActionCall));
 // @ts-ignore

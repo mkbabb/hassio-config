@@ -1,26 +1,13 @@
-// @ts-ignore
-let staticPlantStates = flow.get("staticPlantStates");
-// @ts-ignore
-let staticBlacklist = flow.get("staticBlacklist");
-
-if (staticPlantStates == null) {
-    // @ts-ignore
-    flow.set("staticPlantStates", {});
-    // @ts-ignore
-    staticPlantStates = flow.get("staticPlantStates");
-}
-
-if (staticBlacklist == null) {
-    // @ts-ignore
-    flow.set("staticBlacklist", []);
-    // @ts-ignore
-    staticBlacklist = flow.get("staticBlacklist");
-}
+import { setStaticState, getStaticStates } from "../utils/static-states";
 
 // @ts-ignore
 const payload = msg.payload;
 
-staticPlantStates[payload.entity_id] = payload.state;
+// Set the static state for this entity in the 'plants' namespace
+setStaticState(payload.entity_id, payload.state, 'plants');
+
+// Get all static states for the plants namespace for debugging/output
+const plantStates = getStaticStates('plants');
 
 // @ts-ignore
-msg.staticPlantStates = staticPlantStates;
+msg.staticStates = { plants: plantStates };

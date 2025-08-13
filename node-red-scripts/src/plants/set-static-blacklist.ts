@@ -1,19 +1,13 @@
-// @ts-ignore
-let staticBlacklist = flow.get("staticBlacklist");
-
-if (staticBlacklist == null) {
-    // @ts-ignore
-    flow.set("staticBlacklist", []);
-    // @ts-ignore
-    staticBlacklist = flow.get("staticBlacklist");
-}
+import { addToBlacklist, getBlacklist } from "../utils/static-states";
 
 // @ts-ignore
 const payload = msg.payload;
 
-if (!staticBlacklist.includes(payload.entity_id)) {
-    staticBlacklist.push(payload.entity_id);
-}
+// Add the entity to the blacklist in the 'plants' namespace
+addToBlacklist(payload.entity_id, 'plants');
+
+// Get the current blacklist for debugging/output
+const blacklist = getBlacklist('plants');
 
 // @ts-ignore
-msg.staticBlacklist = staticBlacklist;
+msg.staticBlacklist = { plants: blacklist };
