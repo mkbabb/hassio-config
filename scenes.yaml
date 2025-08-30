@@ -605,20 +605,6 @@
       friendly_name: Bonus Room Light
       supported_features: 0
       state: 'off'
-    fan.master_bedroom_air_purifier:
-      preset_modes:
-      - auto
-      - sleep
-      percentage: 50
-      percentage_step: 25
-      preset_mode:
-      screen_status: false
-      child_lock: false
-      night_light: 'off'
-      mode: manual
-      friendly_name: Master Bedroom Air Purifier
-      supported_features: 57
-      state: 'on'
     fan.levoit_vesync_everestair_smart_air_purifier:
       preset_modes:
       - auto
@@ -822,8 +808,6 @@
     light.hey_lamp_2_2:
       entity_only: true
     light.bonus_room_light:
-      entity_only: true
-    fan.master_bedroom_air_purifier:
       entity_only: true
     fan.levoit_vesync_everestair_smart_air_purifier:
       entity_only: true
@@ -1152,3 +1136,34 @@
       entity_only: true
     light.flower_lamp:
       entity_only: true
+- id: '1755472037270'
+  name: Sleeptime
+  entities:
+    fan.master_bedroom_ceiling_fan:
+      preset_modes: []
+      percentage: 67
+      percentage_step: 33.333333333333336
+      preset_mode:
+      friendly_name: 'Master Bedroom Ceiling Fan '
+      supported_features: 49
+      state: 'on'
+    fan.master_bedroom_air_purifier:
+      preset_modes:
+      - auto
+      - sleep
+      percentage:
+      percentage_step: 25
+      preset_mode: sleep
+      screen_status: false
+      child_lock: false
+      night_light: 'off'
+      mode: sleep
+      friendly_name: Master Bedroom Air Purifier
+      supported_features: 57
+      state: 'on'
+  metadata:
+    fan.master_bedroom_ceiling_fan:
+      entity_only: true
+    fan.master_bedroom_air_purifier:
+      entity_only: true
+  icon: mdi:sleep

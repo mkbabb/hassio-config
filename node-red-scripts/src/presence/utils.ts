@@ -1,5 +1,5 @@
 const MAX_COOL_DOWN = 30 * 60; // 30 minutes max cool-down
-export const DEFAULT_COOL_DOWN = 10 * 60; // 10 minutes for debugging (was 10 * 60)
+export const DEFAULT_COOL_DOWN = 10 * 60; // 10 minutes default cool-down
 
 // States for the presence state machine
 export enum PresenceState {

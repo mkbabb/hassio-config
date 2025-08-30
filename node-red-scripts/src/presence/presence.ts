@@ -113,6 +113,13 @@ if (normalizedState === "off" && prevState === "reset" && !inCoolDown) {
             flowInfo.lastOff = null;
             flowInfo.state = PresenceState.ON;
             flowInfo.delay = 0;
+            
+            // If coming from PENDING_OFF, reset the trigger node to cancel pending turn_off
+            if (prevState === PresenceState.PENDING_OFF) {
+                // @ts-ignore
+                msg.reset = true;
+            }
+            
             // @ts-ignore
             msg.payload = createPayload(filteredEntities, "turn_on");
         } else if (prevState === PresenceState.UNKNOWN && !inCoolDown) {

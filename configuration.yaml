@@ -1,6 +1,9 @@
 # Configure a default setup of Home Assistant (frontend, api, etc)
 default_config:
 
+# Entity Guard - Conditional blocking of entities
+entity_guard:
+
 group: !include_dir_merge_list group
 
 automation: !include automations.yaml

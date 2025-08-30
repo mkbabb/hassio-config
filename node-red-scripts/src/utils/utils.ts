@@ -1,12 +1,14 @@
 export const GLOBAL_CACHED_STATES_KEY = "cachedStates";
 
-export function getEntityBasename(entityId: string): string {
+export function getEntityBasename(entity: Partial<Hass.State> | string): string {
+    const entityId = typeof entity === "string" ? entity : entity.entity_id;
     const match = entityId.match(/^.*\.(.*)$/);
 
     return match ? match[1] : entityId;
 }
 
-export function getEntityDomain(entityId: string): string {
+export function getEntityDomain(entity: Partial<Hass.State> | string): string {
+    const entityId = typeof entity === "string" ? entity : entity.entity_id;
     const match = entityId.match(/^(.*)\..*$/);
 
     return match ? match[1] : entityId;
@@ -174,19 +176,19 @@ const BLACKLISTED_ENTITIES = [
 ];
 
 export const filterBlacklistedEntity = (
-    e: Hass.State | string,
+    entity: Partial<Hass.State> | string,
     blacklist: (string | RegExp)[] = BLACKLISTED_ENTITIES
 ) => {
     // check if the object is an entity, or just an entity_id
     let entity_id: string;
     let state: string;
 
-    if (typeof e === "string") {
-        entity_id = e;
+    if (typeof entity === "string") {
+        entity_id = entity;
         state = undefined;
     } else {
-        entity_id = e.entity_id;
-        state = e.state;
+        entity_id = entity.entity_id;
+        state = entity.state;
     }
 
     const whitelisted = !isBlacklisted(entity_id, blacklist);
@@ -352,7 +354,7 @@ export const domainToService = function (entity: Hass.State, domain: string) {
 };
 
 export const createServiceCall = (entity: Hass.State): Hass.Service | undefined => {
-    const domain = getEntityDomain(entity.entity_id);
+    const domain = getEntityDomain(entity);
     const service = domainToService(entity, domain);
 
     // If the entity is not in the domain list, or the service is undefined,
@@ -586,7 +588,7 @@ export const createStatesObject = (
     return states.reduce((acc, state) => {
         if (state?.entity_id != undefined) {
             const name = basename
-                ? getEntityBasename(state.entity_id)
+                ? getEntityBasename(state)
                 : state.entity_id;
 
             acc[name] = state;

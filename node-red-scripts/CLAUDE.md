@@ -8,6 +8,68 @@ TypeScript automation functions compiled to JavaScript for Node-RED. Custom buil
 **Engine**: esbuild via custom `build.ts` - tracks dependencies, caches compiled output, appends `return msg;` for Node-RED compatibility  
 **Output**: `dist/` directory mirrors `src/` structure  
 
+## Connection Information
+
+### Home Assistant API
+
+-   **URL**: `http://homeassistant.local:8123`
+-   **API Base**: `http://homeassistant.local:8123/api/`
+-   **States**: `GET /api/states` - List all entity states
+-   **Services**: `POST /api/services/<domain>/<service>` - Call services
+-   **Authentication**: Bearer token required in headers
+-   **Credentials**: Located at `node-red-scripts/.env`
+
+### Node-RED
+
+-   **URL**: `http://homeassistant.local:1880`
+-   **API**: REST endpoints at `/endpoint/remote/`
+-   **Admin API**: Hot reload deployment via `/flows` endpoint
+-   **Credentials**: Username and password in `node-red-scripts/.env`
+
+### InfluxDB
+
+-   **URL**: `http://homeassistant.local:8086` or `http://a0d7b954-influxdb:8086`
+-   **Credentials**: `secrets.yaml` (`influxdb_username`, `influxdb_password`)
+-   **Environment**: `INFLUXDB_USERNAME`, `INFLUXDB_PASSWORD`
+-   **Databases**:
+    -   `homeassistant` - State history
+    -   `nodered` - Automation metrics (presence_events, schedule_events, plant_events, cache_events, remote_events)
+    -   `_internal` - InfluxDB metrics
+
+## Directory Structure
+
+```
+src/
+├── batteries/
+│   └── battery.ts                    # Battery level notifications
+├── cache-states/
+│   ├── cache-house-state.ts         # Snapshot entity states
+│   ├── filter-blacklisted-entities.ts # Remove blacklisted entities
+│   └── states-to-actions.ts         # Convert states to actions
+├── garage-door/
+│   └── controller.ts                # Garage automation logic
+├── plants/
+│   └── set-static-state.ts          # Plant state management
+├── presence/
+│   ├── presence.ts                  # Main presence detection
+│   └── utils.ts                     # Presence calculations
+├── remote-entities/
+│   └── service-call/                # IR/RF device control
+│       ├── fan.ts                   # Fan service calls
+│       └── light.ts                 # Light service calls
+├── scheduling/
+│   ├── schedule.ts                  # Main scheduling engine
+│   └── schedules/
+│       ├── plants-schedules.ts      # Grow light schedules
+│       └── day-night-schedules.ts   # Day/night rules
+├── utils/
+│   ├── datetime.ts                  # Date/time utilities
+│   ├── ha-entities.ts               # Entity helpers
+│   └── utils.ts                     # General utilities
+├── door-state.ts                    # Door sensor notifications
+└── time-of-use.ts                   # Energy rate scheduling
+```
+
 ## Core Modules
 
 ### presence/presence.ts
@@ -163,11 +225,6 @@ Configure in `.env`:
 - **Safety**: Automatic backups, change detection
 - **Accuracy**: Guaranteed correct function updates
 - **Tracking**: Know exactly which TS files map to which nodes
-
-## Integration
-
-**API endpoint**: REST commands via `http://localhost:1880/endpoint/remote/`  
-**State persistence**: Flow-level context storage for timers, states, schedules
 
 ## Node-RED Development Standards
 
