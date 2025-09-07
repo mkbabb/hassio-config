@@ -1,41 +1,39 @@
 # Configure a default setup of Home Assistant (frontend, api, etc)
 default_config:
 
+# Entity customizations
+homeassistant:
+  customize: !include customize.yaml
+  external_url: "http://192.168.1.230:8123"
+  internal_url: "http://192.168.1.230:8123"
+
 # Entity Guard - Conditional blocking of entities
 entity_guard:
 
+# Include files
 group: !include_dir_merge_list group
-
 automation: !include automations.yaml
-
 script: !include scripts.yaml
-
 scene: !include scenes.yaml
-
 light: !include_dir_merge_list light
 fan: !include_dir_merge_list fan
 sensor: !include_dir_merge_list sensor
 cover: !include cover.yaml
-
 input_boolean: !include input_boolean.yaml
 input_datetime: !include input_datetime.yaml
 input_select: !include input_select.yaml
 input_number: !include input_number.yaml
 input_text: !include input_text.yaml
-
 rest_command: !include rest_commands.yaml
-
 binary_sensor: !include binary_sensors.yaml
-
 zone: !include zone.yaml
-
 template: !include template_entities.yaml
 
+# Frontend themes
 frontend:
-    themes: !include_dir_merge_named themes
+  themes: !include_dir_merge_named themes
 
-homeassistant: !include customize.yaml
-
+# InfluxDB configuration
 influxdb:
   host: !secret influxdb_host
   port: !secret influxdb_port
@@ -67,4 +65,22 @@ influxdb:
       - sensor.last_boot
       - sensor.date
 
+# LIFX Integration
+lifx:
+  broadcast: 192.168.1.255
+  port: 56700
 
+# HTTP configuration
+http:
+  server_host: 0.0.0.0
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 192.168.122.1
+    - 192.168.1.0/24
+    - 127.0.0.1
+
+# HomeKit Bridge Configuration
+homekit:
+  advertise_ip: "192.168.1.230"
+  port: 21064
+  name: "HASS Bridge"

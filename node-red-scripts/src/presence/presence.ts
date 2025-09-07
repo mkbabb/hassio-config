@@ -3,6 +3,7 @@ import {
     PresenceState,
     calculateCoolDown,
     isInCoolDownPeriod,
+    getRemainingCoolDownMs,
     determinePresenceState,
     DEFAULT_COOL_DOWN
 } from "./utils";
@@ -49,6 +50,7 @@ let flowInfo = flow.get(flowInfoKey) || {
     state: PresenceState.OFF,
     lastOn: null,
     lastOff: null,
+    coolDownEndTime: null,
     delay: 0
 };
 
@@ -67,35 +69,23 @@ presenceStates[dataEntityId] = normalizedState;
 const presenceStatesValues = Object.values(presenceStates);
 const aggregateState = determinePresenceState(presenceStatesValues);
 
-// Simple reset handling: only act when we get 'off' after a 'reset'
-const prevState = transitionHistory.length > 0 ? transitionHistory[transitionHistory.length - 1].state : 'off';
+// Get previous state for transitions
+const prevState = flowInfo.state || PresenceState.OFF;
 const inCoolDown = isInCoolDownPeriod(flowInfo);
 
-if (normalizedState === "off" && prevState === "reset" && !inCoolDown) {
-    // This is reset→off, turn off lights
-    flowInfo.state = PresenceState.OFF;
-    flowInfo.lastOff = Date.now();
-    flowInfo.lastOn = null;
-    flowInfo.delay = 0;
-    
+if (normalizedState === "reset" || normalizedState === "ignored") {
+    // Reset or ignored states - maintain current state
+    // @ts-ignore
+    msg.payload = null;
     // @ts-ignore
     msg.delay = 1;
-    // @ts-ignore
-    msg.payload = createPayload(filteredEntities, "turn_off");
-} else if (normalizedState === "reset") {
-    // Reset state from sensor, just set state but don't act
-    flowInfo.state = PresenceState.RESET;
-    // @ts-ignore
-    msg.payload = null;
-} else if (normalizedState === "ignored") {
-    // Debounced reset - do nothing
-    // @ts-ignore
-    msg.payload = null;
 } else {
-    // Normal state processing
-    let actualState = aggregateState;
+    // Determine target state based on sensors and cooldown
+    let targetState = aggregateState;
+    
+    // If sensors say OFF but we're in cooldown, stay in PENDING_OFF
     if (aggregateState === PresenceState.OFF && inCoolDown) {
-        actualState = PresenceState.PENDING_OFF;
+        targetState = PresenceState.PENDING_OFF;
     }
 
     // Initialize output
@@ -104,17 +94,17 @@ if (normalizedState === "off" && prevState === "reset" && !inCoolDown) {
     // @ts-ignore
     msg.payload = null;
 
-    // State machine logic - treat pending_off as off for re-triggering
-    switch (actualState) {
+    // State machine logic
+    switch (targetState) {
     case PresenceState.ON:
-        if (prevState === PresenceState.OFF || prevState === PresenceState.PENDING_OFF) {
-            // Transition from OFF/PENDING_OFF to ON - treat pending_off as off for re-triggering
+        if (prevState !== PresenceState.ON) {
+            // Transition to ON from any other state
             flowInfo.lastOn = Date.now();
-            flowInfo.lastOff = null;
             flowInfo.state = PresenceState.ON;
+            flowInfo.coolDownEndTime = null;  // Clear cooldown
             flowInfo.delay = 0;
             
-            // If coming from PENDING_OFF, reset the trigger node to cancel pending turn_off
+            // Cancel any pending off commands
             if (prevState === PresenceState.PENDING_OFF) {
                 // @ts-ignore
                 msg.reset = true;
@@ -122,44 +112,54 @@ if (normalizedState === "off" && prevState === "reset" && !inCoolDown) {
             
             // @ts-ignore
             msg.payload = createPayload(filteredEntities, "turn_on");
-        } else if (prevState === PresenceState.UNKNOWN && !inCoolDown) {
-            // Recover from unknown to on, no cool-down active
-            flowInfo.state = PresenceState.ON;
-            if (!flowInfo.lastOn) {
-                flowInfo.lastOn = Date.now();
-            }
-            // @ts-ignore
-            msg.payload = createPayload(filteredEntities, "turn_on");
         }
-        // If already ON, do nothing (no payload)
+        // If already ON, do nothing
         break;
 
     case PresenceState.OFF:
-        if (prevState === PresenceState.ON && !inCoolDown) {
-            // Start cool-down period
+        if (prevState === PresenceState.ON) {
+            // Start cool-down period when transitioning from ON to OFF
             const dwellTime = flowInfo.lastOn ? Date.now() - flowInfo.lastOn : 0;
             const delayMs = calculateCoolDown(dwellTime, coolDown);
 
             flowInfo.lastOff = Date.now();
             flowInfo.state = PresenceState.PENDING_OFF;
+            flowInfo.coolDownEndTime = Date.now() + delayMs;
             flowInfo.delay = delayMs;
 
             // @ts-ignore
             msg.delay = delayMs;
             // @ts-ignore
             msg.payload = createPayload(filteredEntities, "turn_off");
-        } else if (prevState === PresenceState.UNKNOWN && !inCoolDown) {
-            // From unknown to off, no cool-down active
+        } else if (prevState === PresenceState.PENDING_OFF && !inCoolDown) {
+            // Cooldown expired, transition to OFF
+            flowInfo.state = PresenceState.OFF;
+            flowInfo.coolDownEndTime = null;
+            flowInfo.lastOn = null;
+            flowInfo.delay = 0;
+            // No action needed, lights already turned off
+        } else if (prevState === PresenceState.UNKNOWN) {
+            // From unknown to off
             flowInfo.state = PresenceState.OFF;
             flowInfo.lastOff = Date.now();
             flowInfo.lastOn = null;
+            flowInfo.coolDownEndTime = null;
+            // @ts-ignore
+            msg.payload = createPayload(filteredEntities, "turn_off");
         }
-        // If already OFF or in cool-down, do nothing
+        // If already OFF, do nothing
         break;
 
     case PresenceState.PENDING_OFF:
-        // In cool-down period - maintain state
-        flowInfo.state = PresenceState.PENDING_OFF;
+        // Still in cool-down period - maintain state
+        if (!inCoolDown) {
+            // Cooldown has expired, transition to OFF
+            flowInfo.state = PresenceState.OFF;
+            flowInfo.coolDownEndTime = null;
+            flowInfo.lastOn = null;
+            flowInfo.delay = 0;
+        }
+        // No action during pending_off
         break;
 
     case PresenceState.UNKNOWN:
@@ -169,10 +169,12 @@ if (normalizedState === "off" && prevState === "reset" && !inCoolDown) {
     }
 }
 
-// Update transition history
-transitionHistory.push({ state: flowInfo.state, time: Date.now() });
-if (transitionHistory.length > 10) {
-    transitionHistory = transitionHistory.slice(-10);
+// Update transition history (only if state changed)
+if (flowInfo.state !== prevState) {
+    transitionHistory.push({ state: flowInfo.state, time: Date.now() });
+    if (transitionHistory.length > 10) {
+        transitionHistory = transitionHistory.slice(-10);
+    }
 }
 
 // Update flow context
@@ -194,6 +196,8 @@ msg.flowInfo = flowInfo;
 msg.aggregateState = aggregateState;
 // @ts-ignore
 msg.inCoolDown = inCoolDown;
+// @ts-ignore
+msg.coolDownRemaining = isInCoolDownPeriod(flowInfo) ? getRemainingCoolDownMs(flowInfo) : 0;
 // @ts-ignore
 msg.debug = msg.debug || {}; // Preserve any existing debug info
 // @ts-ignore

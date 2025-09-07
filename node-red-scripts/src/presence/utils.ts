@@ -27,20 +27,19 @@ export const calculateCoolDown = (
 
 // Check if we're in a cool-down period
 export const isInCoolDownPeriod = (flowInfo: any): boolean => {
-    if (!flowInfo.delay || !flowInfo.lastOff) {
+    if (!flowInfo.coolDownEndTime) {
         return false;
     }
-    const timeSinceLastOff = Date.now() - flowInfo.lastOff;
-    return timeSinceLastOff < flowInfo.delay;
+    return Date.now() < flowInfo.coolDownEndTime;
 };
 
 // Calculate remaining cooldown time in milliseconds
 export const getRemainingCoolDownMs = (flowInfo: any): number => {
-    if (!isInCoolDownPeriod(flowInfo)) {
+    if (!flowInfo.coolDownEndTime) {
         return 0;
     }
-    const timeSinceLastOff = Date.now() - flowInfo.lastOff;
-    return flowInfo.delay - timeSinceLastOff;
+    const remaining = flowInfo.coolDownEndTime - Date.now();
+    return remaining > 0 ? remaining : 0;
 };
 
 // Determine aggregate presence state from multiple sensors

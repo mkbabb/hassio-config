@@ -272,9 +272,7 @@ export const domainToService = function (entity: Hass.State, domain: string) {
     switch (domain) {
         case "switch":
         case "light":
-        case "fan": {
-            return `turn_${entity.state}`;
-        }
+        case "fan":
         case "input_boolean": {
             return entity.state === "on" ? "turn_on" : "turn_off";
         }
@@ -587,9 +585,7 @@ export const createStatesObject = (
     // @ts-ignore
     return states.reduce((acc, state) => {
         if (state?.entity_id != undefined) {
-            const name = basename
-                ? getEntityBasename(state)
-                : state.entity_id;
+            const name = basename ? getEntityBasename(state) : state.entity_id;
 
             acc[name] = state;
         }

@@ -23,8 +23,9 @@ if (flowInfo.state === PresenceState.PENDING_OFF) {
         // @ts-ignore
         msg.delay = getRemainingCoolDownMs(flowInfo);
     } else {
-        // If cooldown is over, reset state to OFF and clear delay
+        // If cooldown is over, reset state to OFF and clear cooldown
         flowInfo.state = PresenceState.OFF;
+        flowInfo.coolDownEndTime = null;
         flowInfo.delay = 0;
         // @ts-ignore
         flow.set(flowInfoKey, flowInfo);
