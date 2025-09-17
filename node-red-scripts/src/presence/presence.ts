@@ -1,12 +1,15 @@
 import { groupActions, filterBlacklistedEntity } from "../utils/utils";
-import {
-    PresenceState,
-    calculateCoolDown,
-    isInCoolDownPeriod,
-    getRemainingCoolDownMs,
-    determinePresenceState,
-    DEFAULT_COOL_DOWN
-} from "./utils";
+
+const MAX_COOL_DOWN = 30 * 60; // 30 minutes max cool-down
+const DEFAULT_COOL_DOWN = 5; // 5 seconds for debugging (was 10 * 60)
+
+// States for the presence state machine
+enum PresenceState {
+    OFF = "off",
+    ON = "on",
+    UNKNOWN = "unknown",
+    PENDING_OFF = "pending_off" // New state for cool-down period
+}
 
 // Unified payload creator to follow DRY principle
 const createPayload = (entities: Hass.State[], action: "turn_on" | "turn_off") => {
@@ -15,6 +18,54 @@ const createPayload = (entities: Hass.State[], action: "turn_on" | "turn_off") =
         target: { entity_id: e.entity_id }
     }));
     return groupActions(actions);
+};
+
+// Calculate exponential backoff with gentler curve
+const calculateCoolDown = (dwellTimeMs: number, baseCoolDown: number): number => {
+    const minutesDwelled = Math.floor(dwellTimeMs / 60000);
+    // Use square root for gentler curve: base + sqrt(minutes) * 120
+    const additionalDelay = Math.sqrt(minutesDwelled) * 120;
+    return Math.min(MAX_COOL_DOWN, baseCoolDown + additionalDelay);
+};
+
+// Check if we're in a cool-down period
+const isInCoolDownPeriod = (flowInfo: any): boolean => {
+    if (!flowInfo.delay || !flowInfo.lastOff) {
+        return false;
+    }
+    const timeSinceLastOff = Date.now() - flowInfo.lastOff;
+    return timeSinceLastOff < flowInfo.delay;
+};
+
+// Determine aggregate presence state from multiple sensors
+const determinePresenceState = (sensorStates: string[]): PresenceState => {
+    // If all sensors are unknown, state is unknown
+    if (
+        sensorStates.every(
+            (state) => state === "unknown" || state === "unavailable" || !state
+        )
+    ) {
+        return PresenceState.UNKNOWN;
+    }
+    // If any sensor is on, presence is detected
+    if (sensorStates.some((state) => state === "on")) {
+        return PresenceState.ON;
+    }
+    // All sensors are off
+    return PresenceState.OFF;
+};
+
+// Check if we have the on→unknown→off sequence
+const isOnUnknownOffSequence = (
+    currentState: PresenceState,
+    prevState: PresenceState,
+    prevPrevState: PresenceState
+): boolean => {
+    return (
+        prevPrevState === PresenceState.ON &&
+        prevState === PresenceState.UNKNOWN &&
+        currentState === PresenceState.OFF
+    );
 };
 
 // @ts-ignore
@@ -36,7 +87,7 @@ const filteredEntities = entities.filter((e) => filterBlacklistedEntity(e));
 // Flow context keys
 const presenceStatesKey = `presenceStates.${topic}`;
 const flowInfoKey = `flowInfo.${topic}`;
-const historyKey = `transitionHistory.${topic}`;
+const debounceKey = `debounce.${topic}`;
 
 // Initialize presence states if needed
 // @ts-ignore
@@ -48,44 +99,71 @@ flow.set(presenceStatesKey, presenceStates);
 // @ts-ignore
 let flowInfo = flow.get(flowInfoKey) || {
     state: PresenceState.OFF,
+    prevState: PresenceState.OFF,
+    prevPrevState: PresenceState.OFF,
     lastOn: null,
     lastOff: null,
-    coolDownEndTime: null,
     delay: 0
 };
 
-// Get transition history (last 10 transitions)
+// Initialize debounce tracking
 // @ts-ignore
-let transitionHistory = flow.get(historyKey) || [];
+let debounceInfo = flow.get(debounceKey) || {
+    lastUpdate: 0,
+    pendingState: null
+};
 
 // Validate and normalize the incoming sensor state
-// Handle 'reset' and 'ignored' states from debouncer
-const normalizedState = state === "on" || state === "off" || state === "reset" || state === "ignored" ? state : "unknown";
+const normalizedState = state === "on" || state === "off" ? state : "unknown";
 
-// Update the specific sensor's state
-presenceStates[dataEntityId] = normalizedState;
+// Simple debouncing - ignore rapid state changes within 2 seconds
+const DEBOUNCE_TIME = 2000; // 2 seconds
+const now = Date.now();
+const timeSinceLastUpdate = now - debounceInfo.lastUpdate;
 
-// Determine aggregate presence state
-const presenceStatesValues = Object.values(presenceStates);
-const aggregateState = determinePresenceState(presenceStatesValues);
-
-// Get previous state for transitions
-const prevState = flowInfo.state || PresenceState.OFF;
-const inCoolDown = isInCoolDownPeriod(flowInfo);
-
-if (normalizedState === "reset" || normalizedState === "ignored") {
-    // Reset or ignored states - maintain current state
+// Check if this is a rapid state change
+if (
+    timeSinceLastUpdate < DEBOUNCE_TIME &&
+    presenceStates[dataEntityId] !== normalizedState
+) {
+    // Store pending state but don't process yet
+    debounceInfo.pendingState = normalizedState;
+    debounceInfo.lastUpdate = now;
+    // @ts-ignore
+    flow.set(debounceKey, debounceInfo);
+    // Exit early - no state change, return empty message
     // @ts-ignore
     msg.payload = null;
     // @ts-ignore
     msg.delay = 1;
 } else {
-    // Determine target state based on sensors and cooldown
-    let targetState = aggregateState;
-    
-    // If sensors say OFF but we're in cooldown, stay in PENDING_OFF
+    // Update the specific sensor's state
+    presenceStates[dataEntityId] = normalizedState;
+    debounceInfo.lastUpdate = now;
+    debounceInfo.pendingState = null;
+
+    // Determine aggregate presence state
+    const presenceStatesValues = Object.values(presenceStates);
+    const aggregateState = determinePresenceState(presenceStatesValues);
+
+    // Get previous states
+    const prevState = flowInfo.state as PresenceState;
+    const prevPrevState = flowInfo.prevState as PresenceState;
+
+    // Check if we're in cool-down period
+    const inCoolDown = isInCoolDownPeriod(flowInfo);
+
+    // Check for on→unknown→off sequence
+    const isProblematicSequence = isOnUnknownOffSequence(
+        aggregateState,
+        prevState,
+        prevPrevState
+    );
+
+    // Determine actual state considering cool-down
+    let actualState = aggregateState;
     if (aggregateState === PresenceState.OFF && inCoolDown) {
-        targetState = PresenceState.PENDING_OFF;
+        actualState = PresenceState.PENDING_OFF;
     }
 
     // Initialize output
@@ -94,132 +172,117 @@ if (normalizedState === "reset" || normalizedState === "ignored") {
     // @ts-ignore
     msg.payload = null;
 
-    // State machine logic
-    switch (targetState) {
-    case PresenceState.ON:
-        if (prevState !== PresenceState.ON) {
-            // Transition to ON from any other state
-            flowInfo.lastOn = Date.now();
-            flowInfo.state = PresenceState.ON;
-            flowInfo.coolDownEndTime = null;  // Clear cooldown
-            flowInfo.delay = 0;
-            
-            // Cancel any pending off commands
-            if (prevState === PresenceState.PENDING_OFF) {
+    // State machine logic - simplified and clear
+    switch (actualState) {
+        case PresenceState.ON:
+            if (prevState === PresenceState.OFF) {
+                // Transition from OFF to ON
+                flowInfo.lastOn = Date.now();
+                flowInfo.lastOff = null;
+                flowInfo.state = PresenceState.ON;
+                flowInfo.delay = 0;
                 // @ts-ignore
-                msg.reset = true;
+                msg.payload = createPayload(filteredEntities, "turn_on");
+            } else if (prevState === PresenceState.PENDING_OFF) {
+                // Cancel pending off - presence detected during cool-down
+                flowInfo.state = PresenceState.ON;
+                flowInfo.lastOff = null;
+                flowInfo.delay = 0;
+                // Don't update lastOn - maintain dwell time calculation
+            } else if (prevState === PresenceState.UNKNOWN && !inCoolDown) {
+                // Recover from unknown to on, no cool-down active
+                flowInfo.state = PresenceState.ON;
+                if (!flowInfo.lastOn) {
+                    flowInfo.lastOn = Date.now();
+                }
+                // @ts-ignore
+                msg.payload = createPayload(filteredEntities, "turn_on");
             }
-            
-            // @ts-ignore
-            msg.payload = createPayload(filteredEntities, "turn_on");
-        }
-        // If already ON, do nothing
-        break;
+            // If already ON, do nothing (no payload)
+            break;
 
-    case PresenceState.OFF:
-        if (prevState === PresenceState.ON) {
-            // Start cool-down period when transitioning from ON to OFF
-            const dwellTime = flowInfo.lastOn ? Date.now() - flowInfo.lastOn : 0;
-            const delayMs = calculateCoolDown(dwellTime, coolDown);
+        case PresenceState.OFF:
+            if (prevState === PresenceState.ON && !inCoolDown) {
+                // Start cool-down period
+                const dwellTime = flowInfo.lastOn ? Date.now() - flowInfo.lastOn : 0;
+                const delaySeconds = calculateCoolDown(dwellTime, coolDown);
+                const delayMs = delaySeconds * 1000;
 
-            flowInfo.lastOff = Date.now();
+                flowInfo.lastOff = Date.now();
+                flowInfo.state = PresenceState.PENDING_OFF;
+                flowInfo.delay = delayMs;
+
+                // @ts-ignore
+                msg.delay = delayMs;
+                // @ts-ignore
+                msg.payload = createPayload(filteredEntities, "turn_off");
+            } else if (
+                prevState === PresenceState.UNKNOWN &&
+                !inCoolDown &&
+                !isProblematicSequence
+            ) {
+                // From unknown to off, no cool-down active, not problematic sequence
+                flowInfo.state = PresenceState.OFF;
+                flowInfo.lastOff = Date.now();
+                flowInfo.lastOn = null;
+                // @ts-ignore
+                msg.payload = createPayload(filteredEntities, "turn_off");
+            } else if (isProblematicSequence) {
+                // On→Unknown→Off sequence detected - skip instant off, just update state
+                flowInfo.state = PresenceState.OFF;
+            }
+            // If already OFF or in cool-down, do nothing
+            break;
+
+        case PresenceState.PENDING_OFF:
+            // In cool-down period - maintain state
             flowInfo.state = PresenceState.PENDING_OFF;
-            flowInfo.coolDownEndTime = Date.now() + delayMs;
-            flowInfo.delay = delayMs;
+            break;
 
-            // @ts-ignore
-            msg.delay = delayMs;
-            // @ts-ignore
-            msg.payload = createPayload(filteredEntities, "turn_off");
-        } else if (prevState === PresenceState.PENDING_OFF && !inCoolDown) {
-            // Cooldown expired, transition to OFF
-            flowInfo.state = PresenceState.OFF;
-            flowInfo.coolDownEndTime = null;
-            flowInfo.lastOn = null;
-            flowInfo.delay = 0;
-            // No action needed, lights already turned off
-        } else if (prevState === PresenceState.UNKNOWN) {
-            // From unknown to off
-            flowInfo.state = PresenceState.OFF;
-            flowInfo.lastOff = Date.now();
-            flowInfo.lastOn = null;
-            flowInfo.coolDownEndTime = null;
-            // @ts-ignore
-            msg.payload = createPayload(filteredEntities, "turn_off");
-        }
-        // If already OFF, do nothing
-        break;
-
-    case PresenceState.PENDING_OFF:
-        // Still in cool-down period - maintain state
-        if (!inCoolDown) {
-            // Cooldown has expired, transition to OFF
-            flowInfo.state = PresenceState.OFF;
-            flowInfo.coolDownEndTime = null;
-            flowInfo.lastOn = null;
-            flowInfo.delay = 0;
-        }
-        // No action during pending_off
-        break;
-
-    case PresenceState.UNKNOWN:
-        // Set state but don't control entities
-        flowInfo.state = PresenceState.UNKNOWN;
-        break;
+        case PresenceState.UNKNOWN:
+            // Set state but don't control entities
+            flowInfo.state = PresenceState.UNKNOWN;
+            break;
     }
-}
 
-// Update transition history (only if state changed)
-if (flowInfo.state !== prevState) {
-    transitionHistory.push({ state: flowInfo.state, time: Date.now() });
-    if (transitionHistory.length > 10) {
-        transitionHistory = transitionHistory.slice(-10);
-    }
-}
+    // Update state history before saving
+    flowInfo.prevPrevState = flowInfo.prevState;
+    flowInfo.prevState = prevState;
 
-// Update flow context
-// @ts-ignore
-flow.set(flowInfoKey, flowInfo);
-// @ts-ignore
-flow.set(presenceStatesKey, presenceStates);
-// @ts-ignore
-flow.set(historyKey, transitionHistory);
-
-// Add debug information to message
-// @ts-ignore
-msg.presenceStates = presenceStates;
-// @ts-ignore
-msg.presenceState = flowInfo.state;
-// @ts-ignore
-msg.flowInfo = flowInfo;
-// @ts-ignore
-msg.aggregateState = aggregateState;
-// @ts-ignore
-msg.inCoolDown = inCoolDown;
-// @ts-ignore
-msg.coolDownRemaining = isInCoolDownPeriod(flowInfo) ? getRemainingCoolDownMs(flowInfo) : 0;
-// @ts-ignore
-msg.debug = msg.debug || {}; // Preserve any existing debug info
-// @ts-ignore
-Object.assign(msg.debug, {
-    topic: topic,
-    sensorCount: Object.keys(presenceStates).length,
-    coolDownSeconds: coolDown,
+    // Update flow context
     // @ts-ignore
-    actualDelayMs: msg.delay,
-    currentState: flowInfo.state,
-    stateTransition: transitionHistory.length > 0 ? 
-        `${transitionHistory[transitionHistory.length - 1]?.state || 'unknown'} → ${flowInfo.state}` : 
-        `unknown → ${flowInfo.state}`,
-    transitionHistory: transitionHistory.slice(-10), // Last 10 transitions for full history
-    timeSinceLastOn: flowInfo.lastOn ? Date.now() - flowInfo.lastOn : null,
-    timeSinceLastOff: flowInfo.lastOff ? Date.now() - flowInfo.lastOff : null,
-    resetHandled: normalizedState === "reset" || (normalizedState === "off" && prevState === "reset"),
-    normalizedState: normalizedState,
-    prevState: prevState,
-    sequenceType: normalizedState === "reset" ? "reset" : 
-                 normalizedState === "ignored" ? "debounced" : "normal",
-    // State machine behavior flags
-    wasPendingOffTreatedAsOff: (flowInfo.state === PresenceState.ON && prevState === PresenceState.PENDING_OFF),
-    coolDownCancelled: (flowInfo.state === PresenceState.ON && prevState === PresenceState.PENDING_OFF)
-});
+    flow.set(flowInfoKey, flowInfo);
+    // @ts-ignore
+    flow.set(presenceStatesKey, presenceStates);
+    // @ts-ignore
+    flow.set(debounceKey, debounceInfo);
+
+    // Add debug information to message
+    // @ts-ignore
+    msg.presenceStates = presenceStates;
+    // @ts-ignore
+    msg.presenceState = flowInfo.state;
+    // @ts-ignore
+    msg.flowInfo = flowInfo;
+    // @ts-ignore
+    msg.aggregateState = aggregateState;
+    // @ts-ignore
+    msg.inCoolDown = inCoolDown;
+    // @ts-ignore
+    msg.debug = {
+        topic: topic,
+        sensorCount: Object.keys(presenceStates).length,
+        coolDownSeconds: coolDown,
+        // @ts-ignore
+        actualDelayMs: msg.delay,
+        stateTransition: `${prevState} → ${flowInfo.state}`,
+        timeSinceLastOn: flowInfo.lastOn ? Date.now() - flowInfo.lastOn : null,
+        timeSinceLastOff: flowInfo.lastOff ? Date.now() - flowInfo.lastOff : null,
+        // Debounce info
+        // @ts-ignore
+        debounceInfo: {
+            lastUpdate: debounceInfo.lastUpdate,
+            pendingState: debounceInfo.pendingState
+        }
+    };
+} // End of else block for debounce check
