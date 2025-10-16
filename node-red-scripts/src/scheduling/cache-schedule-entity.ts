@@ -1,139 +1,266 @@
+/**
+ * Cache Schedule Entity
+ *
+ * Purpose: Cache schedule entity times and set them to current values.
+ * This allows preserving and restoring wake/sleep schedules.
+ *
+ * Entity Types:
+ * 1. Wake entities (sensor.wakeup_time) - Template sensors that dynamically select:
+ *    - input_datetime.weekday_wakeup (Mon-Fri, Python weekday 0-4)
+ *    - input_datetime.weekend_wakeup (Sat-Sun, Python weekday 5-6)
+ *
+ * 2. Sleep entities (sensor.sleep_time) - Template sensors that dynamically select:
+ *    - input_datetime.weekday_sleep (Mon-Fri)
+ *    - input_datetime.weekend_sleep (Sat-Sun)
+ *
+ * 3. Plants global start (input_datetime.plants_global_schedule_start) - Direct entity
+ *
+ * Skip Logic:
+ * - Wake/Plants: Skip if day_status == "day" AND inbound_time > current_time
+ *   Example: If it's 11 AM (day) and wake entity is 9 AM, skip (already past)
+ *
+ * - Sleep: Never skip, but enforce minimum 1-hour gap after wake time
+ *   Example: If wake is 8 AM and sleep is set to 8 AM, adjust sleep to 9 AM
+ *
+ * Week Boundary Logic:
+ * - JavaScript getDay(): 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+ * - Python weekday(): 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+ * - Template uses: weekday < 5 for weekday entities
+ * - Conversion: pythonWeekday = (jsGetDay() + 6) % 7
+ */
+
 import { timeStringToDate, compareTime, dateToTimeString } from "../utils/datetime";
+import { getEntity } from "../utils/ha-entities";
 
-const weekdaySleepEntityId = "input_datetime.weekday_sleep";
-const weekendSleepEntityId = "input_datetime.weekend_sleep";
+// ============================================================================
+// Entity ID Constants
+// ============================================================================
 
-const weekdayWakeEntityId = "input_datetime.weekday_wakeup";
-const weekendWakeEntityId = "input_datetime.weekend_wakeup";
+// Concrete input_datetime entities (what we actually update)
+const WEEKDAY_WAKE_ID = "input_datetime.weekday_wakeup";
+const WEEKEND_WAKE_ID = "input_datetime.weekend_wakeup";
+const WEEKDAY_SLEEP_ID = "input_datetime.weekday_sleep";
+const WEEKEND_SLEEP_ID = "input_datetime.weekend_sleep";
 
-const sleepEntityId = "sensor.sleep_time";
-const wakeupEntityId = "sensor.wakeup_time";
+// Template sensors (dynamic selectors based on day of week)
+const WAKE_SENSOR_ID = "sensor.wakeup_time";
+const SLEEP_SENSOR_ID = "sensor.sleep_time";
 
+// Direct entity
+const PLANTS_START_ID = "input_datetime.plants_global_schedule_start";
+
+// Minimum gap between wake and sleep times (milliseconds)
+const MIN_WAKE_SLEEP_GAP_MS = 60 * 60 * 1000; // 1 hour
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Convert JavaScript getDay() (0=Sun) to Python weekday() (0=Mon)
+ * to match Home Assistant template logic
+ */
+function getPythonWeekday(date: Date): number {
+    return (date.getDay() + 6) % 7;
+}
+
+/**
+ * Determine if we should use weekday or weekend entities
+ * Matches HA template: {% if now().weekday() < 5 %}
+ */
+function isWeekdayContext(date: Date): boolean {
+    return getPythonWeekday(date) < 5; // Mon-Fri = 0-4
+}
+
+/**
+ * Get current state value of an entity
+ */
+function getEntityState(entityId: string): string | null {
+    const entity = getEntity(entityId);
+    if (!entity || !entity.state || entity.state === 'unavailable' || entity.state === 'unknown') {
+        return null;
+    }
+    return entity.state;
+}
+
+// ============================================================================
+// Main Logic
+// ============================================================================
+
+// @ts-ignore
+const message = msg;
 const now = new Date();
 
-const isWeekend = now.getDay() === 0 || now.getDay() === 6;
+// Extract input data
+const inboundEntityId = message.data?.entity_id || message.payload?.entity_id || message.entity_id;
+const inboundTime = message.payload; // Time string like "08:00:00"
+const dayStatus = message.day_status; // "day" or "night"
 
-// @ts-ignore
-let cachedTimes = flow.get("cachedTimes");
-if (cachedTimes == null) {
+// Validate inputs
+if (!inboundEntityId || typeof inboundEntityId !== 'string' || inboundEntityId.trim() === '') {
     // @ts-ignore
-    flow.set("cachedTimes", {});
-    // @ts-ignore
-    cachedTimes = flow.get("cachedTimes");
-    // @ts-ignore
-    node.status({ fill: "blue", shape: "ring", text: "Cache init" });
-}
-
-// @ts-ignore
-const payload = msg.payload;
-
-// @ts-ignore
-const dayStatus = msg.day_status;
-
-// @ts-ignore
-let entityId = msg.data?.entity_id || msg.payload?.entity_id || msg.entity_id;
-
-// Validate entity_id is not empty
-if (!entityId || entityId.trim() === "") {
-    // @ts-ignore
-    node.status({ fill: "red", shape: "ring", text: "Empty entity_id" });
-    // @ts-ignore
-    msg.should_skip = true;
-    entityId = "invalid"; // Set to prevent further processing
-}
-
-const entityTime = timeStringToDate(payload);
-
-// @ts-ignore
-node.status({ fill: "blue", shape: "dot", text: entityId });
-
-// If the current day status is "night" and the entity is "sensor.sleep_time"
-// Or if the current day status is "day" and the entity is "sensor.wakeup_time"
-// OR if the current time is after entity's time
-
-// Then don't change the cached time
-// Calculate time comparison correctly handling midnight crossover
-// If entity time is very early morning (0-3 AM) and current time is late evening (9-11 PM),
-// treat entity time as tomorrow
-let timeComparison = compareTime(now, entityTime);
-const currentHour = now.getHours();
-const entityHour = entityTime.getHours();
-
-// Handle midnight edge case: if current is late evening and entity is early morning
-if (currentHour >= 21 && entityHour <= 3) {
-    timeComparison = -1; // Entity time is tomorrow, not past
-}
-
-// Build debug info about skip reasons
-const skipReasons: string[] = [];
-let shouldSkip = false;
-
-// @ts-ignore
-if (msg?.should_skip) {
-    skipReasons.push("pre-flagged");
-    shouldSkip = true;
-}
-
-// REMOVED the day/night skip logic - we want to set schedules for the NEXT occurrence
-// The old logic was wrong: during night, we WANT to set tomorrow's sleep time
-// During day, we WANT to set tonight's wakeup time
-
-// Only skip if we're truly past the time AND it's not a midnight crossover
-// For sleep/wake entities, we're always setting for the next occurrence
-const isScheduleEntity = entityId === sleepEntityId || entityId === wakeupEntityId;
-if (!isScheduleEntity && timeComparison > 0) {
-    // For non-schedule entities, skip if time is past
-    skipReasons.push(`time_past(${dateToTimeString(now)}>${dateToTimeString(entityTime)})`);
-    shouldSkip = true;
-}
-
-// @ts-ignore
-msg.debug = {
-    entity_id: entityId,
-    day_status: dayStatus,
-    current_time: dateToTimeString(now),
-    entity_time: dateToTimeString(entityTime),
-    time_comparison: timeComparison,
-    skip_reasons: skipReasons,
-    should_skip: shouldSkip,
-    is_weekend: isWeekend
-};
-
-if (shouldSkip) {
-    // @ts-ignore
-    msg.time_string = null;
+    node.status({ fill: "red", shape: "ring", text: "Invalid entity_id" });
     // @ts-ignore
     msg.payload = null;
     // @ts-ignore
-    node.status({
-        fill: "yellow",
-        shape: "ring",
-        text: `Skip ${entityId.split(".")[1]}: ${skipReasons.join(", ")}`
-    });
+    msg.should_skip = true;
+} else if (!inboundTime || typeof inboundTime !== 'string') {
+    // @ts-ignore
+    node.status({ fill: "red", shape: "ring", text: "Invalid time payload" });
+    // @ts-ignore
+    msg.payload = null;
+    // @ts-ignore
+    msg.should_skip = true;
 } else {
-    // Map sensor entities to the actual input_datetime entities
-    let targetEntityId = entityId;
-    if (entityId === sleepEntityId) {
-        targetEntityId = isWeekend ? weekendSleepEntityId : weekdaySleepEntityId;
-    } else if (entityId === wakeupEntityId) {
-        targetEntityId = isWeekend ? weekendWakeEntityId : weekdayWakeEntityId;
+    // Determine week context (weekday vs weekend)
+    const useWeekdayEntities = isWeekdayContext(now);
+
+    // Determine entity type and target entity ID
+    let entityType: "wake" | "sleep" | "plants" | "unknown" = "unknown";
+    let targetEntityId = inboundEntityId;
+
+    if (inboundEntityId === WAKE_SENSOR_ID) {
+        entityType = "wake";
+        targetEntityId = useWeekdayEntities ? WEEKDAY_WAKE_ID : WEEKEND_WAKE_ID;
+    } else if (inboundEntityId === SLEEP_SENSOR_ID) {
+        entityType = "sleep";
+        targetEntityId = useWeekdayEntities ? WEEKDAY_SLEEP_ID : WEEKEND_SLEEP_ID;
+    } else if (inboundEntityId === PLANTS_START_ID) {
+        entityType = "plants";
+        targetEntityId = PLANTS_START_ID;
     }
 
-    if (cachedTimes[targetEntityId] == null) {
-        cachedTimes[targetEntityId] = payload;
+    // Get current entity state for comparison
+    const currentEntityState = getEntityState(targetEntityId);
+
+    // Parse times
+    const inboundTimeDate = timeStringToDate(inboundTime);
+    const currentTimeDate = now;
+
+    // Compare inbound time with current time
+    // compareTime returns: -1 if time1 < time2, 0 if equal, 1 if time1 > time2
+    const timeComparison = compareTime(currentTimeDate, inboundTimeDate);
+
+    // Initialize skip logic
+    let shouldSkip = false;
+    const skipReasons: string[] = [];
+    let finalTime = inboundTime;
+
+    // ========================================================================
+    // Skip Logic for Wake and Plants Entities
+    // ========================================================================
+    if ((entityType === "wake" || entityType === "plants") && dayStatus === "day") {
+        // If it's daytime and the wake/plants time is in the future, skip
+        // This means we haven't reached the wake time yet, so don't update
+        if (timeComparison < 0) { // currentTime < inboundTime
+            shouldSkip = true;
+            skipReasons.push(`day_status=day, wake_time=${inboundTime} > current=${dateToTimeString(currentTimeDate)}`);
+        }
     }
 
-    const timeString = dateToTimeString(now);
+    // ========================================================================
+    // Redundancy Check: Skip if setting same value
+    // ========================================================================
+    if (!shouldSkip && currentEntityState) {
+        // Normalize times for comparison (handle HH:MM:SS vs HH:MM)
+        const normalizedInbound = inboundTime.substring(0, 5); // Get HH:MM
+        const normalizedCurrent = currentEntityState.substring(0, 5);
 
-    // @ts-ignore
-    msg.time_string = timeString;
-    // @ts-ignore
-    msg.payload = targetEntityId;  // Use the mapped entity ID, not the original
+        if (normalizedInbound === normalizedCurrent) {
+            shouldSkip = true;
+            skipReasons.push(`already_set_to=${normalizedCurrent}`);
+        }
+    }
 
+    // ========================================================================
+    // Sleep Entity: Enforce Minimum Gap After Wake
+    // ========================================================================
+    if (!shouldSkip && entityType === "sleep") {
+        // Get corresponding wake entity
+        const wakeEntityId = useWeekdayEntities ? WEEKDAY_WAKE_ID : WEEKEND_WAKE_ID;
+        const wakeTimeStr = getEntityState(wakeEntityId);
+
+        if (wakeTimeStr) {
+            const wakeTimeDate = timeStringToDate(wakeTimeStr);
+            const minSleepTimeDate = new Date(wakeTimeDate.getTime() + MIN_WAKE_SLEEP_GAP_MS);
+
+            // If inbound sleep time is before minimum allowed time, adjust it
+            if (inboundTimeDate < minSleepTimeDate) {
+                finalTime = dateToTimeString(minSleepTimeDate);
+                // Note: Not skipping, just adjusting the time
+            }
+        }
+    }
+
+    // ========================================================================
+    // Cache Management
+    // ========================================================================
     // @ts-ignore
-    node.status({
-        fill: "green",
-        shape: "dot",
-        text: `${targetEntityId.split(".")[1]} (${timeString})`
-    });
+    let cachedTimes = flow.get("cachedTimes");
+    if (!cachedTimes) {
+        cachedTimes = {};
+        // @ts-ignore
+        flow.set("cachedTimes", cachedTimes);
+        // @ts-ignore
+        node.status({ fill: "blue", shape: "ring", text: "Cache initialized" });
+    }
+
+    if (!shouldSkip) {
+        // Update cache with final time
+        cachedTimes[targetEntityId] = finalTime;
+        // @ts-ignore
+        flow.set("cachedTimes", cachedTimes);
+    }
+
+    // ========================================================================
+    // Output Message
+    // ========================================================================
+    if (shouldSkip) {
+        // @ts-ignore
+        msg.payload = null;
+        // @ts-ignore
+        msg.time_string = null;
+        // @ts-ignore
+        msg.should_skip = true;
+        // @ts-ignore
+        node.status({
+            fill: "yellow",
+            shape: "ring",
+            text: `Skip ${entityType}: ${skipReasons.join(", ")}`
+        });
+    } else {
+        // @ts-ignore
+        msg.payload = targetEntityId;
+        // @ts-ignore
+        msg.time_string = finalTime;
+        // @ts-ignore
+        msg.should_skip = false;
+        // @ts-ignore
+        node.status({
+            fill: "green",
+            shape: "dot",
+            text: `Set ${entityType} → ${finalTime}`
+        });
+    }
+
+    // ========================================================================
+    // Debug Information
+    // ========================================================================
+    // @ts-ignore
+    msg.debug = {
+        inbound_entity_id: inboundEntityId,
+        target_entity_id: targetEntityId,
+        entity_type: entityType,
+        day_status: dayStatus,
+        current_time: dateToTimeString(currentTimeDate),
+        current_entity_state: currentEntityState,
+        inbound_time: inboundTime,
+        final_time: finalTime,
+        should_skip: shouldSkip,
+        skip_reasons: skipReasons,
+        week_context: useWeekdayEntities ? "weekday" : "weekend",
+        js_day: now.getDay(),
+        python_weekday: getPythonWeekday(now),
+        time_comparison: timeComparison
+    };
 }

@@ -19,5 +19,18 @@ export const blindsSchedules: Schedule[] = [
             },
             off: { state: "closed", service: "close_cover" }
         }
+    },
+    // Inverse schedule to ensure blinds are ALWAYS closed at night
+    {
+        name: "blinds_night_schedule",
+        entities: ["regex:cover\\..*blind.*", "regex:cover\\..*shade.*"],
+        start: { entity_id: "sensor.sunset" },
+        end: { entity_id: "sensor.wakeup_time" },
+        precedence: 71, // Higher than day schedule to take priority at night
+        type: "continuous",
+        defaultStates: {
+            on: { state: "closed", service: "close_cover" },
+            off: { state: "open", service: "set_cover_position", data: { position: 3 } }
+        }
     }
 ];

@@ -720,6 +720,7 @@ if (message.payload && Array.isArray(message.payload)) {
 // STEP 5: Process each entity against matching schedules
 const serviceActions: Partial<Hass.Service>[] = [];
 const entityScheduleMatches: any[] = [];
+const debugMatches: any[] = []; // Track blind matches for debugging
 
 entitiesToCheck.forEach((entity) => {
     // Skip entities that are:
@@ -766,6 +767,17 @@ entitiesToCheck.forEach((entity) => {
         : null;
 
     const isActive = isTimeInRange(now, activeSchedule.start, activeSchedule.end);
+
+    // Debug: Track blind schedule matches
+    if (activeSchedule.name.includes("blind")) {
+        debugMatches.push({
+            entity_id: entity.entity_id,
+            current_state: entity.state,
+            schedule: activeSchedule.name,
+            isActive,
+            targetState: isActive ? "closed" : "open"
+        });
+    }
 
     // Handle continuous vs trigger schedules
     if (activeSchedule.type === "continuous") {
@@ -824,7 +836,8 @@ const debugInfo = {
             type: s.type,
             startTime: s.startTime,
             endTime: s.endTime
-        }))
+        })),
+    blindMatches: debugMatches.length > 0 ? debugMatches : "No blind entities matched"
 };
 
 // STEP 8: Clean up stale trigger states (>24 hours old)

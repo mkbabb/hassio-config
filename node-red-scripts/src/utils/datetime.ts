@@ -34,14 +34,17 @@ export function timeStringToDate(time: string): Date {
 // Time comparison and range checking
 
 export function compareTime(time1: Date, time2: Date, withDay: boolean = false): number {
-    let t1 = time1.getHours() * 3600 + time1.getMinutes() * 60 + time1.getSeconds();
-    let t2 = time2.getHours() * 3600 + time2.getMinutes() * 60 + time2.getSeconds();
-    
     if (withDay) {
-        t1 += time1.getDate() * 86400;
-        t2 += time2.getDate() * 86400;
+        // Compare full timestamps when day matters
+        const ts1 = time1.getTime();
+        const ts2 = time2.getTime();
+        return ts1 === ts2 ? 0 : ts1 > ts2 ? 1 : -1;
     }
-    
+
+    // Compare only time of day (ignore date)
+    const t1 = time1.getHours() * 3600 + time1.getMinutes() * 60 + time1.getSeconds();
+    const t2 = time2.getHours() * 3600 + time2.getMinutes() * 60 + time2.getSeconds();
+
     return t1 === t2 ? 0 : t1 > t2 ? 1 : -1;
 }
 
@@ -79,25 +82,37 @@ export function adjustDateForSchedule(time: Date, reference: Date, isStart: bool
 export function handleMidnightSpan(start: Date, end: Date, now: Date): [Date, Date] {
     const startCopy = new Date(start);
     const endCopy = new Date(end);
-    
-    startCopy.setDate(now.getDate());
-    endCopy.setDate(now.getDate());
-    
-    // Check if schedule spans midnight
-    if (compareTime(startCopy, endCopy) >= 0) {
-        if (compareTime(now, endCopy) < 1) {
-            // We're in the early morning part
+
+    // Set both to today's date initially
+    startCopy.setFullYear(now.getFullYear(), now.getMonth(), now.getDate());
+    endCopy.setFullYear(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // Check if schedule spans midnight by comparing times
+    const spansMidnight = compareTime(startCopy, endCopy) >= 0;
+
+    if (spansMidnight) {
+        // Schedule spans midnight (e.g., 18:00 to 08:00)
+        if (compareTime(now, endCopy) < 0) {
+            // Current time is before end time (e.g., 02:00 < 08:00)
+            // We're in the early morning part of the span
+            // Start should be yesterday
             startCopy.setDate(startCopy.getDate() - 1);
         } else {
-            // We're in the evening part
+            // Current time is at or after end time (e.g., 22:00 >= 08:00)
+            // We're in the evening part of the span
+            // End should be tomorrow
             endCopy.setDate(endCopy.getDate() + 1);
         }
-    } else if (compareTime(now, endCopy) > 1) {
-        // Already past end time today, move to tomorrow
-        startCopy.setDate(startCopy.getDate() + 1);
-        endCopy.setDate(endCopy.getDate() + 1);
+    } else {
+        // Schedule doesn't span midnight (e.g., 08:00 to 18:00)
+        if (compareTime(now, endCopy) > 0) {
+            // Already past end time today, move entire schedule to tomorrow
+            startCopy.setDate(startCopy.getDate() + 1);
+            endCopy.setDate(endCopy.getDate() + 1);
+        }
+        // Otherwise, schedule is today (or in progress today)
     }
-    
+
     return [startCopy, endCopy];
 }
 

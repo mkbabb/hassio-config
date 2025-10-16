@@ -157,8 +157,6 @@ const BLACKLISTED_ENTITIES = [
     "son_of_toast",
     // grow lights
     /.*grow.*/i,
-    // blinds
-    /.*blinds.*/i,
     // air purifiers
     /.*air_purifier.*/i,
     // garage door
