@@ -853,13 +853,6 @@
       friendly_name: 'Master Bedroom Ceiling Fan Light '
       supported_features: 0
       state: 'off'
-    light.ophelia_light:
-      supported_color_modes:
-      - onoff
-      color_mode:
-      friendly_name: Ophelia Light
-      supported_features: 0
-      state: 'off'
     light.rose_light:
       min_color_temp_kelvin: 1500
       max_color_temp_kelvin: 9000
@@ -873,20 +866,27 @@
       - color_temp
       - hs
       effect:
-      color_mode:
-      brightness:
-      color_temp_kelvin:
-      color_temp:
+      color_mode: color_temp
+      brightness: 18
+      color_temp_kelvin: 3003
+      color_temp: 333
       hs_color:
+      - 27.82
+      - 56.814
       rgb_color:
+      - 255
+      - 177
+      - 110
       xy_color:
+      - 0.496
+      - 0.383
       entity_id:
       - light.rose_light_1
       - light.rose_light_2
       icon: mdi:lightbulb-group
       friendly_name: Rose Light
       supported_features: 36
-      state: 'off'
+      state: 'on'
     light.pineapple_light:
       min_color_temp_kelvin: 1500
       max_color_temp_kelvin: 9000
@@ -900,16 +900,23 @@
       - color_temp
       - hs
       effect:
-      color_mode:
-      brightness:
-      color_temp_kelvin:
-      color_temp:
+      color_mode: color_temp
+      brightness: 82
+      color_temp_kelvin: 3003
+      color_temp: 333
       hs_color:
+      - 27.82
+      - 56.814
       rgb_color:
+      - 255
+      - 177
+      - 110
       xy_color:
+      - 0.496
+      - 0.383
       friendly_name: Pineapple Light
       supported_features: 36
-      state: 'off'
+      state: 'on'
     switch.master_bedroom_bomb_grow_light:
       friendly_name: Bomb Grow Light
       state: 'off'
@@ -924,7 +931,7 @@
       state: 'off'
     switch.master_bedroom_pineapple_grow_light_switch:
       friendly_name: Pineapple Grow Light Switch
-      state: 'off'
+      state: 'on'
     light.master_bathroom_light_1:
       supported_color_modes:
       - onoff
@@ -1080,6 +1087,13 @@
       friendly_name: Flower Lamp
       supported_features: 0
       state: 'off'
+    light.ophelia_light:
+      supported_color_modes:
+      - onoff
+      color_mode: onoff
+      friendly_name: Ophelia Light
+      supported_features: 0
+      state: 'on'
   icon: mdi:sleep
   metadata:
     cover.master_bedroom_blinds:
@@ -1087,8 +1101,6 @@
     fan.master_bedroom_ceiling_fan:
       entity_only: true
     light.master_bedroom_ceiling_fan_light:
-      entity_only: true
-    light.ophelia_light:
       entity_only: true
     light.rose_light:
       entity_only: true
@@ -1135,6 +1147,8 @@
     light.guest_bathroom_light:
       entity_only: true
     light.flower_lamp:
+      entity_only: true
+    light.ophelia_light:
       entity_only: true
 - id: '1755472037270'
   name: Sleeptime

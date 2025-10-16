@@ -7,9 +7,23 @@
 const message = msg;
 const debug = message.debug || {};
 
+// Helper function to safely convert to number
+const safeNumber = (value: any, defaultValue = 0): number => {
+  if (value === null || value === undefined || value === '') return defaultValue;
+  if (typeof value === 'number') {
+    return isNaN(value) ? defaultValue : value;
+  }
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? defaultValue : parsed;
+  }
+  if (typeof value === 'boolean') return value ? 1 : 0;
+  return defaultValue;
+};
+
 // Extract battery info
 const entity = message.entity || message.data || {};
-const batteryLevel = parseInt(entity.state || entity.attributes?.battery_level || 0);
+const batteryLevel = safeNumber(entity.state || entity.attributes?.battery_level, 0);
 const friendlyName = entity.attributes?.friendly_name || entity.entity_id || 'unknown';
 
 // Determine thresholds
@@ -25,23 +39,23 @@ message.payload = [{
   battery_level: batteryLevel,
   is_low: isLow ? 1 : 0,
   is_critical: isCritical ? 1 : 0,
-  
+
   // Entity info
   entity_id: entity.entity_id || 'unknown',
   friendly_name: friendlyName,
-  
+
   // Alert status
   alert_sent: message.alert_sent ? 1 : 0,
-  
-  // Debug metrics from main function
+
+  // Debug metrics from main function - ensure all numbers are safe
   check_type: debug.checkType || 'unknown',
-  total_devices: debug.totalDevices || 0,
-  low_battery_count: debug.lowBatteryCount || 0,
-  critical_battery_count: debug.criticalBatteryCount || 0,
-  average_battery_level: debug.averageBatteryLevel || batteryLevel,
-  
+  total_devices: safeNumber(debug.totalDevices, 0),
+  low_battery_count: safeNumber(debug.lowBatteryCount, 0),
+  critical_battery_count: safeNumber(debug.criticalBatteryCount, 0),
+  average_battery_level: safeNumber(debug.averageBatteryLevel, batteryLevel),
+
   // Timing
-  execution_time: debug.executionTime || 0,
+  execution_time: safeNumber(debug.executionTime, 0),
   timestamp_ms: Date.now()
 }];
 

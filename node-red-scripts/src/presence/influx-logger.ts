@@ -10,11 +10,29 @@ const message = msg;
 const debug = message.debug || {};
 const flowInfo = message.flowInfo || {};
 
-// Skip if no debug data - set empty payload
+// Skip if no debug data - set a minimal valid payload
 if (!debug || !message.presenceState) {
     message.measurement = 'presence_events';
-    message.payload = [];
-    message.tags = { flow: 'presence', skip: 'true' };
+    message.payload = [{
+        presence_state: 'unknown',
+        aggregate_state: 'unknown',
+        state_transition: 'none',
+        sensor_count: 0,
+        entity_count: 0,
+        cool_down_seconds: 0,
+        delay_ms: 0,
+        in_cool_down: 0,
+        has_action: 0,
+        flow_state: 'unknown',
+        action: 'none'
+    }];
+    message.tags = {
+        flow: 'presence',
+        skip: 'true',
+        event_type: 'skip',
+        topic: 'unknown',
+        current_state: 'unknown'
+    };
 } else {
     // Set measurement for InfluxDB
     message.measurement = 'presence_events';
@@ -59,7 +77,7 @@ if (!debug || !message.presenceState) {
         
         // State flags
         in_cool_down: safeBooleanAsInt(message.inCoolDown),
-        has_action: safeBooleanAsInt(message.payload && message.payload.length > 0),
+        has_action: safeBooleanAsInt(message.payload !== null && message.payload !== undefined),
         is_off_unknown_off: safeBooleanAsInt(debug.isOffUnknownOffSequence),
         reset_handled: safeBooleanAsInt(debug.resetHandled),
         
@@ -78,7 +96,8 @@ if (!debug || !message.presenceState) {
         transition_history: safeString(JSON.stringify(debug.transitionHistory || []).substring(0, 1000)),
         
         // Action details with length limit
-        action: message.payload ? safeString(JSON.stringify(message.payload).substring(0, 1000)) : 'none',
+        action: (message.payload !== null && message.payload !== undefined) ?
+                safeString(JSON.stringify(message.payload).substring(0, 1000)) : 'none',
         entities_controlled: message.entities ? 
                            safeString(message.entities.map((e: any) => e.entity_id).join(',')) : '',
         
@@ -104,11 +123,11 @@ if (!debug || !message.presenceState) {
         room: safeString(extractRoomFromTopic(message.topic || '')),
         current_state: safeString(message.presenceState || 'unknown'),
         previous_state: safeString(debug.prevState || 'unknown'),
-        has_action: message.payload && message.payload.length > 0 ? 'true' : 'false',
+        has_action: (message.payload !== null && message.payload !== undefined) ? 'true' : 'false',
         event_type: determineEventType(),
         trigger_type: safeString(message.state === 'reset' ? 'reset' : 
                                 message.state === 'ignored' ? 'debounced' : 'sensor'),
-        action_count: safeString((message.payload?.length || 0).toString())
+        action_count: safeString(Array.isArray(message.payload) ? message.payload.length.toString() : '0')
     };
 
     // Helper function to extract room from topic

@@ -1,15 +1,12 @@
 import { groupActions, filterBlacklistedEntity } from "../utils/utils";
-
-const MAX_COOL_DOWN = 30 * 60; // 30 minutes max cool-down
-const DEFAULT_COOL_DOWN = 5; // 5 seconds for debugging (was 10 * 60)
-
-// States for the presence state machine
-enum PresenceState {
-    OFF = "off",
-    ON = "on",
-    UNKNOWN = "unknown",
-    PENDING_OFF = "pending_off" // New state for cool-down period
-}
+import {
+    MAX_COOL_DOWN,
+    DEFAULT_COOL_DOWN,
+    DEBOUNCE_TIME_MS,
+    IMMEDIATE_DELAY_MS,
+    PresenceState,
+    calculateCoolDown
+} from "./utils";
 
 // Unified payload creator to follow DRY principle
 const createPayload = (entities: Hass.State[], action: "turn_on" | "turn_off") => {
@@ -20,13 +17,6 @@ const createPayload = (entities: Hass.State[], action: "turn_on" | "turn_off") =
     return groupActions(actions);
 };
 
-// Calculate exponential backoff with gentler curve
-const calculateCoolDown = (dwellTimeMs: number, baseCoolDown: number): number => {
-    const minutesDwelled = Math.floor(dwellTimeMs / 60000);
-    // Use square root for gentler curve: base + sqrt(minutes) * 120
-    const additionalDelay = Math.sqrt(minutesDwelled) * 120;
-    return Math.min(MAX_COOL_DOWN, baseCoolDown + additionalDelay);
-};
 
 // Check if we're in a cool-down period
 const isInCoolDownPeriod = (flowInfo: any): boolean => {
@@ -78,11 +68,26 @@ const dataEntityId = data.entity_id;
 const topic: string = message.topic ?? dataEntityId;
 const coolDown = message.coolDown ?? DEFAULT_COOL_DOWN;
 
-// Filter entities
-const entities: Hass.State[] = Array.isArray(message.entities)
-    ? message.entities
-    : [message.entities];
+
+// Filter entities - handle both strings and objects
+const rawEntities = message.entities
+    ? (Array.isArray(message.entities) ? message.entities : [message.entities])
+    : [];
+
+// If no entities provided, try to infer from topic (e.g., guest_bathroom → light.guest_bathroom_light)
+if (rawEntities.length === 0 && topic && topic !== dataEntityId) {
+    // Common pattern: topic like "guest_bathroom" maps to "light.guest_bathroom_light"
+    const inferredLight = `light.${topic.replace(/_/g, '_')}_light`;
+    rawEntities.push(inferredLight);
+}
+
+// Convert string entity IDs to objects if needed
+const entities: Hass.State[] = rawEntities.map(e =>
+    typeof e === 'string' ? { entity_id: e, state: 'unknown' } as Hass.State : e
+);
+
 const filteredEntities = entities.filter((e) => filterBlacklistedEntity(e));
+
 
 // Flow context keys
 const presenceStatesKey = `presenceStates.${topic}`;
@@ -113,17 +118,50 @@ let debounceInfo = flow.get(debounceKey) || {
     pendingState: null
 };
 
+// Handle reset commands
+const isReset = ["reset", "reset_on", "reset_off"].includes(state);
+if (isReset) {
+    const action = state === "reset_on" ? "turn_on" : "turn_off";
+    const targetState = state === "reset_on" ? PresenceState.ON : PresenceState.OFF;
+
+    // Reset flow state
+    Object.assign(flowInfo, {
+        state: targetState,
+        prevState: targetState,
+        prevPrevState: targetState,
+        lastOn: state === "reset_on" ? Date.now() : null,
+        lastOff: state === "reset_off" ? Date.now() : null,
+        delay: 0
+    });
+
+    presenceStates = {};
+    // @ts-ignore
+    flow.set(presenceStatesKey, presenceStates);
+    // @ts-ignore
+    flow.set(flowInfoKey, flowInfo);
+
+    // @ts-ignore
+    msg.payload = createPayload(filteredEntities, action);
+    // @ts-ignore
+    msg.delay = IMMEDIATE_DELAY_MS;
+    // @ts-ignore
+    msg.presenceState = flowInfo.state;
+    // @ts-ignore
+    msg.topic = topic;
+}
+
 // Validate and normalize the incoming sensor state
-const normalizedState = state === "on" || state === "off" ? state : "unknown";
+const normalizedState = !isReset ? (state === "on" || state === "off" ? state : "unknown") : "";
 
-// Simple debouncing - ignore rapid state changes within 2 seconds
-const DEBOUNCE_TIME = 2000; // 2 seconds
-const now = Date.now();
-const timeSinceLastUpdate = now - debounceInfo.lastUpdate;
+// Process normal sensor state changes (not reset commands)
+if (!isReset) {
+    // Simple debouncing - ignore rapid state changes
+    const now = Date.now();
+    const timeSinceLastUpdate = now - debounceInfo.lastUpdate;
 
-// Check if this is a rapid state change
+    // Check if this is a rapid state change
 if (
-    timeSinceLastUpdate < DEBOUNCE_TIME &&
+    timeSinceLastUpdate < DEBOUNCE_TIME_MS &&
     presenceStates[dataEntityId] !== normalizedState
 ) {
     // Store pending state but don't process yet
@@ -135,7 +173,7 @@ if (
     // @ts-ignore
     msg.payload = null;
     // @ts-ignore
-    msg.delay = 1;
+    msg.delay = IMMEDIATE_DELAY_MS;
 } else {
     // Update the specific sensor's state
     presenceStates[dataEntityId] = normalizedState;
@@ -168,7 +206,7 @@ if (
 
     // Initialize output
     // @ts-ignore
-    msg.delay = 1;
+    msg.delay = IMMEDIATE_DELAY_MS;
     // @ts-ignore
     msg.payload = null;
 
@@ -188,7 +226,13 @@ if (
                 flowInfo.state = PresenceState.ON;
                 flowInfo.lastOff = null;
                 flowInfo.delay = 0;
+                flowInfo.coolDownEndTime = null; // Clear cooldown end time
                 // Don't update lastOn - maintain dwell time calculation
+                // Send turn_on to ensure lights stay on (counteract any pending turn_off)
+                // @ts-ignore
+                msg.payload = createPayload(filteredEntities, "turn_on");
+                // @ts-ignore
+                msg.delay = IMMEDIATE_DELAY_MS; // Immediate action
             } else if (prevState === PresenceState.UNKNOWN && !inCoolDown) {
                 // Recover from unknown to on, no cool-down active
                 flowInfo.state = PresenceState.ON;
@@ -205,12 +249,13 @@ if (
             if (prevState === PresenceState.ON && !inCoolDown) {
                 // Start cool-down period
                 const dwellTime = flowInfo.lastOn ? Date.now() - flowInfo.lastOn : 0;
-                const delaySeconds = calculateCoolDown(dwellTime, coolDown);
-                const delayMs = delaySeconds * 1000;
+                // calculateCoolDown already returns milliseconds
+                const delayMs = calculateCoolDown(dwellTime, coolDown);
 
                 flowInfo.lastOff = Date.now();
                 flowInfo.state = PresenceState.PENDING_OFF;
                 flowInfo.delay = delayMs;
+                flowInfo.coolDownEndTime = Date.now() + delayMs; // Set cooldown end time
 
                 // @ts-ignore
                 msg.delay = delayMs;
@@ -225,6 +270,7 @@ if (
                 flowInfo.state = PresenceState.OFF;
                 flowInfo.lastOff = Date.now();
                 flowInfo.lastOn = null;
+                flowInfo.coolDownEndTime = null;
                 // @ts-ignore
                 msg.payload = createPayload(filteredEntities, "turn_off");
             } else if (isProblematicSequence) {
@@ -267,6 +313,8 @@ if (
     // @ts-ignore
     msg.aggregateState = aggregateState;
     // @ts-ignore
+    msg.topic = topic; // Ensure topic is passed through
+    // @ts-ignore
     msg.inCoolDown = inCoolDown;
     // @ts-ignore
     msg.debug = {
@@ -285,4 +333,6 @@ if (
             pendingState: debounceInfo.pendingState
         }
     };
+
 } // End of else block for debounce check
+} // End of !isReset block

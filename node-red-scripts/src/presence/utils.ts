@@ -1,5 +1,9 @@
-const MAX_COOL_DOWN = 30 * 60; // 30 minutes max cool-down
+// Time constants (in seconds unless specified)
+export const MAX_COOL_DOWN = 30 * 60; // 30 minutes max cool-down
 export const DEFAULT_COOL_DOWN = 10 * 60; // 10 minutes default cool-down
+export const DEBOUNCE_TIME_MS = 1000; // 1 second debounce window (in milliseconds)
+export const IMMEDIATE_DELAY_MS = 1; // 1ms for immediate actions (in milliseconds)
+export const TEST_WAIT_MS = 2000; // 2 seconds standard wait time for tests (in milliseconds)
 
 // States for the presence state machine
 export enum PresenceState {

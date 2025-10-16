@@ -19,7 +19,7 @@ export function normalizeTime(time: string): string {
 }
 
 export function dateToTimeString(date: Date): string {
-    return date.toTimeString().split(" ")[0];
+    return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
 }
 
 export function timeStringToDate(time: string): Date {
