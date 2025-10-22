@@ -1,4 +1,4 @@
-import type { Schedule } from "../types";
+import type { Schedule } from "../../types";
 
 // Warocqueanum (titanic light) sub-schedules
 const warocqueanumSchedules: Schedule[] = [
@@ -113,16 +113,6 @@ export const plantSchedules: Schedule[] = [
         start: { entity_id: "sensor.wakeup_time" },
         end: { entity_id: "sensor.sleep_time" },
         precedence: 110, // HIGHER - bedroom plants override global
-        type: "continuous"
-    },
-
-    // Penguin light - specific schedule
-    {
-        name: "penguin",
-        entities: ["light.penguin_light"],
-        start: "09:00",
-        end: "18:45",
-        precedence: 120, // HIGHEST for specific plants
         type: "continuous"
     },
 

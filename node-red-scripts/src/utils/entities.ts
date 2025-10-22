@@ -175,18 +175,20 @@ export function entitiesToObject(entities: Hass.State[]): Record<string, Hass.St
 
 /**
  * Match entities against multiple patterns
+ * Uses getEntitiesByPattern internally for caching benefits
  */
 export function matchEntitiesMultiple(patterns: (string | RegExp)[]): Hass.State[] {
-    const states = getAllEntities();
-    if (!states) return [];
-    
-    const regexps = patterns.map(p => 
-        p instanceof RegExp ? p : new RegExp(p)
-    );
-    
-    return Object.values(states).filter(entity =>
-        regexps.some(regex => regex.test(entity.entity_id))
-    );
+    const allMatches = new Map<string, Hass.State>();
+
+    // Use cached getEntitiesByPattern for each pattern
+    for (const pattern of patterns) {
+        const matches = getEntitiesByPattern(pattern);
+        matches.forEach(entity => {
+            allMatches.set(entity.entity_id, entity);
+        });
+    }
+
+    return Array.from(allMatches.values());
 }
 
 /**
@@ -210,4 +212,42 @@ export function groupEntitiesByDomain(entities: Hass.State[]): Record<string, Ha
         acc[domain].push(entity);
         return acc;
     }, {} as Record<string, Hass.State[]>);
+}
+
+/**
+ * Get entity state value, returning null for unavailable/unknown states
+ */
+export function getEntityState(entityId: string): string | null {
+    const entity = getEntity(entityId);
+    if (!entity || !entity.state ||
+        entity.state === 'unavailable' ||
+        entity.state === 'unknown') {
+        return null;
+    }
+    return entity.state;
+}
+
+/**
+ * Get battery level from an entity
+ * Handles different formats where battery info could be stored
+ *
+ * @param entity - Entity to check for battery information
+ * @returns Battery level (0-100) or null if no battery info
+ */
+export function getBatteryLevel(entity: Hass.State): number | null {
+    // Case 1: Entity is a battery sensor where the state itself is the battery level
+    if (entity.entity_id.includes("battery") && !isNaN(Number(entity.state))) {
+        return Number(entity.state);
+    }
+
+    // Case 2: Entity has battery_level in attributes
+    if (
+        "battery_level" in entity.attributes &&
+        !isNaN(Number(entity.attributes.battery_level))
+    ) {
+        return Number(entity.attributes.battery_level);
+    }
+
+    // No battery info found
+    return null;
 }

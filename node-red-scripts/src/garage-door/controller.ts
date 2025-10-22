@@ -10,7 +10,7 @@
  * Safety: Suppressed at night, when asleep, or within 5 min cooldown
  */
 
-import { getEntity } from "../utils/ha-entities";
+import { getEntity } from "../utils/entities";
 
 // Timing Configuration
 const CHARGER_WINDOW = 2 * 60 * 1000;  // 2 minutes - Max time between unplugging charger and entering car for departure sequence

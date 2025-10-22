@@ -1,4 +1,5 @@
-import { groupActions, filterBlacklistedEntity } from "../utils/utils";
+import { filterBlacklistedEntity } from "../utils/utils";
+import { groupActions } from "../utils/service-calls";
 import {
     MAX_COOL_DOWN,
     DEFAULT_COOL_DOWN,

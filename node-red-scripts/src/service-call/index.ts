@@ -1,19 +1,23 @@
 import {
-    serviceToActionCall,
-    groupActions,
-    domainToService,
     getEntityDomain,
     filterBlacklistedEntity,
-    createServiceCall,
-    createStatesMap,
     deepEqual
 } from "../utils/utils";
+import {
+    serviceToActionCall,
+    groupActions,
+    domainToService
+} from "../utils/service-calls";
+import {
+    createServiceCall,
+    createStatesMap
+} from "../cache-states/utils";
 import {
     getEntity,
     getEntitiesById,
     getEntitiesByPattern,
     filterAvailableEntities
-} from "../utils/ha-entities";
+} from "../utils/entities";
 
 interface ServiceCallConfig {
     groupActions?: boolean;

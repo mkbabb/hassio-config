@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import * as fs from 'fs';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 import { StyleHelper } from '../style';
 
@@ -13,9 +13,9 @@ const __dirname = path.dirname(__filename);
 
 // Configuration
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5";
 const CONFIDENCE_THRESHOLD = parseInt(process.env.AI_CONFIDENCE_THRESHOLD || '75');
-const MAX_TOKENS_PER_REQUEST = 12000; // Conservative limit for context
+const MAX_TOKENS_PER_REQUEST = 16_000; // Conservative limit for context
 const MAX_LINES_PER_FILE = 500;
 
 // Initialize OpenAI
@@ -291,6 +291,44 @@ async function selectBestMatch(
 }
 
 /**
+ * Clean stale mappings where source files no longer exist
+ * Returns cleaned mappings and orphaned nodes for re-reconciliation
+ */
+export async function cleanStaleMappings(
+  existingMappings: Record<string, any[]>,
+  srcDir: string
+): Promise<{cleaned: Record<string, any[]>, orphanedNodes: FunctionNode[]}> {
+  const cleanedMappings = {...existingMappings};
+  const orphanedNodes: FunctionNode[] = [];
+
+  for (const [filePath, nodes] of Object.entries(existingMappings)) {
+    const fullPath = path.join(srcDir, filePath.replace(/^src\//, ''));
+
+    if (!fs.existsSync(fullPath)) {
+      console.log(`    ${StyleHelper.colors.warning('⚠')} Stale mapping detected: ${StyleHelper.colors.bold(filePath)} no longer exists`);
+
+      // Add nodes to orphaned list for re-reconciliation
+      orphanedNodes.push(...nodes.map((n: any) => ({
+        id: n.nodeId,
+        name: n.nodeName,
+        func: '', // Will be loaded from flows during reconciliation
+        flowId: n.flowId,
+        flowName: n.flowName
+      })));
+
+      // Remove stale mapping
+      delete cleanedMappings[filePath];
+    }
+  }
+
+  if (orphanedNodes.length > 0) {
+    console.log(StyleHelper.info(`Found ${orphanedNodes.length} orphaned nodes from ${Object.keys(existingMappings).length - Object.keys(cleanedMappings).length} stale file paths`));
+  }
+
+  return {cleaned: cleanedMappings, orphanedNodes};
+}
+
+/**
  * Reconcile unmapped functions using AI
  * Note: Orphaned nodes (with compiled JS but no source TS) are excluded and require manual reconciliation
  */
@@ -298,13 +336,24 @@ export async function reconcileUnmappedFunctions(
   unmappedNodes: FunctionNode[],
   srcDir: string,
   existingMappings: Record<string, any[]>
-): Promise<ReconciliationResult[]> {
+): Promise<{results: ReconciliationResult[], cleanedMappings: Record<string, any[]>}> {
   console.log(StyleHelper.section("AI Function Reconciliation"));
-  console.log(StyleHelper.info(`Processing ${unmappedNodes.length} unmapped functions`));
+
+  // Clean stale mappings first
+  const {cleaned, orphanedNodes} = await cleanStaleMappings(existingMappings, srcDir);
+
+  // Merge orphaned nodes with unmapped nodes
+  const allUnmappedNodes = [...unmappedNodes, ...orphanedNodes];
+
+  console.log(StyleHelper.info(`Processing ${allUnmappedNodes.length} unmapped functions`));
+  if (orphanedNodes.length > 0) {
+    console.log(StyleHelper.info(`  • ${unmappedNodes.length} originally unmapped`));
+    console.log(StyleHelper.info(`  • ${orphanedNodes.length} from stale file paths`));
+  }
   console.log(StyleHelper.colors.muted("Note: Orphaned nodes require manual reconciliation and are excluded"));
-  
-  // Get set of already mapped files
-  const mappedFiles = new Set(Object.keys(existingMappings));
+
+  // Get set of already mapped files (using cleaned mappings)
+  const mappedFiles = new Set(Object.keys(cleaned));
   
   // Get unmapped TypeScript files
   const unmappedFiles = await getUnmappedTypeScriptFiles(srcDir, mappedFiles);
@@ -320,9 +369,9 @@ export async function reconcileUnmappedFunctions(
   console.log(StyleHelper.info(`Created ${fileChunks.length} file chunks for analysis`));
   
   const results: ReconciliationResult[] = [];
-  
+
   // Process each unmapped node
-  for (const node of unmappedNodes) {
+  for (const node of allUnmappedNodes) {
     const processingContent = [
       `Function: ${StyleHelper.colors.bold(node.name)}`,
       StyleHelper.keyValue('Flow', node.flowName || 'Unknown'),
@@ -368,8 +417,8 @@ export async function reconcileUnmappedFunctions(
     // Add small delay to avoid rate limits
     await new Promise(resolve => setTimeout(resolve, 500));
   }
-  
-  return results;
+
+  return {results, cleanedMappings: cleaned};
 }
 
 /**
@@ -377,10 +426,16 @@ export async function reconcileUnmappedFunctions(
  */
 export function exportReconciliationResults(
   results: ReconciliationResult[],
-  mappingsPath: string
+  mappingsPath: string,
+  cleanedMappings?: Record<string, any[]>
 ): void {
   // Read current mappings
   const mappingsData = JSON.parse(fs.readFileSync(mappingsPath, 'utf8'));
+
+  // Use cleaned mappings if provided (to remove stale paths)
+  if (cleanedMappings) {
+    mappingsData.mappings = cleanedMappings;
+  }
   
   // Update mappings with successful matches
   let newMappings = 0;

@@ -22,27 +22,11 @@ entities.forEach((entity) => {
 });
 entities = Array.from(uniqueEntities.values());
 
-/**
- * Get battery state from entity
- * Handles different formats where battery info could be stored
- */
-function getBatteryState(entity: Hass.State): number | null {
-    // Case 1: Entity is a battery sensor where the state itself is the battery level
-    if (entity.entity_id.includes("battery") && !isNaN(Number(entity.state))) {
-        return Number(entity.state);
-    }
+// Battery level extraction moved to utils/entities.ts
+import { getBatteryLevel } from "../utils/entities";
 
-    // Case 2: Entity has battery_level in attributes
-    if (
-        "battery_level" in entity.attributes &&
-        !isNaN(Number(entity.attributes.battery_level))
-    ) {
-        return Number(entity.attributes.battery_level);
-    }
-
-    // No battery info found
-    return null;
-}
+// Alias for backwards compatibility
+const getBatteryState = getBatteryLevel;
 
 /**
  * Check if entity should be included in battery report

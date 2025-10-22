@@ -1,4 +1,4 @@
-import type { Schedule } from "../types";
+import type { Schedule } from "../../types";
 
 // Lock schedules - UNIDIRECTIONAL (only lock, never unlock automatically)
 export const lockSchedules: Schedule[] = [

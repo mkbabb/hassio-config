@@ -20,224 +20,34 @@
  * 9. Return formatted actions
  */
 
-import {
-    groupActions,
-    serviceToActionCall,
-    getEntityDomain,
-    domainToService
-} from "../utils/utils";
+import { getEntityDomain } from "../../utils/utils";
+import { groupActions, serviceToActionCall } from "../../utils/service-calls";
 import {
     isTimeInRange,
-    timeStringToDate,
     dateToTimeString,
-    compareTime,
-    calculateProgress,
     resolveEntityTime,
     calculateScheduleTimes,
-    isWithinWindow,
-    cleanupOldEntries
-} from "../utils/datetime";
+    cleanupOldEntries,
+    calculateProgress
+} from "../../utils/datetime";
 import {
+    getEntity,
     getScheduleEntities,
     getEntitiesByPattern,
     entitiesToObject,
     filterAvailableEntities,
-    getEntity,
     getEntitiesById
-} from "../utils/ha-entities";
-import {
-    shouldFilterEntity
-} from "../utils/static-states";
-import { DomainStates, PRESENCE_STATE_ENTITY_ID } from "./types";
+} from "../../utils/entities";
+import { shouldFilterEntity } from "../../utils/static-states";
+import { shouldSkipAction } from "../../utils/validation";
+import { checkConditions } from "./conditions";
+import { normalizeEntityMatch, matchesEntity, matchesEntityByTag } from "./entity-matching";
+import { processContinuousSchedule, processTriggerSchedule } from "./schedule-processing";
 import type {
     NormalizedSchedule,
     Schedule,
-    ScheduleCondition,
-    ScheduleEvent,
-    EntityMatch,
-    EntityConfig,
-    NormalizedEntityConfig,
-    EntityState
-} from "./types";
-
-// ============================================================================
-// CONDITION CHECKING
-// ============================================================================
-
-/**
- * Evaluates schedule conditions against current state
- * @param conditions - Array of conditions to check (presence, entity states)
- * @param msg - Node-RED message for context
- * @returns true if all conditions pass or no conditions defined
- */
-function checkConditions(
-    conditions: ScheduleCondition[] | undefined,
-    msg: any
-): boolean {
-    if (!conditions || conditions.length === 0) {
-        return true;
-    }
-
-    // Use getEntity for cleaner direct access
-    const presenceEntity = getEntity(PRESENCE_STATE_ENTITY_ID);
-    const presenceState = presenceEntity?.state;
-
-    return conditions.every((condition) => {
-        switch (condition.type) {
-            case "presence":
-                return presenceState === condition.value;
-            case "state":
-                if (!condition.entity_id) return true;
-                const entity = getEntity(condition.entity_id);
-                return entity?.state === condition.value;
-            default:
-                return true;
-        }
-    });
-}
-
-// ============================================================================
-// ENTITY MATCHING & NORMALIZATION
-// ============================================================================
-
-/**
- * Normalizes various entity match formats into consistent config objects
- * @param match - String, regex, array, or config object to normalize
- * @returns Array of normalized entity configurations with patterns
- */
-function normalizeEntityMatch(match: EntityMatch): NormalizedEntityConfig[] {
-    if (!match) {
-        return [{ pattern: new RegExp("(?!)") }];
-    }
-
-    // Handle arrays
-    if (Array.isArray(match)) {
-        return match.flatMap((m) => normalizeEntityMatch(m));
-    }
-
-    if (typeof match === "string") {
-        // Check if it's a regex pattern with prefix
-        if (match.startsWith("regex:")) {
-            const pattern = match.substring(6); // Remove "regex:" prefix
-            return [{ pattern: new RegExp(pattern) }];
-        } else {
-            // Plain string entity ID
-            return [
-                {
-                    pattern: new RegExp(
-                        `^${match.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`
-                    )
-                }
-            ];
-        }
-    } else if (match instanceof RegExp) {
-        // RegExp pattern
-        return [{ pattern: match }];
-    } else if (match && typeof match === "object") {
-        // Check if it's an empty object {}
-        if (Object.keys(match).length === 0) {
-            return [{ pattern: new RegExp("(?!)") }];
-        }
-
-        // EntityConfig object
-        const config = match as EntityConfig;
-
-        // Check if entity_id exists
-        if (!config.entity_id) {
-            return [{ pattern: new RegExp("(?!)") }];
-        }
-
-        // Handle array of entity_ids in config
-        if (Array.isArray(config.entity_id)) {
-            return config.entity_id.map((id) => {
-                const pattern =
-                    id instanceof RegExp
-                        ? id
-                        : new RegExp(
-                              `^${String(id).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`
-                          );
-                return {
-                    pattern,
-                    states: config.states
-                };
-            });
-        }
-
-        // Single entity_id
-        const pattern =
-            config.entity_id instanceof RegExp
-                ? config.entity_id
-                : new RegExp(
-                      `^${String(config.entity_id).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`
-                  );
-        return [
-            {
-                pattern,
-                states: config.states
-            }
-        ];
-    }
-
-    // Fallback
-    return [{ pattern: new RegExp("(?!)") }];
-}
-
-/**
- * Checks if entity ID matches any configured patterns
- * @param entityId - Entity to check
- * @param entityConfigs - Normalized configurations to match against
- * @returns Matching config or null
- */
-function matchesEntity(
-    entityId: string,
-    entityConfigs: NormalizedEntityConfig[] | undefined
-): NormalizedEntityConfig | null {
-    if (!entityConfigs) return null;
-
-    for (const config of entityConfigs) {
-        if (config.pattern.test(entityId)) {
-            return config;
-        }
-    }
-    return null;
-}
-
-/**
- * Checks if entity matches any defined tags
- * @param entityId - Entity to check
- * @param tags - Tag names to match
- * @param tagDefinitions - Map of tag names to entity patterns
- * @param allowedDomains - Domains allowed for tag matching
- * @returns true if entity matches any tag
- */
-function matchesEntityByTag(
-    entityId: string,
-    tags: string[] | undefined,
-    tagDefinitions: Record<string, string[]>,
-    allowedDomains: string[] = [
-        "light",
-        "switch",
-        "fan",
-        "climate",
-        "lock",
-        "cover",
-        "media_player"
-    ]
-): boolean {
-    if (!tags || tags.length === 0) return false;
-
-    // Check if entity domain is allowed
-    const domain = getEntityDomain(entityId);
-    if (!allowedDomains.includes(domain)) return false;
-
-    for (const tag of tags) {
-        const patterns = tagDefinitions[tag] || [];
-        if (patterns.some((pattern) => new RegExp(pattern).test(entityId))) {
-            return true;
-        }
-    }
-    return false;
-}
+    ScheduleEvent
+} from "../types";
 
 // ============================================================================
 // TIME CALCULATIONS
@@ -346,220 +156,6 @@ function calculateScheduleEvents(
     return events;
 }
 
-// ============================================================================
-// STATE DETERMINATION
-// ============================================================================
-
-/**
- * Determines target state for entity based on domain and schedule state
- * @param domain - Entity domain (light, switch, climate, etc.)
- * @param isActive - Whether schedule is active
- * @param customState - Optional custom state configuration
- * @returns Target state string (on/off/heat/cool/etc.)
- */
-function getTargetState(
-    domain: string,
-    isActive: boolean,
-    customState?: EntityState
-): string {
-    // Use custom state if provided
-    if (customState?.state) {
-        return customState.state;
-    }
-
-    // Get domain-specific states
-    const domainStates = DomainStates[domain as keyof typeof DomainStates];
-    if (domainStates) {
-        return isActive ? domainStates.on : domainStates.off;
-    }
-
-    // Fallback to on/off
-    return isActive ? "on" : "off";
-}
-
-/**
- * Maps entity state to appropriate service call
- * @param domain - Entity domain
- * @param state - Target state
- * @param customService - Optional custom service override
- * @returns Service name (turn_on, turn_off, set_hvac_mode, etc.)
- */
-function getServiceForState(
-    domain: string,
-    state: string,
-    customService?: string
-): string {
-    // Use custom service if provided
-    if (customService) return customService;
-
-    // Create a mock entity to leverage domainToService from utils
-    const mockEntity: Partial<Hass.State> = {
-        state: state,
-        entity_id: `${domain}.mock`,
-        attributes: {}
-    };
-
-    // Get service from utils domainToService
-    const service = domainToService(mockEntity as Hass.State, domain);
-
-    // If domainToService returned a valid service, use it
-    if (service) {
-        return service;
-    }
-
-    // Fallback for any edge cases not handled by domainToService
-    return "set_state";
-}
-
-/**
- * Builds service call for entity based on schedule and current state
- * @param entity - Current entity state
- * @param schedule - Active schedule configuration
- * @param entityConfig - Entity-specific configuration
- * @param isActive - Whether schedule is in active period
- * @returns Service call object or null if no action needed
- */
-function determineEntityAction(
-    entity: Hass.State,
-    schedule: NormalizedSchedule,
-    entityConfig: NormalizedEntityConfig | null,
-    isActive: boolean
-): Partial<Hass.Service> | null {
-    const domain = getEntityDomain(entity.entity_id);
-
-    // Get the appropriate state config
-    const stateKey = isActive ? "on" : "off";
-    let stateConfig =
-        entityConfig?.states?.[stateKey] || schedule.defaultStates?.[stateKey];
-
-    // If no state config is defined, provide default turn_on/turn_off behavior
-    if (!stateConfig) {
-        stateConfig = {
-            service: isActive ? "turn_on" : "turn_off"
-        };
-    }
-
-    // For unidirectional schedules: if schedule is inactive and no "off" state is defined, skip
-    // (This check is now after we've provided defaults, so only applies to explicitly null configs)
-    if (!isActive && !stateConfig) {
-        return null;
-    }
-
-    // Determine target state
-    const targetState = getTargetState(domain, isActive, stateConfig);
-
-    // Check if entity already in target state
-    if (entity.state === targetState) return null;
-
-    // Determine service to call
-    const service = getServiceForState(domain, targetState, stateConfig?.service);
-
-    // If no valid service for this domain, skip
-    if (!service || service === "set_state") {
-        return null;
-    }
-
-    // Build service data
-    const serviceData: Record<string, any> = {
-        entity_id: entity.entity_id,
-        ...(stateConfig?.data || {})
-    };
-
-    // Add state-specific data
-    if (domain === "climate" && service === "set_hvac_mode") {
-        serviceData.hvac_mode = targetState;
-    }
-
-    return {
-        domain: stateConfig?.domain || domain,
-        service,
-        data: serviceData
-    };
-}
-
-// ============================================================================
-// SCHEDULE PROCESSORS
-// ============================================================================
-
-/**
- * Processes continuous schedule - enforces state throughout active period
- * @param entity - Entity to control
- * @param schedule - Schedule configuration
- * @param entityConfig - Entity-specific settings
- * @param isActive - Whether in active time window
- * @returns Service call to enforce correct state
- */
-function processContinuousSchedule(
-    entity: Hass.State,
-    schedule: NormalizedSchedule,
-    entityConfig: NormalizedEntityConfig | null,
-    isActive: boolean
-): Partial<Hass.Service> | null {
-    // Continuous: Always enforce state during active period
-    return determineEntityAction(entity, schedule, entityConfig, isActive);
-}
-
-/**
- * Processes trigger schedule - fires once at start and once at end
- * @param entity - Entity to control
- * @param schedule - Schedule configuration
- * @param entityConfig - Entity-specific settings
- * @param now - Current time
- * @param triggeredSchedules - State tracking for fired triggers
- * @returns Action to execute and whether trigger state was updated
- */
-function processTriggerSchedule(
-    entity: Hass.State,
-    schedule: NormalizedSchedule,
-    entityConfig: NormalizedEntityConfig | null,
-    now: Date,
-    triggeredSchedules: Record<string, any>
-): { action: Partial<Hass.Service> | null; updateTriggerState: boolean } {
-    const scheduleKey = `${schedule.name}_${entity.entity_id}`;
-    const triggerState: { on: string | null; off: string | null } = 
-        triggeredSchedules[scheduleKey] || { on: null, off: null };
-    
-    const triggerWindowMs = 10 * 60 * 1000; // 10 minutes
-    
-    // Use datetime utilities for window checking
-    const inStartWindow = isWithinWindow(now, schedule.start, triggerWindowMs);
-    const inEndWindow = isWithinWindow(now, schedule.end, triggerWindowMs);
-    const pastEndWindow = now.getTime() > (schedule.end.getTime() + triggerWindowMs);
-    
-    let action: Partial<Hass.Service> | null = null;
-    let updateTriggerState = false;
-    
-    // Handle ON trigger: trigger within start window
-    if (inStartWindow && !triggerState.on) {
-        action = determineEntityAction(entity, schedule, entityConfig, true);
-        if (action) {
-            triggerState.on = now.toISOString();
-            triggeredSchedules[scheduleKey] = triggerState;
-            updateTriggerState = true;
-        }
-    }
-    
-    // Handle OFF trigger: trigger within end window
-    if (inEndWindow && !triggerState.off) {
-        const offAction = determineEntityAction(entity, schedule, entityConfig, false);
-        if (offAction) {
-            // If we already have an ON action, OFF takes precedence in same cycle
-            action = offAction;
-            triggerState.off = now.toISOString();
-            triggeredSchedules[scheduleKey] = triggerState;
-            updateTriggerState = true;
-        }
-    }
-    
-    // Reset state when we're past the schedule for next cycle
-    // Only reset if we've passed the end window AND both triggers have fired
-    if (pastEndWindow && triggerState.on && triggerState.off) {
-        delete triggeredSchedules[scheduleKey];
-        updateTriggerState = true;
-    }
-    
-    return { action, updateTriggerState };
-}
 
 // ============================================================================
 // TIME RESOLUTION
@@ -721,6 +317,7 @@ if (message.payload && Array.isArray(message.payload)) {
 const serviceActions: Partial<Hass.Service>[] = [];
 const entityScheduleMatches: any[] = [];
 const debugMatches: any[] = []; // Track blind matches for debugging
+const skippedActions: any[] = []; // Track actions skipped by validation
 
 entitiesToCheck.forEach((entity) => {
     // Skip entities that are:
@@ -768,16 +365,6 @@ entitiesToCheck.forEach((entity) => {
 
     const isActive = isTimeInRange(now, activeSchedule.start, activeSchedule.end);
 
-    // Debug: Track blind schedule matches
-    if (activeSchedule.name.includes("blind")) {
-        debugMatches.push({
-            entity_id: entity.entity_id,
-            current_state: entity.state,
-            schedule: activeSchedule.name,
-            isActive,
-            targetState: isActive ? "closed" : "open"
-        });
-    }
 
     // Handle continuous vs trigger schedules
     if (activeSchedule.type === "continuous") {
@@ -790,7 +377,18 @@ entitiesToCheck.forEach((entity) => {
         );
 
         if (action) {
-            serviceActions.push(action);
+            // Validate action before adding
+            const validation = shouldSkipAction(action);
+            if (validation.skip) {
+                skippedActions.push({
+                    entity_id: entity.entity_id,
+                    schedule: activeSchedule.name,
+                    reason: validation.reason,
+                    action: action.service
+                });
+            } else {
+                serviceActions.push(action);
+            }
         }
     } else if (activeSchedule.type === "trigger") {
         // Use the abstracted trigger schedule processor
@@ -803,7 +401,18 @@ entitiesToCheck.forEach((entity) => {
         );
 
         if (action) {
-            serviceActions.push(action);
+            // Validate action before adding
+            const validation = shouldSkipAction(action);
+            if (validation.skip) {
+                skippedActions.push({
+                    entity_id: entity.entity_id,
+                    schedule: activeSchedule.name,
+                    reason: validation.reason,
+                    action: action.service
+                });
+            } else {
+                serviceActions.push(action);
+            }
         }
     }
 
@@ -828,6 +437,7 @@ const debugInfo = {
     schedulesFound: schedules.length,
     entitiesChecked: entitiesToCheck.length,
     actionsGenerated: serviceActions.length,
+    actionsSkipped: skippedActions.length,
     currentTime: dateToTimeString(now),
     activeSchedules: normalizedSchedules
         .filter((s) => isTimeInRange(now, s.start, s.end))
@@ -837,7 +447,8 @@ const debugInfo = {
             startTime: s.startTime,
             endTime: s.endTime
         })),
-    blindMatches: debugMatches.length > 0 ? debugMatches : "No blind entities matched"
+    blindMatches: debugMatches.length > 0 ? debugMatches : "No blind entities matched",
+    skippedActions: skippedActions.length > 0 ? skippedActions : "No actions skipped by validation"
 };
 
 // STEP 8: Clean up stale trigger states (>24 hours old)

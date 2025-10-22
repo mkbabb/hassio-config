@@ -207,7 +207,7 @@ npm run deploy -- --rename-only --dry-run
 
 The system maintains mappings between TypeScript files and Node-RED function nodes:
 - **Exact match**: Code hash matches after normalization
-- **AI reconciled**: GPT-4 matches unmapped functions (75%+ confidence)
+- **AI reconciled**: GPT-5 matches unmapped functions (75%+ confidence)
 - **Manual mapping**: Edit `src/deploy/mappings/node-mappings.json`
 
 Mappings are stored with confidence levels to prevent accidental overwrites.

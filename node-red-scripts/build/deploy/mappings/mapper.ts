@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { fileURLToPath } from 'url';
+import { fileURLToPath } from 'node:url';
 import { StyleHelper } from '../../style';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -448,13 +448,13 @@ export async function generateMappingFile(
     });
     
     const srcDir = options.srcDir || path.join(__dirname, '../../../src');
-    const results = await reconcileUnmappedFunctions(
+    const {results, cleanedMappings} = await reconcileUnmappedFunctions(
       unmappedNodes.filter(n => n.func), // Only process nodes with function code
       srcDir,
       config.mappings
     );
-    
+
     // Export results - this will update node-mappings.json and create reconcile-results.json
-    exportReconciliationResults(results, path.join(mappingsDir, 'node-mappings.json'));
+    exportReconciliationResults(results, path.join(mappingsDir, 'node-mappings.json'), cleanedMappings);
   }
 }

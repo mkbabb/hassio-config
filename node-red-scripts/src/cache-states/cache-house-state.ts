@@ -1,4 +1,5 @@
-import { createServiceCall, groupActions, createAwayPayload } from "../utils/utils";
+import { createServiceCall, createAwayPayload } from "./utils";
+import { groupActions } from "../utils/service-calls";
 
 //@ts-ignore
 const message: Hass.Message = msg;

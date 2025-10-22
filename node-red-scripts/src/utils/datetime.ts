@@ -208,6 +208,24 @@ export function resolveEntityTime(
     throw new Error(`Invalid time format: ${JSON.stringify(time)}`);
 }
 
+// Week/Day utilities
+
+/**
+ * Convert JavaScript getDay() (0=Sun) to Python weekday() (0=Mon)
+ * Used to match Home Assistant template logic
+ */
+export function getPythonWeekday(date: Date = new Date()): number {
+    return (date.getDay() + 6) % 7;
+}
+
+/**
+ * Determine if date falls on a weekday (Mon-Fri)
+ * Matches HA template: {% if now().weekday() < 5 %}
+ */
+export function isWeekday(date: Date = new Date()): boolean {
+    return getPythonWeekday(date) < 5;
+}
+
 // Cleanup utilities
 
 export function isStale(timestamp: string | Date, maxAgeMs: number): boolean {

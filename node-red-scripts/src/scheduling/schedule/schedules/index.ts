@@ -4,7 +4,7 @@ import type {
     ScheduleCondition,
     NormalizedSchedule,
     ScheduleEvent
-} from "../types";
+} from "../../types";
 import { plantSchedules } from "./plants-schedules";
 import { dayNightSchedules } from "./day-night-schedules";
 import { blindsSchedules } from "./blinds-schedules";

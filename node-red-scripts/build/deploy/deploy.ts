@@ -2,7 +2,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { fileURLToPath } from 'url';
+import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 import { createBackup, selectAndRestoreBackup, restoreBackup, getBackupInfo } from './backup';
 import { renameFunctionNodes } from './rename';
@@ -129,9 +129,7 @@ export class Deployer {
         const response = await fetch(url, {
           method: 'POST',
           headers,
-          body: JSON.stringify({
-            flows: flows
-          }),
+          body: JSON.stringify(flows),  // Send flows array directly, not wrapped
           timeout: 5000
         });
         

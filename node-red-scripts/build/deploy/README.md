@@ -100,7 +100,7 @@ npm run watch
 4. **Backup**: Before deployment, flows.json is backed up to `/Volumes/config/node-red-backups/`
 
 5. **AI Reconciliation** (optional with `--ai` flag):
-   - Uses OpenAI GPT-4o to match unmapped functions
+   - Uses OpenAI GPT-5 to match unmapped functions
    - Analyzes code structure, function names, and business logic
    - Requires OPENAI_API_KEY in .env
    - 75% confidence threshold by default

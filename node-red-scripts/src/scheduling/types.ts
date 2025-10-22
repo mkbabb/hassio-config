@@ -20,24 +20,8 @@ export type EntityState = {
     data?: Record<string, any>;  // Additional service data
 };
 
-// Common states for different domains
-export const DomainStates = {
-    light: { on: "on", off: "off" },
-    switch: { on: "on", off: "off" },
-    fan: { on: "on", off: "off" },
-    lock: { on: "locked", off: "unlocked" },
-    cover: { on: "open", off: "closed" },
-    media_player: { on: "playing", off: "off" },
-    climate: { on: "heat", off: "off" },
-    vacuum: { on: "cleaning", off: "docked" },
-    person: { on: "home", off: "not_home" },
-    device_tracker: { on: "home", off: "not_home" },
-    binary_sensor: { on: "on", off: "off" },
-    input_boolean: { on: "on", off: "off" },
-    input_select: { on: "on", off: "off" }  // Will be overridden by schedule states
-} as const;
-
-export type DomainStateKey = keyof typeof DomainStates;
+// Re-export domain states from service-calls for schedule type checking
+export { DOMAIN_STATES, type DomainStateKey } from "../utils/service-calls";
 
 export type Schedule = {
     name: string;

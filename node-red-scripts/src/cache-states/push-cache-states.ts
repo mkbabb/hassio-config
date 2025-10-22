@@ -4,8 +4,12 @@ import { GLOBAL_CACHED_STATES_KEY } from "../utils/utils";
 const newStates: Partial<Hass.Service>[] = msg.payload;
 
 // @ts-ignore
-const cachedStates: Partial<Hass.Service | Hass.Action>[] =
-    global.get(GLOBAL_CACHED_STATES_KEY) ?? [];
+const cachedStatesRaw = global.get(GLOBAL_CACHED_STATES_KEY);
+
+// Ensure cachedStates is always an array - handle null, undefined, or non-array values
+const cachedStates: Partial<Hass.Service | Hass.Action>[] = Array.isArray(cachedStatesRaw)
+    ? cachedStatesRaw
+    : [];
 
 // filter out the newStates that are already in the cachedStates
 const filteredStates: Partial<Hass.Action>[] = cachedStates.filter((cachedState) => {

@@ -3,7 +3,8 @@
 
 // Import utility functions from the path you specified
 //@ts-ignore
-import { deepEqual, getEntityDomain, domainToService } from "../utils/utils";
+import { deepEqual, getEntityDomain } from "../utils/utils";
+import { domainToService } from "../utils/service-calls";
 
 // Get original action and states from joined message
 //@ts-ignore

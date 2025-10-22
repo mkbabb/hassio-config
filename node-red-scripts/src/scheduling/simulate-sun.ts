@@ -1,5 +1,6 @@
-import { getEntity, getEntities, getEntitiesByDomain } from "../utils/ha-entities";
-import { groupActions, serviceToActionCall, getEntityDomain } from "../utils/utils";
+import { getEntity, getEntities, getEntitiesByDomain } from "../utils/entities";
+import { getEntityDomain } from "../utils/utils";
+import { groupActions, serviceToActionCall } from "../utils/service-calls";
 import type { EntityState } from "./types";
 
 // Type guards for light entities

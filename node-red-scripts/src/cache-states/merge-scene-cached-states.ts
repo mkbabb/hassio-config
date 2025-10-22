@@ -1,4 +1,5 @@
-import { createServiceCall, createStatesMap, GLOBAL_CACHED_STATES_KEY } from "../utils/utils";
+import { createServiceCall, createStatesMap } from "./utils";
+import { GLOBAL_CACHED_STATES_KEY } from "../utils/utils";
 
 // @ts-ignore
 const cachedStates: Partial<Hass.Service>[] = global.get(GLOBAL_CACHED_STATES_KEY) ?? [];

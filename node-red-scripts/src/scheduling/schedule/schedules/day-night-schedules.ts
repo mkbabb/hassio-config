@@ -1,4 +1,4 @@
-import type { Schedule } from "../types";
+import type { Schedule } from "../../types";
 
 export const dayNightSchedules: Schedule[] = [
     // Day status - set to "day" at wakeup, "night" at sleep

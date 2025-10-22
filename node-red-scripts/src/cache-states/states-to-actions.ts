@@ -1,4 +1,4 @@
-import { groupActions, serviceToActionCall } from "../utils/utils";
+import { groupActions, serviceToActionCall } from "../utils/service-calls";
 
 // @ts-ignore
 const states: Partial<Hass.Service>[] = msg.payload;
