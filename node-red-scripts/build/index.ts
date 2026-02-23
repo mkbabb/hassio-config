@@ -1,3 +1,44 @@
+/**
+ * Node-RED TypeScript Build Orchestrator
+ *
+ * Main entry point for the incremental build system. Compiles TypeScript automation
+ * functions to JavaScript for deployment to Node-RED, with intelligent caching,
+ * dependency tracking, and watch mode support.
+ *
+ * Architecture:
+ * - BuildManager: Core orchestration class handling file builds and cache management
+ * - DependencyGraph: Tracks import relationships for smart incremental compilation
+ * - esbuild: Bundles each function with dependencies into self-contained IIFE
+ * - Cache: MD5-based change detection with 24hr staleness window
+ * - Watch mode: Chokidar file monitoring with automatic rebuilds
+ *
+ * Key features:
+ * - Incremental compilation: Only rebuilds changed files and their dependents
+ * - Build contexts: Reuses esbuild contexts for faster successive builds
+ * - CommonJS cleanup: Strips module.exports artifacts for Node-RED compatibility
+ * - Auto-deployment: Optional Node-RED API deployment after builds
+ * - Mapping generation: AI-powered function-to-file reconciliation
+ *
+ * CLI usage:
+ *   npm run build              # Build all changed files
+ *   npm run watch              # Watch mode with auto-rebuild
+ *   npm run build -- --deploy  # Build + deploy to Node-RED
+ *   npm run map -- --ai        # Generate function mappings with AI
+ *
+ * @module build/index
+ *
+ * @example
+ * // Standard build workflow:
+ * const buildManager = new BuildManager('src', 'dist', CACHE_STALE_TIME);
+ * const builtFiles = await buildManager.buildFiles();
+ * await buildManager.dispose();
+ *
+ * @example
+ * // Watch mode with auto-rebuild:
+ * const buildManager = new BuildManager('src', 'dist', CACHE_STALE_TIME);
+ * await buildManager.startWatching();
+ */
+
 import { existsSync } from "fs";
 import { join, dirname } from "path";
 import { writeFile, readFile, mkdir } from "fs/promises";
@@ -28,10 +69,25 @@ import {
     saveCache
 } from "./utils";
 
-// Load environment variables
+// Load environment variables from .env
 loadEnv();
 
-// Parse command line arguments
+/**
+ * CLI argument configuration.
+ *
+ * Supported options:
+ * - inputDir (-i): Source directory (default: "src")
+ * - outputDir (-o): Compiled output directory (default: "dist")
+ * - emptyOutDir: Clean output before build (default: false)
+ * - recursive (-r): Recursive file search (default: false)
+ * - watch (-w): Watch mode for auto-rebuild (default: false)
+ * - cacheTime (-c): Cache staleness time in ms (default: 24hr)
+ * - debug (-d): Enable verbose logging (default: false)
+ * - deploy: Deploy to Node-RED after build (default: false)
+ * - dry-run: Preview deployment without changes (default: false)
+ * - map: Generate function mappings (default: false)
+ * - ai: Enable AI reconciliation for mappings (default: false)
+ */
 const argv = yargs(hideBin(process.argv))
     .option("inputDir", {
         alias: "i",
@@ -96,18 +152,70 @@ const argv = yargs(hideBin(process.argv))
 const { inputDir, outputDir, emptyOutDir, recursive, watch, cacheTime, debug, deploy, "dry-run": dryRun, map } = argv;
 const ai = (argv as any).ai;
 
-// Build Manager class - handles the build process
+/**
+ * Incremental Build Manager
+ *
+ * Orchestrates TypeScript to JavaScript compilation with intelligent caching,
+ * dependency tracking, and watch mode support. Maintains esbuild contexts for
+ * faster successive builds and tracks file hashes to avoid unnecessary rebuilds.
+ *
+ * Rebuild logic:
+ * 1. Check if output file exists - rebuild if missing
+ * 2. Compare MD5 hash with cache - rebuild if changed
+ * 3. Check dependency timestamps - rebuild if deps changed
+ * 4. Check cache staleness - rebuild after 24hr window
+ *
+ * Dependency tracking:
+ * - Extracts imports from esbuild metafile
+ * - Maintains bidirectional dependency graph
+ * - Rebuilds downstream dependents on change
+ *
+ * esbuild context management:
+ * - Creates incremental build contexts for each file
+ * - Reuses contexts for faster rebuilds
+ * - Disposes contexts on file deletion or cache cleanup
+ *
+ * @class BuildManager
+ *
+ * @property {BuildCache} cache - MD5 hash cache with timestamps and dependencies
+ * @property {DependencyGraph} dependencyGraph - Bidirectional import relationship tracker
+ * @property {Map} esbuildContext - Persistent build contexts for incremental builds
+ *
+ * @example
+ * const manager = new BuildManager('src', 'dist', 86400000);
+ * await manager.initialize();
+ * const builtFiles = await manager.buildFiles();
+ * await manager.dispose();
+ */
 class BuildManager {
     private cache: BuildCache = {};
     private dependencyGraph = new DependencyGraph();
     private esbuildContext: Map<string, esbuild.BuildContext> = new Map();
 
+    /**
+     * Creates a new build manager instance.
+     *
+     * @param inputDir - Source directory containing TypeScript files
+     * @param outputDir - Output directory for compiled JavaScript
+     * @param cacheTime - Time in milliseconds before cache entries go stale (default: 24hr)
+     */
     constructor(
         private inputDir: string,
         private outputDir: string,
         private cacheTime: number
     ) {}
 
+    /**
+     * Initializes the build manager by loading cache and rebuilding dependency graph.
+     * Must be called before buildFiles() on a fresh instance.
+     *
+     * Reconstruction process:
+     * 1. Loads persisted cache from build-cache.json
+     * 2. Rebuilds dependency graph from cached dependency arrays
+     * 3. Validates all cached file paths still exist
+     *
+     * @returns Promise that resolves when initialization is complete
+     */
     async initialize(): Promise<void> {
         this.cache = await loadCache(debug);
         
@@ -126,6 +234,20 @@ class BuildManager {
         }
     }
 
+    /**
+     * Determines if a file needs to be rebuilt.
+     *
+     * Checks four conditions (in order):
+     * 1. Output file existence - rebuild if dist file missing
+     * 2. MD5 hash match - rebuild if source content changed
+     * 3. Cache staleness - rebuild after 24hr window
+     * 4. Dependency changes - rebuild if any imported files changed
+     *
+     * @param filePath - Absolute path to source TypeScript file
+     * @returns true if rebuild required, false if cached output is valid
+     *
+     * @private
+     */
     private needsRebuild(filePath: string): boolean {
         const outputPath = getOutputPath(filePath, this.inputDir, this.outputDir);
 
@@ -199,6 +321,30 @@ class BuildManager {
         };
     }
 
+    /**
+     * Compiles a single TypeScript file to JavaScript.
+     *
+     * Build process:
+     * 1. Check for existing esbuild context (incremental build)
+     * 2. If no context, create new context with IIFE bundling
+     * 3. Extract dependencies from metafile
+     * 4. Process output: strip CommonJS, ensure "return msg;" footer
+     * 5. Skip utility modules (no executable code)
+     * 6. Update cache with MD5 hash and dependencies
+     *
+     * Output format:
+     * - IIFE bundle with all dependencies inlined
+     * - CommonJS artifacts removed (module.exports, Object.defineProperty)
+     * - "return msg;" appended for Node-RED compatibility
+     * - Utility modules (only exports) are skipped (no output file)
+     *
+     * @param inputFile - Absolute path to TypeScript source file
+     * @returns Output file path on success, null on error or if skipped
+     *
+     * @example
+     * await buildManager.buildFile('src/presence/presence.ts');
+     * // Compiles to dist/presence/presence.js with dependencies bundled
+     */
     async buildFile(inputFile: string): Promise<string | null> {
         const startTime = Date.now();
         const relativePath = getRelativePath(inputFile, this.inputDir);
@@ -559,6 +705,33 @@ class BuildManager {
         }
     }
 
+    /**
+     * Processes esbuild output for Node-RED compatibility.
+     *
+     * Cleanup operations:
+     * 1. Strip IIFE wrapper: var nodeRedFunction = (() => {...})();
+     * 2. Remove CommonJS artifacts: module.exports, exports.*, __defProp, __toCommonJS
+     * 3. Remove Object.defineProperty calls for exports
+     * 4. Remove 'use strict' declarations
+     * 5. Trim empty lines
+     * 6. Detect utility modules (only exports, no executable code)
+     * 7. Ensure "return msg;" footer
+     *
+     * Utility module detection:
+     * - Files with <10 characters after cleanup are considered utility modules
+     * - Returns null to signal these should be skipped (no output file)
+     * - Prevents deploying shared utilities as Node-RED functions
+     *
+     * @param code - Raw esbuild output with IIFE wrapper
+     * @returns Cleaned code ready for Node-RED, or null if utility module
+     *
+     * @private
+     *
+     * @example
+     * const raw = "var nodeRedFunction = (() => { console.log('test'); return msg; })();";
+     * const processed = await processNodeRedOutput(raw);
+     * // Returns: "console.log('test');\n\nreturn msg;"
+     */
     private async processNodeRedOutput(code: string): Promise<string | null> {
         // First, check if we have an IIFE wrapped output
         const iifeMatch = code.match(/^var\s+\w+\s*=\s*\(\(\)\s*=>\s*{([\s\S]*)}\)\(\);?\s*$/m);
@@ -606,7 +779,25 @@ class BuildManager {
     }
 }
 
-// Deploy built files to Node-RED
+/**
+ * Deploys built files to Node-RED if requested via CLI flags.
+ *
+ * Deployment logic:
+ * - Skipped if: no --deploy flag, watch mode active, no files built
+ * - Uses Deployer class to update Node-RED function nodes
+ * - Supports --dry-run mode for previewing changes
+ * - Creates automatic backups before deployment (unless DEPLOY_BACKUP=false)
+ *
+ * Only deploys files that were actually built in this run (not cached files).
+ * Matches TypeScript files to Node-RED function nodes via node-mappings.json.
+ *
+ * @param builtFiles - Map of relative paths to output files that were compiled
+ *
+ * @example
+ * const builtFiles = new Map([['presence/presence.ts', 'dist/presence/presence.js']]);
+ * await deployIfRequested(builtFiles);
+ * // Deploys presence.ts to its mapped Node-RED function node
+ */
 async function deployIfRequested(builtFiles: Map<string, string>): Promise<void> {
     if (!(deploy || dryRun) || watch) return;
 
@@ -648,7 +839,41 @@ async function deployIfRequested(builtFiles: Map<string, string>): Promise<void>
     }
 }
 
-// Main function
+/**
+ * Main entry point for the build system.
+ *
+ * Execution flow:
+ * 1. Print banner with system name and description
+ * 2. --map mode: Generate function mappings and exit
+ * 3. Normal mode: Build files with BuildManager
+ * 4. Deploy if --deploy flag specified
+ * 5. --watch mode: Start file watcher, else cleanup and exit
+ *
+ * Modes:
+ * - Standard build: Compile changed files and their dependents
+ * - Watch mode (-w): Continuous monitoring with auto-rebuild
+ * - Mapping mode (--map): Generate node-mappings.json (optionally with --ai)
+ * - Deploy mode (--deploy): Build + hot reload to Node-RED
+ * - Dry-run mode (--dry-run): Preview deployment without changes
+ *
+ * Error handling:
+ * - Catches all errors and displays styled error messages
+ * - Shows stack traces in debug mode
+ * - Exits with code 1 on fatal errors
+ *
+ * @example
+ * // Standard build:
+ * // tsx build/index.ts
+ *
+ * // Watch mode:
+ * // tsx build/index.ts --watch
+ *
+ * // Build and deploy:
+ * // tsx build/index.ts --deploy
+ *
+ * // Generate mappings with AI:
+ * // tsx build/index.ts --map --ai
+ */
 async function main(): Promise<void> {
     const startTime = Date.now();
     
