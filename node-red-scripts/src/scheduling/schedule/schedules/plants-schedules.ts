@@ -106,6 +106,21 @@ export const plantSchedules: Schedule[] = [
         type: "continuous" // Enforce state continuously
     },
 
+    // Shelf grow lights - 50% of global window, centered
+    {
+        name: "plants_shelf",
+        entities: [
+            "light.pikachu_grow_light",
+            "switch.pikachu_grow_light_switch",
+            "switch.grow_light_bookshelf_1_switch"
+        ],
+        start: { entity_id: "input_datetime.plants_global_schedule_start" },
+        end: { entity_id: "input_datetime.plants_global_schedule_end" },
+        precedence: 105, // Above global (100), below bedroom (110)
+        type: "continuous",
+        durationModifier: 0.5
+    },
+
     // Bedroom plants - tied to dynamic wakeup/sleep schedule
     {
         name: "bedroom_plants",

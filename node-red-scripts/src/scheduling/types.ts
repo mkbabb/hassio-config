@@ -31,6 +31,7 @@ export type Schedule = {
     end?: string | { entity_id: string };  // Optional for trigger schedules
     precedence: number;
     type?: "continuous" | "trigger";  // Default to "trigger"
+    durationModifier?: number; // 0-1, shrinks window centered (0.5 = 50% duration)
     conditions?: ScheduleCondition[];
     interpolation?: {
         enabled?: boolean;
@@ -58,6 +59,7 @@ export type NormalizedSchedule = {
     start: Date;
     end: Date;
     type: "continuous" | "trigger";
+    durationModifier?: number;
     precedence: number;
     startTime?: string;
     endTime?: string;

@@ -235,16 +235,28 @@ const normalizedSchedules: NormalizedSchedule[] = schedules
             return null; // Invalid schedule
         }
 
+        // STEP 3c-ii: Apply durationModifier (centered shrink)
+        let adjustedStart = startTime;
+        let adjustedEnd = endTime as Date;
+        if (schedule.durationModifier != null && schedule.durationModifier > 0 && schedule.durationModifier < 1) {
+            const duration = adjustedEnd.getTime() - adjustedStart.getTime();
+            const newDuration = duration * schedule.durationModifier;
+            const offset = (duration - newDuration) / 2;
+            adjustedStart = new Date(adjustedStart.getTime() + offset);
+            adjustedEnd = new Date(adjustedEnd.getTime() - offset);
+        }
+
         // STEP 3d: Build normalized schedule object
         return {
             name,
             entities: entities?.filter((e) => e != null).flatMap(normalizeEntityMatch),
             tags,
-            start: startTime,
-            end: endTime as Date,
-            startTime: dateToTimeString(startTime),
-            endTime: endTime ? dateToTimeString(endTime) : undefined,
+            start: adjustedStart,
+            end: adjustedEnd,
+            startTime: dateToTimeString(adjustedStart),
+            endTime: dateToTimeString(adjustedEnd),
             precedence,
+            durationModifier: schedule.durationModifier,
             conditions,
             interpolation: interpolation || { enabled: true }, // Enable t calculation by default
             defaultStates: schedule.defaultStates,
@@ -477,6 +489,8 @@ flow.set("triggeredSchedules", cleanedTriggeredSchedules);
 msg.payload = groupActions(serviceActions.map(serviceToActionCall));
 // @ts-ignore
 msg.scheduleEvents = allScheduleEvents;
+// @ts-ignore
+msg.entityScheduleMatches = entityScheduleMatches;
 // @ts-ignore
 msg.debug = debugInfo;
 // @ts-ignore
