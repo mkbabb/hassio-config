@@ -1,6 +1,28 @@
 # Configure a default setup of Home Assistant (frontend, api, etc)
 default_config:
 
+# Recorder configuration - extended retention for diagnostics
+recorder:
+  purge_keep_days: 30
+  commit_interval: 1
+  exclude:
+    domains:
+      - automation
+      - updater
+    entity_globs:
+      - sensor.sun_*
+      - sensor.date_*
+
+# Logger configuration - capture more detail
+logger:
+  default: info
+  logs:
+    homeassistant.components.zha: warning
+    homeassistant.components.zwave_js: warning
+    homeassistant.components.lifx: info
+    homeassistant.components.mqtt: warning
+    zigpy: warning
+
 # Entity customizations
 homeassistant:
   customize: !include customize.yaml

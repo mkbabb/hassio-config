@@ -187,10 +187,11 @@
       state: 'off'
     light.guest_bedroom_ceiling_light:
       supported_color_modes:
-      - onoff
+      - brightness
       color_mode:
+      brightness:
       friendly_name: 'Guest Bedroom Ceiling Light '
-      supported_features: 0
+      supported_features: 32
       state: 'off'
     light.entryway_light:
       supported_color_modes:
@@ -214,12 +215,6 @@
       friendly_name: 'Guest Bathroom Light '
       supported_features: 0
       state: 'off'
-    light.guest_bedroom_light_2:
-      supported_color_modes:
-      - onoff
-      friendly_name: Guest Bedroom Light 2
-      supported_features: 0
-      state: unavailable
     light.pineapple_light:
       min_color_temp_kelvin: 1500
       max_color_temp_kelvin: 9000
@@ -281,18 +276,20 @@
       supported_features: 0
       state: 'off'
     lock.back_door:
+      changed_by: Mike Babb
+      battery_level: 94
       friendly_name: Back Door
       supported_features: 0
-      state: unavailable
+      state: unlocked
     lock.front_door:
-      changed_by: Mike Babb
-      battery_level: 86
+      changed_by: Manual Lock
+      battery_level: 92
       friendly_name: Front Door
       supported_features: 0
       state: locked
     lock.garage_entry_door:
       changed_by: Mike Babb
-      battery_level: 19
+      battery_level: 94
       friendly_name: Garage Entry Door
       supported_features: 0
       state: locked
@@ -499,14 +496,6 @@
       friendly_name: Guest Bathroom Peppa Pig Lights
       supported_features: 0
       state: 'on'
-    fan.master_bedroom_ceiling_fan:
-      preset_modes: []
-      percentage: 33
-      percentage_step: 33.333333333333336
-      preset_mode:
-      friendly_name: 'Master Bedroom Ceiling Fan '
-      supported_features: 49
-      state: 'on'
     light.goldfish_light:
       supported_color_modes:
       - onoff
@@ -594,10 +583,9 @@
     light.hey_lamp_2_2:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Hey Lamp 2
       supported_features: 0
-      state: 'off'
+      state: unavailable
     light.bonus_room_light:
       supported_color_modes:
       - onoff
@@ -613,9 +601,9 @@
       percentage: 66
       percentage_step: 33.333333333333336
       preset_mode:
-      screen_status: true
+      active_time:
+      display_status: 'on'
       child_lock: false
-      night_light: 'off'
       mode: manual
       friendly_name: Levoit VeSync EverestAir Smart Air Purifier
       supported_features: 57
@@ -705,6 +693,48 @@
       friendly_name: Hey Lamp 3
       supported_features: 0
       state: 'off'
+    light.pixar_lamp:
+      supported_color_modes:
+      - onoff
+      color_mode:
+      friendly_name: Pixar Lamp
+      supported_features: 0
+      state: 'off'
+    light.seashell_nightlight:
+      supported_color_modes:
+      - onoff
+      color_mode: onoff
+      friendly_name: Seashell Nightlight
+      supported_features: 0
+      state: 'on'
+    light.sunflower_light:
+      supported_color_modes:
+      - onoff
+      color_mode:
+      friendly_name: Sunflower Light
+      supported_features: 0
+      state: 'off'
+    light.back_deck_lights:
+      supported_color_modes:
+      - onoff
+      color_mode:
+      friendly_name: 'Back Deck Lights '
+      supported_features: 0
+      state: 'off'
+    light.paintbucket_light:
+      supported_color_modes:
+      - onoff
+      color_mode:
+      friendly_name: Paintbucket Light
+      supported_features: 0
+      state: 'off'
+    light.paintbucket_light_2:
+      supported_color_modes:
+      - onoff
+      color_mode:
+      friendly_name: Paintbucket Light 2
+      supported_features: 0
+      state: 'off'
   icon: mdi:weather-night
   metadata:
     light.kitchen_pendants:
@@ -736,8 +766,6 @@
     light.office_ceiling_light:
       entity_only: true
     light.guest_bathroom_light:
-      entity_only: true
-    light.guest_bedroom_light_2:
       entity_only: true
     light.pineapple_light:
       entity_only: true
@@ -791,8 +819,6 @@
       entity_only: true
     light.guest_bathroom_peppa_pig_lights:
       entity_only: true
-    fan.master_bedroom_ceiling_fan:
-      entity_only: true
     light.goldfish_light:
       entity_only: true
     light.ophelia_light:
@@ -821,6 +847,18 @@
       entity_only: true
     light.hey_lamp_3:
       entity_only: true
+    light.pixar_lamp:
+      entity_only: true
+    light.seashell_nightlight:
+      entity_only: true
+    light.sunflower_light:
+      entity_only: true
+    light.back_deck_lights:
+      entity_only: true
+    light.paintbucket_light:
+      entity_only: true
+    light.paintbucket_light_2:
+      entity_only: true
 - id: '2000310699005'
   name: Daytime
   entities: {}
@@ -838,14 +876,6 @@
       friendly_name: Master Bedroom Blinds
       supported_features: 15
       state: closed
-    fan.master_bedroom_ceiling_fan:
-      preset_modes: []
-      percentage: 67
-      percentage_step: 33.333333333333336
-      preset_mode:
-      friendly_name: 'Master Bedroom Ceiling Fan '
-      supported_features: 49
-      state: 'on'
     light.master_bedroom_ceiling_fan_light:
       supported_color_modes:
       - onoff
@@ -983,19 +1013,8 @@
       friendly_name: 'Upstairs Hallway Lights '
       supported_features: 0
       state: 'off'
-    fan.guest_bedroom_dyson_fan:
-      preset_modes:
-      oscillating: false
-      percentage: 20
-      percentage_step: 10
-      preset_mode:
-      friendly_name: Guest Bedroom Dyson Fan
-      supported_features: 51
-      state: 'on'
     cover.guest_bedroom_blinds:
       current_position: 0
-      target_lift_position:
-      target_tilt_position:
       device_class: shade
       friendly_name: Guest Bedroom Blinds
       supported_features: 15
@@ -1098,8 +1117,6 @@
   metadata:
     cover.master_bedroom_blinds:
       entity_only: true
-    fan.master_bedroom_ceiling_fan:
-      entity_only: true
     light.master_bedroom_ceiling_fan_light:
       entity_only: true
     light.rose_light:
@@ -1125,8 +1142,6 @@
     light.master_bedroom_tiffany_light_2:
       entity_only: true
     light.upstairs_hallway_lights:
-      entity_only: true
-    fan.guest_bedroom_dyson_fan:
       entity_only: true
     cover.guest_bedroom_blinds:
       entity_only: true
