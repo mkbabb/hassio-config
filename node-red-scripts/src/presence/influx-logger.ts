@@ -25,14 +25,13 @@ if (!debug || !message.presenceState) {
         has_action: 0,
         flow_state: 'unknown',
         action: 'none'
-    }];
-    message.tags = {
+    }, {
         flow: 'presence',
         skip: 'true',
         event_type: 'skip',
         topic: 'unknown',
         current_state: 'unknown'
-    };
+    }];
 } else {
     // Set measurement for InfluxDB
     message.measurement = 'presence_events';
@@ -78,8 +77,6 @@ if (!debug || !message.presenceState) {
         // State flags
         in_cool_down: safeBooleanAsInt(message.inCoolDown),
         has_action: safeBooleanAsInt(message.payload !== null && message.payload !== undefined),
-        is_off_unknown_off: safeBooleanAsInt(debug.isOffUnknownOffSequence),
-        reset_handled: safeBooleanAsInt(debug.resetHandled),
         
         // Enhanced state history
         previous_state: safeString(debug.prevState || flowInfo.prevState || 'unknown'),
@@ -92,31 +89,19 @@ if (!debug || !message.presenceState) {
         // Sensor states as JSON string
         sensor_states: safeString(JSON.stringify(message.presenceStates || {})),
         
-        // Detailed transition history (if available)
-        transition_history: safeString(JSON.stringify(debug.transitionHistory || []).substring(0, 1000)),
-        
         // Action details with length limit
         action: (message.payload !== null && message.payload !== undefined) ?
                 safeString(JSON.stringify(message.payload).substring(0, 1000)) : 'none',
         entities_controlled: message.entities ? 
                            safeString(message.entities.map((e: any) => e.entity_id).join(',')) : '',
         
-        // Debug flags for troubleshooting
-        was_pending_off_treated_as_off: safeBooleanAsInt(debug.wasPendingOffTreatedAsOff),
-        cool_down_cancelled: safeBooleanAsInt(debug.coolDownCancelled),
-        sequence_type: safeString(debug.sequenceType || 'normal'),
-        
         // Trigger information
         trigger_sensor: safeString(message.data?.entity_id || message.topic || 'unknown'),
-        trigger_state: safeString(message.state || 'unknown'),
-        normalized_state: safeString(debug.normalizedState || message.state || 'unknown')
+        trigger_state: safeString(message.state || 'unknown')
     };
 
-    // Sanitize and set payload
-    message.payload = [sanitizeFields(fields)];
-
     // Enhanced tags for filtering and grouping
-    message.tags = {
+    const tags = {
         flow: 'presence',
         topic: safeString(message.topic || message.data?.entity_id || 'unknown'),
         sensor_id: safeString(message.data?.entity_id || 'unknown'),
@@ -125,10 +110,13 @@ if (!debug || !message.presenceState) {
         previous_state: safeString(debug.prevState || 'unknown'),
         has_action: (message.payload !== null && message.payload !== undefined) ? 'true' : 'false',
         event_type: determineEventType(),
-        trigger_type: safeString(message.state === 'reset' ? 'reset' : 
+        trigger_type: safeString(message.state === 'reset' ? 'reset' :
                                 message.state === 'ignored' ? 'debounced' : 'sensor'),
         action_count: safeString(Array.isArray(message.payload) ? message.payload.length.toString() : '0')
     };
+
+    // Sanitize and set payload with tags as second element (influxdb 1.x format)
+    message.payload = [sanitizeFields(fields), tags];
 
     // Helper function to extract room from topic
     function extractRoomFromTopic(topic: string): string {

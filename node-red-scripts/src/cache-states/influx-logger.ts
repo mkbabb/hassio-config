@@ -1,52 +1,53 @@
 /**
  * Cache States InfluxDB Logger
  * Logs home/away transitions and state caching events
+ *
+ * Upstream (cache-house-state.ts) sets:
+ *   msg.entities - entity map
+ *   msg.cachedStates - service call array
+ *   msg.payload - grouped away actions
+ *   msg.state - "home" or "away" (from home-status debouncer, may be undefined)
  */
+
+import { safeNumber, safeString, sanitizeFields } from '../utils/influx-logger-base';
 
 // @ts-ignore - Node-RED global
 const message = msg;
 const debug = message.debug || {};
 
-// Determine event type and counts
-const eventType = message.state || 'unknown';
+const eventType = safeString(message.state || 'unknown');
 const isHome = eventType === 'home';
 const isAway = eventType === 'away';
 
-// Use debug info when available, fallback to computed values
-const entityCount = debug.entityCount || (Array.isArray(message.payload) ? message.payload.length : 0);
-const cacheSize = debug.cacheSize || (message.cachedStates ? message.cachedStates.length : 0);
+// Prefer cachedStates for entity count (payload gets transformed to actions)
+const entityCount = safeNumber(
+    debug.entityCount || (Array.isArray(message.cachedStates) ? message.cachedStates.length : 0)
+);
+const cacheSize = safeNumber(
+    debug.cacheSize || (message.cachedStates ? message.cachedStates.length : 0)
+);
 
-// Set measurement name
 message.measurement = 'cache_events';
 
-// Create payload with comprehensive metrics
-message.payload = [{
-  // Operation details
-  operation: debug.operation || 'unknown',
-  state: eventType,
-  action: message.action || 'none',
-  
-  // Counts
-  entity_count: entityCount,
-  cache_size: cacheSize,
-  
-  // State flags
-  is_home: isHome ? 1 : 0,
-  is_away: isAway ? 1 : 0,
-  
-  // Transition info
-  state_transition: debug.stateTransition || eventType,
-  time_since_transition: debug.timeSinceLastTransition || 0,
-  
-  // Timing
-  execution_time: debug.executionTime || 0,
-  timestamp_ms: Date.now()
-}];
-
-// Add tags for filtering
-message.tags = {
-  flow: 'cache_states',
-  event_type: eventType,
-  operation: debug.operation || 'unknown',
-  trigger: message.trigger || 'manual'
+const fields = {
+    operation: safeString(debug.operation || 'unknown'),
+    state: eventType,
+    action: safeString(message.action || 'none'),
+    entity_count: entityCount,
+    cache_size: cacheSize,
+    is_home: isHome ? 1 : 0,
+    is_away: isAway ? 1 : 0,
+    state_transition: safeString(debug.stateTransition || eventType),
+    time_since_transition: safeNumber(debug.timeSinceLastTransition || 0),
+    execution_time: safeNumber(debug.executionTime || 0),
+    timestamp_ms: safeNumber(Date.now())
 };
+
+const tags = {
+    flow: 'cache_states',
+    event_type: eventType,
+    operation: safeString(debug.operation || 'unknown'),
+    trigger: safeString(message.trigger || 'manual')
+};
+
+message.payload = [sanitizeFields(fields), tags];

@@ -14,8 +14,7 @@ message.measurement = 'garage_door_events';
 
 // Skip if no debug data
 if (!debug || Object.keys(debug).length === 0) {
-    message.payload = [];
-    message.tags = { flow: 'garage_door', skip: 'true' };
+    message.payload = [[], { flow: 'garage_door', skip: 'true' }];
 } else {
     // Helper function to determine event classification
     function determineEventClass(): string {
@@ -103,11 +102,8 @@ if (!debug || Object.keys(debug).length === 0) {
         states_json: safeString(JSON.stringify(debug.states || {}).substring(0, 500))
     };
 
-    // Sanitize and set payload
-    message.payload = [sanitizeFields(fields)];
-
     // Enhanced tags for filtering and grouping
-    message.tags = {
+    const tags = {
         flow: 'garage_door',
         trigger_entity: safeString(message.topic || 'unknown'),
         trigger_type: safeString(
@@ -125,4 +121,7 @@ if (!debug || Object.keys(debug).length === 0) {
         tesla_location: safeString(debug.conditions?.teslaLocation || 'unknown'),
         user_home: debug.conditions?.userHome ? 'true' : 'false'
     };
+
+    // Sanitize and set payload with tags as second element (influxdb 1.x format)
+    message.payload = [sanitizeFields(fields), tags];
 }

@@ -87,9 +87,8 @@ export function formatForInflux(event: LogEvent): any {
   // Set measurement for InfluxDB node
   msg.measurement = event.measurement;
   
-  // Format payload for InfluxDB
-  msg.payload = [event.fields];
-  msg.tags = event.tags;
+  // Format payload for InfluxDB (1.x: [fields, tags])
+  msg.payload = [event.fields, event.tags];
   
   return msg;
 }

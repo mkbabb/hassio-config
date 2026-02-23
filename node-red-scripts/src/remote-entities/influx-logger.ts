@@ -1,57 +1,50 @@
 /**
  * Remote Entities InfluxDB Logger
  * Logs IR/RF device commands and state changes
+ *
+ * Upstream (service-call/index.ts) sets:
+ *   msg.payload = [array of remote service calls]
+ *   msg.entity_state = JSON.stringify(stateObj)  (string, not object)
+ *   msg.entity_state_id = target.entity_state_id (string)
  */
+
+import { safeNumber, safeString, sanitizeFields } from '../utils/influx-logger-base';
 
 // @ts-ignore - Node-RED global
 const message = msg;
-const debug = message.debug || {};
 
-// Extract remote entity info
-const target = message.payload?.target || {};
-const service = message.payload?.service || 'unknown';
-const commands = message.payload?.commands || [];
-const entityState = message.entity_state || {};
+// payload is an array of service calls, not a single object
+const commands: any[] = Array.isArray(message.payload) ? message.payload : [];
 
-// Set measurement
+// entity_state is a JSON string — parse it safely
+const entityState = typeof message.entity_state === 'string'
+    ? (() => { try { return JSON.parse(message.entity_state); } catch { return {}; } })()
+    : (message.entity_state || {});
+
+// Extract target entity from first command
+const firstCmd = commands[0] || {};
+const controllerId = safeString(firstCmd?.target?.entity_id || 'unknown');
+const device = safeString(firstCmd?.data?.device || 'unknown');
+
 message.measurement = 'remote_events';
 
-// Create payload with comprehensive metrics
-message.payload = [{
-  // Entity info
-  entity_id: target.entity_id || 'unknown',
-  service: service,
-  command_count: Array.isArray(commands) ? commands.length : 1,
-  
-  // State tracking
-  state_before: entityState.before || 'unknown',
-  state_after: entityState.after || 'unknown',
-  
-  // Device info
-  controller_id: message.controller_id || 'unknown',
-  device_type: target.entity_id ? target.entity_id.split('.')[0] : 'unknown',
-  
-  // Command details
-  ir_commands: JSON.stringify(commands).substring(0, 500),
-  
-  // Debug metrics from main function
-  command_type: debug.commandType || service,
-  command_count_debug: debug.commandCount || 1,
-  delta_changes_count: Object.keys(debug.deltaChanges || {}).length,
-  repeat_count: debug.repeatCount || 1,
-  controller_used: debug.controllerUsed || 'unknown',
-  
-  // Timing
-  execution_time_ms: message.execution_time || debug.executionTime || 0,
-  timestamp_ms: Date.now()
-}];
-
-// Add tags for filtering
-message.tags = {
-  flow: 'remote_entities',
-  entity_id: target.entity_id || 'unknown',
-  service: service,
-  device_type: target.entity_id ? target.entity_id.split('.')[0] : 'unknown',
-  event_type: 'ir_command',
-  controller: debug.controllerUsed || message.controller_id || 'unknown'
+const fields = {
+    controller_id: controllerId,
+    device: device,
+    command_count: safeNumber(commands.length),
+    commands: safeString(
+        commands.map((c: any) => c.data?.command || 'unknown').join(',')
+    ),
+    entity_state: safeString(JSON.stringify(entityState).substring(0, 500)),
+    entity_state_id: safeString(message.entity_state_id || 'unknown'),
+    timestamp_ms: safeNumber(Date.now())
 };
+
+const tags = {
+    flow: 'remote_entities',
+    device: device,
+    controller: controllerId,
+    event_type: 'ir_command'
+};
+
+message.payload = [sanitizeFields(fields), tags];

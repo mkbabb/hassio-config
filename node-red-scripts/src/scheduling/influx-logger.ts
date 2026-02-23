@@ -1,6 +1,15 @@
 /**
  * Scheduling InfluxDB Logger
  * Logs schedule executions and entity state changes
+ *
+ * Reads from the schedule engine's actual output:
+ *   msg.debug = {
+ *     schedulesFound, entitiesChecked, actionsGenerated, actionsSkipped,
+ *     currentTime, activeSchedules: [{name, type, startTime, endTime}],
+ *     skippedActions: [{entity_id, schedule, reason, action}]
+ *   }
+ *   msg.entityScheduleMatches = [{entity_id, schedule, active, precedence}]
+ *   msg.payload = grouped actions array
  */
 
 import { safeNumber, safeString, safeBooleanAsInt, sanitizeFields } from '../utils/influx-logger-base';
@@ -8,49 +17,67 @@ import { safeNumber, safeString, safeBooleanAsInt, sanitizeFields } from '../uti
 // @ts-ignore - Node-RED global
 const message = msg;
 const debug = message.debug || {};
-
-// Extract schedule and entity info
-const schedule = message.schedule || {};
-const entity = message.entity || {};
-const action = message.payload || {};
+const entityMatches: any[] = message.entityScheduleMatches || [];
+const actions: any[] = Array.isArray(message.payload) ? message.payload : [];
 
 // Set measurement name
 message.measurement = 'schedule_events';
 
-// Create comprehensive metrics with type safety
-const fields = {
-  // Schedule details
-  schedule_name: safeString(debug.scheduleName || schedule.name || 'unknown'),
-  schedule_type: safeString(debug.scheduleType || schedule.type || 'continuous'),
-  precedence: safeNumber(debug.precedence || schedule.precedence || 0),
-  
-  // Entity info
-  entity_id: safeString(entity.entity_id || action.target?.entity_id || 'unknown'),
-  current_state: safeString(entity.state || 'unknown'),
-  target_state: safeString(action.data?.state || 'unknown'),
-  
-  // Schedule metrics (ensure all are numbers)
-  active_schedules: safeNumber(debug.activeSchedules || 0),
-  conflict_resolved: safeBooleanAsInt(debug.conflictResolved),
-  entities_processed: safeNumber(debug.entitiesProcessed || 0),
-  
-  // Interpolation data
-  interpolation_phase: safeString(debug.interpolationPhase || 'none'),
-  t_value: safeNumber(debug.tValue || schedule.t || 0),
-  is_active: safeBooleanAsInt(schedule.isActive),
-  
-  // Timing
-  execution_time: safeNumber(debug.executionTime || 0)
-};
+// Build the active schedules summary string
+const activeSchedules: any[] = Array.isArray(debug.activeSchedules)
+    ? debug.activeSchedules
+    : [];
+const activeScheduleNames = activeSchedules.map((s: any) => s.name).join(',');
 
-// Sanitize and set payload
-message.payload = [sanitizeFields(fields)];
+// Build fields from actual engine output
+const fields = {
+    // Summary metrics
+    schedules_found: safeNumber(debug.schedulesFound || 0),
+    entities_checked: safeNumber(debug.entitiesChecked || 0),
+    actions_generated: safeNumber(debug.actionsGenerated || 0),
+    actions_skipped: safeNumber(debug.actionsSkipped || 0),
+    active_schedule_count: safeNumber(activeSchedules.length),
+    active_schedule_names: safeString(activeScheduleNames || 'none'),
+    current_time: safeString(debug.currentTime || 'unknown'),
+
+    // Per-entity match details (JSON for querying)
+    entity_matches: safeString(
+        entityMatches.length > 0
+            ? JSON.stringify(entityMatches.slice(0, 20))
+            : '[]'
+    ),
+    entity_match_count: safeNumber(entityMatches.length),
+
+    // Action details
+    action_count: safeNumber(actions.length),
+    action_targets: safeString(
+        actions
+            .map((a: any) => {
+                const ids = a.target?.entity_id;
+                return Array.isArray(ids) ? ids.join(',') : (ids || 'unknown');
+            })
+            .join(';')
+        || 'none'
+    ),
+
+    // Skipped actions
+    skipped_actions: safeString(
+        Array.isArray(debug.skippedActions)
+            ? JSON.stringify(debug.skippedActions.slice(0, 10))
+            : 'none'
+    ),
+
+    // Timing
+    timestamp_ms: safeNumber(Date.now())
+};
 
 // Add tags for filtering
-message.tags = {
-  flow: 'scheduling',
-  schedule_name: debug.scheduleName || schedule.name || 'unknown',
-  schedule_type: debug.scheduleType || schedule.type || 'unknown',
-  entity_domain: entity.entity_id ? entity.entity_id.split('.')[0] : 'unknown',
-  event_type: 'schedule_execution'
+const tags = {
+    flow: 'scheduling',
+    active_schedule_count: String(activeSchedules.length),
+    has_actions: actions.length > 0 ? 'true' : 'false',
+    event_type: 'schedule_execution'
 };
+
+// Sanitize and set payload with tags as second element (influxdb 1.x format)
+message.payload = [sanitizeFields(fields), tags];
