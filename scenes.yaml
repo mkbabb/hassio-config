@@ -13,7 +13,6 @@
       supported_color_modes:
       - color_temp
       - hs
-      effect:
       color_mode: color_temp
       brightness: 56
       color_temp_kelvin: 2604
@@ -55,7 +54,6 @@
       supported_color_modes:
       - color_temp
       - hs
-      effect:
       color_mode: color_temp
       brightness: 99
       color_temp_kelvin: 2217
@@ -92,7 +90,6 @@
       supported_color_modes:
       - color_temp
       - hs
-      effect:
       color_mode: color_temp
       brightness: 255
       color_temp_kelvin: 1501
@@ -124,8 +121,6 @@
       effect: 'off'
       color_mode: xy
       brightness: 191
-      color_temp_kelvin:
-      color_temp:
       hs_color:
       - 352.5
       - 47.059
@@ -146,72 +141,60 @@
     light.laundry_room_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: 'Laundry Room Light '
       supported_features: 0
       state: 'off'
     light.master_bedroom_ceiling_fan_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: 'Master Bedroom Ceiling Fan Light '
       supported_features: 0
       state: 'off'
     light.master_bathroom_light_1:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: 'Master Bathroom Light 1 '
       supported_features: 0
       state: 'off'
     light.master_bedroom_closet_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: 'Master Bedroom Closet Light '
       supported_features: 0
       state: 'off'
     light.upstairs_hallway_lights:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: 'Upstairs Hallway Lights '
       supported_features: 0
       state: 'off'
     light.bonus_room_ceiling_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: 'Bonus Room Ceiling Light '
       supported_features: 0
       state: 'off'
     light.guest_bedroom_ceiling_light:
       supported_color_modes:
       - brightness
-      color_mode:
-      brightness:
       friendly_name: 'Guest Bedroom Ceiling Light '
       supported_features: 32
       state: 'off'
     light.entryway_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: 'Entryway Light '
       supported_features: 0
       state: 'off'
     light.office_ceiling_light:
       supported_color_modes:
       - brightness
-      color_mode:
-      brightness:
       friendly_name: 'Office Ceiling Light '
       supported_features: 32
       state: 'off'
     light.guest_bathroom_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: 'Guest Bathroom Light '
       supported_features: 0
       state: 'off'
@@ -227,7 +210,6 @@
       supported_color_modes:
       - color_temp
       - hs
-      effect:
       color_mode: color_temp
       brightness: 99
       color_temp_kelvin: 1501
@@ -271,7 +253,6 @@
     light.downstairs_bathroom_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: 'Downstairs Bathroom Light '
       supported_features: 0
       state: 'off'
@@ -307,7 +288,6 @@
       supported_color_modes:
       - color_temp
       - hs
-      effect:
       color_mode: color_temp
       brightness: 92
       color_temp_kelvin: 1501
@@ -338,13 +318,6 @@
       max_mireds: 500
       supported_color_modes:
       - color_temp
-      color_mode:
-      brightness:
-      color_temp_kelvin:
-      color_temp:
-      hs_color:
-      rgb_color:
-      xy_color:
       friendly_name: Office Monitor Light
       supported_features: 0
       state: 'off'
@@ -360,7 +333,6 @@
       supported_color_modes:
       - color_temp
       - hs
-      effect:
       color_mode: color_temp
       brightness: 110
       color_temp_kelvin: 2087
@@ -381,35 +353,30 @@
     light.penguin_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Penguin Light
       supported_features: 0
       state: 'off'
     light.ratgdov25i_4b1c3b_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Garage Door Light
       supported_features: 8
       state: 'off'
     light.master_bathroom_chili_pepper_lights:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Master Bathroom Chili Pepper Lights
       supported_features: 0
       state: 'off'
     light.master_bathroom_light_2:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: 'Master Bathroom Light 2 '
       supported_features: 0
       state: 'off'
     light.hey_lamp:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Hey Lamp
       supported_features: 0
       state: 'off'
@@ -423,21 +390,18 @@
     light.kaiser_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Kaiser Light
       supported_features: 0
       state: 'off'
     light.titanic_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Titanic Light
       supported_features: 0
       state: 'off'
     light.jenny_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Jenny Light
       supported_features: 0
       state: 'off'
@@ -471,7 +435,6 @@
       supported_color_modes:
       - color_temp
       - hs
-      effect:
       color_mode: color_temp
       brightness: 74
       color_temp_kelvin: 1501
@@ -499,14 +462,12 @@
     light.goldfish_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Goldfish Light
       supported_features: 0
       state: 'off'
     light.ophelia_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Ophelia Light
       supported_features: 0
       state: 'off'
@@ -522,7 +483,6 @@
       supported_color_modes:
       - color_temp
       - hs
-      effect:
       color_mode: color_temp
       brightness: 36
       color_temp_kelvin: 1501
@@ -552,7 +512,6 @@
       supported_color_modes:
       - color_temp
       - hs
-      effect:
       color_mode: color_temp
       brightness: 48
       color_temp_kelvin: 1501
@@ -576,7 +535,6 @@
     light.xbox_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Xbox Light
       supported_features: 0
       state: 'off'
@@ -589,7 +547,6 @@
     light.bonus_room_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Bonus Room Light
       supported_features: 0
       state: 'off'
@@ -600,8 +557,6 @@
       - turbo
       percentage: 66
       percentage_step: 33.333333333333336
-      preset_mode:
-      active_time:
       display_status: 'on'
       child_lock: false
       mode: manual
@@ -611,7 +566,6 @@
     light.flower_lamp:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Flower Lamp
       supported_features: 0
       state: 'off'
@@ -627,7 +581,6 @@
       supported_color_modes:
       - color_temp
       - hs
-      effect:
       color_mode: color_temp
       brightness: 51
       color_temp_kelvin: 1501
@@ -657,7 +610,6 @@
       supported_color_modes:
       - color_temp
       - hs
-      effect:
       color_mode: color_temp
       brightness: 3
       color_temp_kelvin: 1501
@@ -682,21 +634,18 @@
     light.plant_ceiling_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: 'Plant Ceiling Light '
       supported_features: 0
       state: 'off'
     light.hey_lamp_3:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Hey Lamp 3
       supported_features: 0
       state: 'off'
     light.pixar_lamp:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Pixar Lamp
       supported_features: 0
       state: 'off'
@@ -710,28 +659,24 @@
     light.sunflower_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Sunflower Light
       supported_features: 0
       state: 'off'
     light.back_deck_lights:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: 'Back Deck Lights '
       supported_features: 0
       state: 'off'
     light.paintbucket_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Paintbucket Light
       supported_features: 0
       state: 'off'
     light.paintbucket_light_2:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Paintbucket Light 2
       supported_features: 0
       state: 'off'
@@ -861,9 +806,222 @@
       entity_only: true
 - id: '2000310699005'
   name: Daytime
-  entities: {}
   icon: mdi:white-balance-sunny
-  metadata: {}
+  entities:
+    light.master_bedroom_ceiling_fan_light:
+      state: 'on'
+    light.bonus_room_ceiling_light:
+      state: 'off'
+    light.master_bathroom_light_2:
+      state: 'off'
+    light.master_bathroom_light_1:
+      state: 'off'
+    light.dining_room_ceiling_light:
+      brightness: 255
+      state: 'on'
+    light.kitchen_can_lights:
+      brightness: 255
+      state: 'on'
+    light.office_ceiling_light:
+      brightness: 255
+      state: 'on'
+    light.entryway_light:
+      state: 'on'
+    light.downstairs_bathroom_light:
+      state: 'off'
+    light.laundry_room_light:
+      state: 'off'
+    light.master_bedroom_closet_light:
+      state: 'off'
+    light.guest_bathroom_light:
+      state: 'off'
+    light.pineapple_light:
+      color_temp: 333
+      brightness: 255
+      state: 'on'
+    light.bonus_room_light:
+      state: 'off'
+    light.upstairs_hallway_lights:
+      state: 'off'
+    light.master_bedroom_tiffany_light_2:
+      color_temp: 333
+      brightness: 255
+      state: 'on'
+    light.butterfly_light_1:
+      color_temp: 333
+      brightness: 255
+      state: 'on'
+    light.butterfly_light_2:
+      color_temp: 333
+      brightness: 255
+      state: 'on'
+    light.office_monitor_light:
+      color_temp: 333
+      brightness: 255
+      state: 'on'
+    light.penguin_light:
+      state: 'on'
+    light.kaiser_light:
+      state: 'on'
+    light.hey_lamp:
+      state: 'on'
+    light.palette_light:
+      state: 'on'
+    light.titanic_light:
+      state: 'off'
+    light.jenny_light:
+      state: 'on'
+    light.fishing_lamp:
+      state: 'off'
+    light.pencil_light:
+      state: 'on'
+    light.goldfish_light:
+      state: 'on'
+    light.ophelia_light:
+      state: 'on'
+    light.goblet_light:
+      color_temp: 333
+      brightness: 255
+      state: 'on'
+    light.squiggle_lamp:
+      color_temp: 333
+      brightness: 255
+      state: 'on'
+    light.pixar_lamp:
+      state: 'on'
+    light.hey_lamp_3:
+      state: 'on'
+    light.flower_lamp:
+      state: 'off'
+    light.kid_s_theme_desk_light:
+      color_temp: 333
+      brightness: 255
+      state: 'on'
+    light.piano_salt_lamp:
+      state: 'on'
+    light.seashell_nightlight:
+      state: 'on'
+    light.sunflower_light:
+      state: 'on'
+    light.guest_bedroom_ceiling_light:
+      brightness: 255
+      state: 'on'
+    light.paintbucket_light:
+      state: 'on'
+    light.paintbucket_light_2:
+      state: 'on'
+    light.hanging_light:
+      color_temp: 333
+      brightness: 255
+      state: 'on'
+    light.kitchen_pendants:
+      color_temp: 333
+      brightness: 255
+      state: 'on'
+    light.kitchen_cabinet_lights:
+      state: 'on'
+    light.tv_lights:
+      color_temp: 333
+      effect: 'off'
+      brightness: 222
+      state: 'on'
+    light.rose_light:
+      color_temp: 333
+      brightness: 255
+      state: 'on'
+  metadata:
+    light.master_bedroom_ceiling_fan_light:
+      entity_only: true
+    light.bonus_room_ceiling_light:
+      entity_only: true
+    light.master_bathroom_light_2:
+      entity_only: true
+    light.master_bathroom_light_1:
+      entity_only: true
+    light.dining_room_ceiling_light:
+      entity_only: true
+    light.kitchen_can_lights:
+      entity_only: true
+    light.office_ceiling_light:
+      entity_only: true
+    light.entryway_light:
+      entity_only: true
+    light.downstairs_bathroom_light:
+      entity_only: true
+    light.laundry_room_light:
+      entity_only: true
+    light.master_bedroom_closet_light:
+      entity_only: true
+    light.guest_bathroom_light:
+      entity_only: true
+    light.pineapple_light:
+      entity_only: true
+    light.bonus_room_light:
+      entity_only: true
+    light.upstairs_hallway_lights:
+      entity_only: true
+    light.master_bedroom_tiffany_light_2:
+      entity_only: true
+    light.butterfly_light_1:
+      entity_only: true
+    light.butterfly_light_2:
+      entity_only: true
+    light.office_monitor_light:
+      entity_only: true
+    light.penguin_light:
+      entity_only: true
+    light.kaiser_light:
+      entity_only: true
+    light.hey_lamp:
+      entity_only: true
+    light.palette_light:
+      entity_only: true
+    light.titanic_light:
+      entity_only: true
+    light.jenny_light:
+      entity_only: true
+    light.fishing_lamp:
+      entity_only: true
+    light.pencil_light:
+      entity_only: true
+    light.goldfish_light:
+      entity_only: true
+    light.ophelia_light:
+      entity_only: true
+    light.goblet_light:
+      entity_only: true
+    light.squiggle_lamp:
+      entity_only: true
+    light.pixar_lamp:
+      entity_only: true
+    light.hey_lamp_3:
+      entity_only: true
+    light.flower_lamp:
+      entity_only: true
+    light.kid_s_theme_desk_light:
+      entity_only: true
+    light.piano_salt_lamp:
+      entity_only: true
+    light.seashell_nightlight:
+      entity_only: true
+    light.sunflower_light:
+      entity_only: true
+    light.guest_bedroom_ceiling_light:
+      entity_only: true
+    light.paintbucket_light:
+      entity_only: true
+    light.paintbucket_light_2:
+      entity_only: true
+    light.hanging_light:
+      entity_only: true
+    light.kitchen_pendants:
+      entity_only: true
+    light.kitchen_cabinet_lights:
+      entity_only: true
+    light.tv_lights:
+      entity_only: true
+    light.rose_light:
+      entity_only: true
 - id: '1746735498617'
   name: Nap time
   entities:
@@ -879,7 +1037,6 @@
     light.master_bedroom_ceiling_fan_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: 'Master Bedroom Ceiling Fan Light '
       supported_features: 0
       state: 'off'
@@ -895,7 +1052,6 @@
       supported_color_modes:
       - color_temp
       - hs
-      effect:
       color_mode: color_temp
       brightness: 18
       color_temp_kelvin: 3003
@@ -929,7 +1085,6 @@
       supported_color_modes:
       - color_temp
       - hs
-      effect:
       color_mode: color_temp
       brightness: 82
       color_temp_kelvin: 3003
@@ -965,21 +1120,18 @@
     light.master_bathroom_light_1:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: 'Master Bathroom Light 1 '
       supported_features: 0
       state: 'off'
     light.master_bathroom_light_2:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: 'Master Bathroom Light 2 '
       supported_features: 0
       state: 'off'
     light.master_bedroom_closet_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: 'Master Bedroom Closet Light '
       supported_features: 0
       state: 'off'
@@ -995,21 +1147,12 @@
       supported_color_modes:
       - color_temp
       - hs
-      effect:
-      color_mode:
-      brightness:
-      color_temp_kelvin:
-      color_temp:
-      hs_color:
-      rgb_color:
-      xy_color:
       friendly_name: Master Bedroom Tiffany Light
       supported_features: 36
       state: 'off'
     light.upstairs_hallway_lights:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: 'Upstairs Hallway Lights '
       supported_features: 0
       state: 'off'
@@ -1022,14 +1165,12 @@
     light.guest_bedroom_ceiling_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: 'Guest Bedroom Ceiling Light '
       supported_features: 0
       state: 'off'
     light.pixar_lamp:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Pixar Lamp
       supported_features: 0
       state: 'off'
@@ -1045,21 +1186,12 @@
       supported_color_modes:
       - color_temp
       - hs
-      effect:
-      color_mode:
-      brightness:
-      color_temp_kelvin:
-      color_temp:
-      hs_color:
-      rgb_color:
-      xy_color:
       friendly_name: Goblet Light
       supported_features: 36
       state: 'off'
     light.hey_lamp_3:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Hey Lamp 3
       supported_features: 0
       state: 'off'
@@ -1075,14 +1207,6 @@
       supported_color_modes:
       - color_temp
       - hs
-      effect:
-      color_mode:
-      brightness:
-      color_temp_kelvin:
-      color_temp:
-      hs_color:
-      rgb_color:
-      xy_color:
       friendly_name: Squiggle Lamp
       supported_features: 36
       state: 'off'
@@ -1095,14 +1219,12 @@
     light.guest_bathroom_light:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: 'Guest Bathroom Light '
       supported_features: 0
       state: 'off'
     light.flower_lamp:
       supported_color_modes:
       - onoff
-      color_mode:
       friendly_name: Flower Lamp
       supported_features: 0
       state: 'off'
@@ -1169,10 +1291,8 @@
   name: Sleeptime
   entities:
     fan.master_bedroom_ceiling_fan:
-      preset_modes: []
       percentage: 67
       percentage_step: 33.333333333333336
-      preset_mode:
       friendly_name: 'Master Bedroom Ceiling Fan '
       supported_features: 49
       state: 'on'
@@ -1180,7 +1300,6 @@
       preset_modes:
       - auto
       - sleep
-      percentage:
       percentage_step: 25
       preset_mode: sleep
       screen_status: false

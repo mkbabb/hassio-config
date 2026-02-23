@@ -7,12 +7,9 @@ import uuid
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
-from functools import lru_cache
 from pathlib import Path
 from typing import Any, NotRequired, Optional, TypeAlias, TypedDict, TypeVar
 
-import colour
-import numpy as np
 import requests
 import yaml
 from loguru import logger
@@ -54,11 +51,6 @@ T = TypeVar('T')
 
 ENTITY_STATES_URL = "http://homeassistant.local:1880/endpoint/entities/"
 
-# Color constants
-MAX_BRIGHTNESS = 255
-COLOR_CACHE_SIZE = 1024
-KELVIN_CONVERSION_FACTOR = 1000000
-
 # Scene constants
 SCENE_ID_LENGTH = 13
 DEFAULT_SCENE_ICON = 'mdi:palette'
@@ -66,25 +58,6 @@ DATETIME_FORMAT = '%Y-%m-%d %H:%M'
 
 # Scene format constants
 SCENE_REQUIRED_FIELDS = {'id', 'name', 'entities'}
-
-# Entity constants
-ENTITY_ATTRIBUTES = {
-    'supported_features',
-    'supported_color_modes',
-    'friendly_name',
-    'device_class',
-}
-COLOR_FIELDS = {
-    'color_temp',
-    'color_temp_kelvin',
-    'brightness',
-    'hs_color',
-    'rgb_color',
-    'xy_color',
-    'effect',
-}
-# Color mode constants
-COLOR_MODES = {'color_temp', 'hs', 'xy', 'rgb', 'brightness', 'onoff'}
 
 # Domain configuration
 DOMAIN_ICONS = {
@@ -96,139 +69,154 @@ DOMAIN_ICONS = {
     'cover': 'mdi:window-shutter',
 }
 
+# Domain-specific writable attributes (mirrors cache-states/utils.ts filterAttributes)
+# Light color attrs are handled separately by color_mode logic
 DOMAIN_ATTRIBUTES = {
-    'light': {'effect', 'brightness', 'rgb_color'},
-    'fan': {'percentage', 'preset_mode'},
-    'climate': {
-        'min_temp',
-        'max_temp',
-        'target_temp_step',
-        'target_temp_high',
-        'target_temp_low',
-        'preset_mode',
-    },
-    'cover': {'current_position'},
+    'light': {'brightness', 'effect'},  # Color attrs added dynamically by color_mode
+    'fan': {'percentage'},
+    'climate': {'preset_mode', 'temperature', 'hvac_mode'},
+    'cover': set(),     # position handled via service mapping below
     'media_player': {'volume_level', 'is_volume_muted', 'source'},
+    'lock': set(),
+    'switch': set(),
 }
 
-IGNORED_ATTRIBUTES = {
+# Read-only / informational attributes that should NEVER appear in scene output
+IGNORED_SCENE_ATTRIBUTES = {
+    # Capability attributes
+    'min_color_temp_kelvin',
+    'max_color_temp_kelvin',
+    'min_mireds',
+    'max_mireds',
+    'supported_features',
+    'supported_color_modes',
+    'effect_list',
+    'preset_modes',
+    # Informational
     'friendly_name',
     'icon',
-    'entity_id',
+    'device_class',
+    'unit_of_measurement',
+    'entity_id',  # Group member list (added back by grouping logic)
+    # Timestamps
     'last_changed',
     'last_updated',
+    'timeSinceChangedMs',
+    # Context
     'id',
     'parent_id',
     'user_id',
-    'timeSinceChangedMs',
+    # Climate read-only
+    'current_temperature',
+    'current_humidity',
+    'hvac_action',
+    'min_temp',
+    'max_temp',
+    'target_temp_step',
+    'target_temp_high',
+    'target_temp_low',
+    # Cover read-only
+    'current_position',
+    'current_tilt_position',
+    # Fan read-only
+    'percentage_step',
+    # Lock read-only
+    'changed_by',
+    'battery_level',
+    # Air purifier / fan informational
+    'active_time',
+    'display_status',
+    'child_lock',
+    'mode',
+    'screen_status',
+    'night_light',
 }
 
 BLACKLISTED_ENTITIES = [
     # car
     "son_of_toast",
     # grow lights
-    re.compile(r".*grow.*"),
+    re.compile(r".*grow.*", re.IGNORECASE),
+    # blinds
+    re.compile(r".*blinds.*", re.IGNORECASE),
     # air purifiers
-    re.compile(r".*air_purifier.*"),
+    re.compile(r".*air_purifier.*", re.IGNORECASE),
+    # garage door switches
+    re.compile(r"switch\.ratgdov25i_4b1c3b.*", re.IGNORECASE),
+    "lock.ratgdov25i_4b1c3b_lock_remotes",
     # washer/dryer
     "washer_power",
     "dryer_power",
     # water pump
     "switch.plant_water_pump_switch",
-    # ESPresnce:
-    re.compile(r"espresense_.*"),
-    # media players:
+    # ESPresence
+    re.compile(r"espresense_.*", re.IGNORECASE),
+    # media players
     re.compile(r".*media_player\..*"),
-    # sonos beam:
-    re.compile(r".*sonos_beam.*"),
+    # sonos beam
+    re.compile(r".*sonos_beam.*", re.IGNORECASE),
 ]
 
 
 def is_blacklisted(entity_id: str) -> bool:
     for blacklist_item in BLACKLISTED_ENTITIES:
         if isinstance(blacklist_item, str):
-            if entity_id == blacklist_item:
+            if blacklist_item in entity_id:
                 return True
         elif isinstance(blacklist_item, re.Pattern):
-            if blacklist_item.match(entity_id):
+            if blacklist_item.search(entity_id):
                 return True
 
     return False
 
 
-@dataclass(frozen=True)
-class ColorNormalizer:
-    """Immutable color space conversion utilities"""
-
-    @staticmethod
-    @lru_cache(maxsize=COLOR_CACHE_SIZE)
-    def xy_to_rgb(
-        xy: tuple[float, float], brightness: int = MAX_BRIGHTNESS
-    ) -> list[int]:
-        Y = brightness / MAX_BRIGHTNESS
-        XYZ = colour.xy_to_XYZ([xy[0], xy[1], Y])
-        RGB = colour.XYZ_to_sRGB(XYZ)
-
-        return np.clip(RGB * MAX_BRIGHTNESS, 0, MAX_BRIGHTNESS).astype(int).tolist()  # type: ignore
-
-    @staticmethod
-    @lru_cache(maxsize=COLOR_CACHE_SIZE)
-    def hs_to_rgb(
-        hs: tuple[float, float], brightness: int = MAX_BRIGHTNESS
-    ) -> list[int]:
-        HSV = np.array([hs[0], hs[1] / 100, brightness / MAX_BRIGHTNESS])
-        RGB = colour.HSV_to_RGB(HSV)
-
-        return np.clip(RGB * MAX_BRIGHTNESS, 0, MAX_BRIGHTNESS).astype(int).tolist()  # type: ignore
-
-    @staticmethod
-    @lru_cache(maxsize=COLOR_CACHE_SIZE)
-    def color_temp_to_rgb(temp_kelvin: int) -> list[int]:
-        sd = colour.sd_blackbody(temp_kelvin)
-        XYZ = colour.sd_to_XYZ(sd)
-        RGB = colour.XYZ_to_sRGB(XYZ)
-
-        return np.clip(RGB * MAX_BRIGHTNESS, 0, MAX_BRIGHTNESS).astype(int).tolist()  # type: ignore
-
-
-def normalize_colors(attributes: dict[str, Any]) -> dict[str, Any]:
-    """Pure function for color normalization"""
-    if 'supported_color_modes' not in attributes:
-        return attributes
-
-    normalized = attributes.copy()
-    brightness = attributes.get('brightness', MAX_BRIGHTNESS)
-
-    color_conversions = [
-        ('xy_color', lambda xy: ColorNormalizer.xy_to_rgb(tuple(xy), brightness)),
-        ('hs_color', lambda hs: ColorNormalizer.hs_to_rgb(tuple(hs), brightness)),
-        ('color_temp_kelvin', ColorNormalizer.color_temp_to_rgb),
-        (
-            'color_temp',
-            lambda t: ColorNormalizer.color_temp_to_rgb(KELVIN_CONVERSION_FACTOR // t),
-        ),
-    ]
-
-    for attr, converter in color_conversions:
-        if attr in attributes:
-            normalized['rgb_color'] = converter(attributes[attr])  # type: ignore
-            return normalized
-
-    return normalized
-
-
 def normalize_entity(entity: EntityState) -> NormalizedEntity:
-    """Pure function for entity normalization"""
+    """Normalize entity attributes based on domain, mirroring cache-states/utils.ts filterAttributes()"""
     domain = entity['entity_id'].split('.')[0]
     attributes = entity['attributes'].copy()
+    state = entity['state']
+    normalized_attributes: dict[str, Any] = {}
 
     if domain == 'light':
-        attributes = normalize_colors(attributes)
+        if state == 'on':
+            # Use color_mode to determine which color representation to save
+            # Mirrors TypeScript: filterAttributes() lines 38-52
+            color_mode = attributes.get('color_mode')
 
-    relevant_attrs = DOMAIN_ATTRIBUTES.get(domain, set())
-    normalized_attributes = {
-        k: v for k, v in attributes.items() if k in relevant_attrs and v is not None
-    }
+            if color_mode and color_mode in attributes and attributes[color_mode] is not None:
+                # Save the direct attribute (e.g., color_temp value)
+                normalized_attributes[color_mode] = attributes[color_mode]
+
+            # Many color modes use {mode}_color format (e.g., hs -> hs_color, rgb -> rgb_color)
+            if color_mode:
+                color_mode_color = f"{color_mode}_color"
+                if color_mode_color in attributes and attributes[color_mode_color] is not None:
+                    normalized_attributes[color_mode_color] = attributes[color_mode_color]
+
+            # Save standard attributes (brightness, effect) independent of color mode
+            for attr in DOMAIN_ATTRIBUTES.get('light', set()):
+                if attr in attributes and attributes[attr] is not None:
+                    normalized_attributes[attr] = attributes[attr]
+        # If light is off: no attributes needed (just state)
+
+    elif domain == 'cover':
+        # Map current_position -> position (writable param) only when partially open
+        current_position = attributes.get('current_position')
+        if current_position is not None and 0 < current_position < 100:
+            normalized_attributes['position'] = current_position
+
+    elif domain == 'fan':
+        if state == 'on':
+            for attr in DOMAIN_ATTRIBUTES.get('fan', set()):
+                if attr in attributes and attributes[attr] is not None:
+                    normalized_attributes[attr] = attributes[attr]
+
+    else:
+        # For other domains: use DOMAIN_ATTRIBUTES allowlist
+        relevant_attrs = DOMAIN_ATTRIBUTES.get(domain, set())
+        for attr in relevant_attrs:
+            if attr in attributes and attributes[attr] is not None:
+                normalized_attributes[attr] = attributes[attr]
 
     return {
         'entity_id': entity['entity_id'],
@@ -261,11 +249,10 @@ def process_entity_group(
     base_entity = entities[0]
     base_path = base_entity['entity_id'].split('.')
 
-    # filter out ignored attributes from the base entity's original attributes
     attributes = {
         k: v
         for k, v in base_entity['normalized_attributes'].items()
-        if k not in IGNORED_ATTRIBUTES
+        if k not in IGNORED_SCENE_ATTRIBUTES
     }
 
     if len(base_path) < 2:
@@ -319,7 +306,11 @@ def group_entities(
 
         if len(group) == 1:
             entity = group[0]
-            config = entity['normalized_attributes'].copy()
+            config = {
+                k: v
+                for k, v in entity['normalized_attributes'].items()
+                if k not in IGNORED_SCENE_ATTRIBUTES
+            }
             config['state'] = entity['state']
 
             result[entity['entity_id']] = config
@@ -341,8 +332,6 @@ def clean_dict(d: Any) -> Any:
         }
     if isinstance(d, list):
         return [clean_dict(x) for x in d if x is not None]
-    if isinstance(d, np.ndarray):
-        return clean_dict(d.tolist())
 
     return d
 
@@ -489,10 +478,16 @@ def process_scene(
             processed = group_entities(list(normalized))
         else:
             # Simple entity processing without optimization
-            processed = {
-                state['entity_id']: {**state['attributes'], 'state': state['state']}
-                for state in entity_states
-            }
+            processed = {}
+            for state in entity_states:
+                normalized = normalize_entity(state)
+                config = {
+                    k: v
+                    for k, v in normalized['normalized_attributes'].items()
+                    if k not in IGNORED_SCENE_ATTRIBUTES
+                }
+                config['state'] = normalized['state']
+                processed[state['entity_id']] = config
 
         # Create new scene
         return create_scene_config(entities=processed, id=id, name=name, icon=icon)

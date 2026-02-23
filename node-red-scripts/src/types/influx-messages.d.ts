@@ -161,6 +161,17 @@ interface InfluxPayload {
   tags: Record<string, string>;
 }
 
+interface RollbackDebugInfo extends BaseDebugInfo {
+  operation: 'push' | 'pop';
+  entityCount: number;
+  sceneIds: string;
+  ageMs?: number;
+}
+
+interface RollbackMessage extends BaseMessage {
+  debug?: RollbackDebugInfo;
+}
+
 // Export all types
 export {
   BaseMessage,
@@ -177,5 +188,7 @@ export {
   PlantDebugInfo,
   RemoteMessage,
   RemoteDebugInfo,
+  RollbackMessage,
+  RollbackDebugInfo,
   InfluxPayload
 };

@@ -16,3 +16,6 @@ plants_trigger_on:
 plants_trigger_off:
     name: "Trigger Plants Off"
     icon: mdi:leaf-off
+scene_rollback:
+    name: "Scene Rollback"
+    icon: mdi:undo-variant
