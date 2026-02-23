@@ -46,7 +46,7 @@ class PresenceTestRunner {
         return response.json();
     }
 
-    private async getState(entityId: string) {
+    private async getState(entityId: string): Promise<Hass.State> {
         const response = await fetch(`${HA_URL}/api/states/${entityId}`, {
             headers: {
                 'Authorization': `Bearer ${HA_TOKEN}`,
@@ -58,7 +58,7 @@ class PresenceTestRunner {
             throw new Error(`Get state failed: ${response.statusText}`);
         }
 
-        return response.json();
+        return response.json() as Promise<Hass.State>;
     }
 
     private async setTestState(entityId: string, state: string, attributes: any = {}) {
