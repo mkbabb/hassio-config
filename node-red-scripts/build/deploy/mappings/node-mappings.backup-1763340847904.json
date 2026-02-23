@@ -1,0 +1,397 @@
+{
+  "generated": "2025-10-22T20:31:07.752Z",
+  "stats": {
+    "total": 35,
+    "exact": 23,
+    "high": 0,
+    "orphaned": 0,
+    "unmapped": 1,
+    "ai-reconciled": 11
+  },
+  "mappings": {
+    "src/cache-states/influx-logger.ts": [
+      {
+        "nodeId": "9705ba2ad2458e85",
+        "nodeName": "Log Cache Write",
+        "flowId": "dc6c7d82059d5798",
+        "flowName": "Cache House States Away"
+      },
+      {
+        "nodeId": "497c9a0d17161edf",
+        "nodeName": "Log Cache Read",
+        "flowId": "dc6c7d82059d5798",
+        "flowName": "Cache House States Away"
+      }
+    ],
+    "src/get-domain-entities/filter-hidden-and-domains.ts": [
+      {
+        "nodeId": "420bdf56a9545130",
+        "nodeName": "filter hidden and domains",
+        "flowId": "e920ad5e223ac1b7",
+        "flowName": "Get Domain Entities"
+      }
+    ],
+    "src/get-domain-entities/reconcile.ts": [
+      {
+        "nodeId": "f3f79edb0a0bc587",
+        "nodeName": "reconcile",
+        "flowId": "e920ad5e223ac1b7",
+        "flowName": "Get Domain Entities"
+      }
+    ],
+    "src/get-domain-entities/filter-entites.ts": [
+      {
+        "nodeId": "fe549fb394a9227a",
+        "nodeName": "filter entites",
+        "flowId": "e920ad5e223ac1b7",
+        "flowName": "Get Domain Entities"
+      }
+    ],
+    "src/presence/get-flow-info.ts": [
+      {
+        "nodeId": "f59de909516cb178",
+        "nodeName": "get flow info",
+        "flowId": "173c5faccfb73051",
+        "flowName": "Presence Subflow"
+      }
+    ],
+    "src/presence/influx-logger.ts": [
+      {
+        "nodeId": "influx_formatter_presence",
+        "nodeName": "Format for InfluxDB",
+        "flowId": "173c5faccfb73051",
+        "flowName": "Presence Subflow"
+      }
+    ],
+    "src/cache-states/push-cache-states.ts": [
+      {
+        "nodeId": "3f3963cff3716131",
+        "nodeName": "push cache states",
+        "flowId": "4f871e90.29a61",
+        "flowName": "Cache Home 🏡"
+      },
+      {
+        "nodeId": "715a229a5e312dca",
+        "nodeName": "push cache states",
+        "flowId": "4f871e90.29a61",
+        "flowName": "Cache Home 🏡"
+      }
+    ],
+    "src/cache-states/home-status.ts": [
+      {
+        "nodeId": "20d9cf93f238d30f",
+        "nodeName": "home status",
+        "flowId": "4f871e90.29a61",
+        "flowName": "Cache Home 🏡"
+      }
+    ],
+    "src/scheduling/schedule/index.ts": [
+      {
+        "nodeId": "test_scheduler_1753565985859_test_scheduler",
+        "nodeName": "schedule",
+        "flowId": "test_scheduler_1753565985859",
+        "flowName": "Scheduler ⏳"
+      }
+    ],
+    "src/scheduling/simulate-sun.ts": [
+      {
+        "nodeId": "e019cd996a487214",
+        "nodeName": "simulate sun",
+        "flowId": "test_scheduler_1753565985859",
+        "flowName": "Scheduler ⏳"
+      }
+    ],
+    "src/scheduling/influx-logger.ts": [
+      {
+        "nodeId": "32caee359282b155",
+        "nodeName": "Log Schedule",
+        "flowId": "test_scheduler_1753565985859",
+        "flowName": "Scheduler ⏳"
+      }
+    ],
+    "src/scheduling/pop-schedule-entites.ts": [
+      {
+        "nodeId": "6bc7f26c9c624e6c",
+        "nodeName": "pop schedule entites",
+        "flowId": "a807a4834abd67fa",
+        "flowName": "Day 🌞/Night 🌚"
+      }
+    ],
+    "src/time-of-use.ts": [
+      {
+        "nodeId": "8f4c1ad0cad49211",
+        "nodeName": "time of use",
+        "flowId": "88965fe6e95d05d9",
+        "flowName": "Thermostat Time of Use"
+      }
+    ],
+    "src/plants/set-static-state.ts": [
+      {
+        "nodeId": "04f8709ebd6588c0",
+        "nodeName": "set static state",
+        "flowId": "e921812388e8a474",
+        "flowName": "Plants 🌱"
+      }
+    ],
+    "src/plants/influx-logger.ts": [
+      {
+        "nodeId": "5d0f56f93fb70c2b",
+        "nodeName": "Log Plant State",
+        "flowId": "e921812388e8a474",
+        "flowName": "Plants 🌱"
+      }
+    ],
+    "src/batteries/battery.ts": [
+      {
+        "nodeId": "9b723d99a73d643f",
+        "nodeName": "battery",
+        "flowId": "e05fae85092ccf96",
+        "flowName": "Batteries 🔋"
+      }
+    ],
+    "src/batteries/influx-logger.ts": [
+      {
+        "nodeId": "cf026368e7c44f35",
+        "nodeName": "Log Battery Check",
+        "flowId": "e05fae85092ccf96",
+        "flowName": "Batteries 🔋"
+      }
+    ],
+    "src/remote-entities/get-entity-attributes-id.ts": [
+      {
+        "nodeId": "e2cb1e6a7e2044f7",
+        "nodeName": "get entity attributes id",
+        "flowId": "6337f535d7b8e1f2",
+        "flowName": "Remote Entities 🪤"
+      }
+    ],
+    "src/remote-entities/influx-logger.ts": [
+      {
+        "nodeId": "88f76b6cac37a29a",
+        "nodeName": "Log IR Command",
+        "flowId": "6337f535d7b8e1f2",
+        "flowName": "Remote Entities 🪤"
+      }
+    ],
+    "src/garage-door/controller.ts": [
+      {
+        "nodeId": "garage_controller",
+        "nodeName": "Smart Garage Controller",
+        "flowId": "garage_door_flow_tab",
+        "flowName": "Garage 🚗"
+      }
+    ],
+    "src/garage-door/influx-logger.ts": [
+      {
+        "nodeId": "influx_logger",
+        "nodeName": "Log to InfluxDB",
+        "flowId": "garage_door_flow_tab",
+        "flowName": "Garage 🚗"
+      }
+    ],
+    "src/cache-states/states-to-actions.ts": [
+      {
+        "nodeId": "5cd5c7a97cbfb2a5",
+        "nodeName": "states to actions",
+        "flowId": "dc6c7d82059d5798",
+        "flowName": "Cache House States Away",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 100
+      },
+      {
+        "nodeId": "5cd5c7a97cbfb2a5",
+        "nodeName": "states to actions",
+        "flowId": "dc6c7d82059d5798",
+        "flowName": "Cache House States Away",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 100
+      }
+    ],
+    "src/cache-states/cache-house-state.ts": [
+      {
+        "nodeId": "fd875b9553cf1720",
+        "nodeName": "cache house state",
+        "flowId": "dc6c7d82059d5798",
+        "flowName": "Cache House States Away",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 99
+      },
+      {
+        "nodeId": "fd875b9553cf1720",
+        "nodeName": "cache house state",
+        "flowId": "dc6c7d82059d5798",
+        "flowName": "Cache House States Away",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 99
+      }
+    ],
+    "src/presence/presence.ts": [
+      {
+        "nodeId": "f633b8e8b3205bc1",
+        "nodeName": "presence",
+        "flowId": "173c5faccfb73051",
+        "flowName": "Presence Subflow",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 98
+      },
+      {
+        "nodeId": "f633b8e8b3205bc1",
+        "nodeName": "presence",
+        "flowId": "173c5faccfb73051",
+        "flowName": "Presence Subflow",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 98
+      }
+    ],
+    "src/cache-states/filter-blacklisted-entities.ts": [
+      {
+        "nodeId": "627b25edecfe582e",
+        "nodeName": "filter blacklisted entities",
+        "flowId": "b0e3e1c3c40d9540",
+        "flowName": "Get Area Entities",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 99
+      },
+      {
+        "nodeId": "08f84c6d37343c7a",
+        "nodeName": "filter blacklisted entities",
+        "flowId": "4f871e90.29a61",
+        "flowName": "Cache Home 🏡",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 99
+      },
+      {
+        "nodeId": "3cbb13d1da946813",
+        "nodeName": "filter blacklisted entities",
+        "flowId": "e921812388e8a474",
+        "flowName": "Plants 🌱",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 99
+      },
+      {
+        "nodeId": "627b25edecfe582e",
+        "nodeName": "filter blacklisted entities",
+        "flowId": "b0e3e1c3c40d9540",
+        "flowName": "Get Area Entities",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 99
+      },
+      {
+        "nodeId": "08f84c6d37343c7a",
+        "nodeName": "filter blacklisted entities",
+        "flowId": "4f871e90.29a61",
+        "flowName": "Cache Home 🏡",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 99
+      },
+      {
+        "nodeId": "3cbb13d1da946813",
+        "nodeName": "filter blacklisted entities",
+        "flowId": "e921812388e8a474",
+        "flowName": "Plants 🌱",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 99
+      }
+    ],
+    "src/scheduling/schedule/schedules/index.ts": [
+      {
+        "nodeId": "test_scheduler_1753565985859_schedules",
+        "nodeName": "schedules",
+        "flowId": "test_scheduler_1753565985859",
+        "flowName": "Scheduler ⏳",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 98
+      },
+      {
+        "nodeId": "test_scheduler_1753565985859_schedules",
+        "nodeName": "schedules",
+        "flowId": "test_scheduler_1753565985859",
+        "flowName": "Scheduler ⏳",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 98
+      }
+    ],
+    "src/cache-states/merge-cached-states.ts": [
+      {
+        "nodeId": "fcef4072b3d808c5",
+        "nodeName": "merge cached states",
+        "flowId": "a807a4834abd67fa",
+        "flowName": "Day 🌞/Night 🌚",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 100
+      },
+      {
+        "nodeId": "fcef4072b3d808c5",
+        "nodeName": "merge cached states",
+        "flowId": "a807a4834abd67fa",
+        "flowName": "Day 🌞/Night 🌚",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 100
+      }
+    ],
+    "src/cache-states/merge-scene-cached-states.ts": [
+      {
+        "nodeId": "57ba98e05115a206",
+        "nodeName": "merge scene cached states",
+        "flowId": "a807a4834abd67fa",
+        "flowName": "Day 🌞/Night 🌚",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 99
+      },
+      {
+        "nodeId": "57ba98e05115a206",
+        "nodeName": "merge scene cached states",
+        "flowId": "a807a4834abd67fa",
+        "flowName": "Day 🌞/Night 🌚",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 99
+      }
+    ],
+    "src/scheduling/cache-schedule-entity.ts": [
+      {
+        "nodeId": "d22ac4c1c222afd5",
+        "nodeName": "cache schedule entity",
+        "flowId": "a807a4834abd67fa",
+        "flowName": "Day 🌞/Night 🌚",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 97
+      },
+      {
+        "nodeId": "d22ac4c1c222afd5",
+        "nodeName": "cache schedule entity",
+        "flowId": "a807a4834abd67fa",
+        "flowName": "Day 🌞/Night 🌚",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 97
+      }
+    ],
+    "src/remote-entities/service-call/fan.ts": [
+      {
+        "nodeId": "ba17a7bee754d74a",
+        "nodeName": "create service call",
+        "flowId": "6337f535d7b8e1f2",
+        "flowName": "Remote Entities 🪤",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 95
+      },
+      {
+        "nodeId": "ba17a7bee754d74a",
+        "nodeName": "create service call",
+        "flowId": "6337f535d7b8e1f2",
+        "flowName": "Remote Entities 🪤",
+        "confidence": "ai-reconciled",
+        "aiConfidence": 95
+      }
+    ]
+  },
+  "orphaned": [],
+  "unmapped": [
+    {
+      "nodeId": "b2b315489cc8d2a7",
+      "nodeName": "guest daytime",
+      "flowId": "a807a4834abd67fa",
+      "flowName": "Day 🌞/Night 🌚",
+      "codePreview": "// src/chronos/guest-daytime.ts\nvar entities = msg.payload;\nvar filteredEntities = entities.filter((entity) => {\n  const floor = entity.floor || [];\n  const areaId = entity.area_id;\n  return floor.inc..."
+    }
+  ]
+}

@@ -1,3 +1,56 @@
+/**
+ * Node-RED Function Mapping System
+ *
+ * Maps Node-RED function nodes to TypeScript source files using hash-based matching
+ * and AI reconciliation. Critical for the deployment system to know which source file
+ * corresponds to which function node.
+ *
+ * Mapping strategies (in order):
+ * 1. **Hash matching**: MD5 hash of normalized code matches dist file
+ *    - Removes comments, whitespace, and "return msg;" footer
+ *    - 100% accuracy when code hasn't changed
+ * 2. **Collision resolution**: Multiple files with same hash (rare)
+ *    - Uses name similarity scoring to pick best match
+ *    - Confidence downgraded to 'high'
+ * 3. **AI reconciliation**: GPT-5 semantic matching for unmapped functions
+ *    - Analyzes function code and available source files
+ *    - Requires 75%+ confidence for acceptance
+ *    - Incremental saving prevents re-processing
+ *
+ * Source comment matching was REMOVED (broken by esbuild bundling):
+ * - esbuild inlines dependencies with "// src/*.ts" comments
+ * - Regex would match FIRST comment = always a utility dependency (wrong!)
+ * - Now relies exclusively on hash matching + AI reconciliation
+ *
+ * Confidence levels:
+ * - 'exact': Single hash match, verified source file exists
+ * - 'high': Hash collision resolved by name similarity
+ * - 'orphaned': Compiled JS exists but source TS missing (manual reconciliation needed)
+ * - 'none': No hash match, needs AI reconciliation
+ *
+ * Output format (node-mappings.json):
+ * ```json
+ * {
+ *   "mappings": {
+ *     "src/presence/presence.ts": [
+ *       { "nodeId": "abc123", "nodeName": "presence", "flowId": "def456", "flowName": "Presence Subflow" }
+ *     ]
+ *   },
+ *   "orphaned": [...],
+ *   "unmapped": [...]
+ * }
+ * ```
+ *
+ * @module build/deploy/mappings/mapper
+ *
+ * @example
+ * // Generate mappings without AI:
+ * await generateMappingFile();
+ *
+ * // Generate with AI reconciliation:
+ * await generateMappingFile({ useAI: true });
+ */
+
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -7,30 +60,63 @@ import { StyleHelper } from '../../style';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+/**
+ * Represents a Node-RED function node from flows.json.
+ */
 interface FunctionNode {
-  id: string;
-  name: string;
-  func: string;
-  z: string;
+  id: string;        // Unique node identifier
+  name: string;      // Display name in Node-RED
+  func: string;      // JavaScript function code
+  z: string;         // Parent flow/subflow ID
 }
 
+/**
+ * Represents a Node-RED flow or subflow container.
+ */
 interface FlowNode {
   id: string;
-  label?: string;  // For regular flows (tabs)
-  name?: string;   // For subflows
-  type: string;
+  label?: string;    // For regular flows (tabs)
+  name?: string;     // For subflows
+  type: string;      // 'tab' or 'subflow'
 }
 
+/**
+ * Mapping between a Node-RED function node and its TypeScript source file.
+ */
 interface Mapping {
-  nodeId: string;
-  nodeName: string;
-  tsFile: string;
-  distFile: string;
-  flowId: string;
-  flowName?: string;
-  confidence: 'exact' | 'high' | 'medium' | 'low' | 'orphaned' | 'none';
+  nodeId: string;          // Node-RED function node ID
+  nodeName: string;        // Node-RED function node name
+  tsFile: string;          // Source TypeScript file path (or 'unmapped'/'orphaned')
+  distFile: string;        // Compiled JavaScript file path
+  flowId: string;          // Parent flow/subflow ID
+  flowName?: string;       // Parent flow/subflow name
+  confidence: 'exact' | 'high' | 'orphaned' | 'none';
 }
 
+/**
+ * Normalizes JavaScript code for hash comparison.
+ *
+ * Normalization steps:
+ * 1. Remove block comments (/* ... *\/)
+ * 2. Remove line comments (// ...)
+ * 3. Collapse all whitespace to single spaces
+ * 4. Remove spaces around punctuation ({}();,)
+ * 5. Remove "return msg;" footer (Node-RED standard)
+ * 6. Convert to lowercase for case-insensitive comparison
+ *
+ * Edge case: If normalization results in empty string, use original code
+ * to prevent hash collisions between different empty/placeholder functions.
+ *
+ * @param code - Raw JavaScript code
+ * @returns Normalized code suitable for hashing
+ *
+ * @example
+ * normalizeCode("  // Comment\n  return msg;  ")
+ * // Returns: ""
+ *
+ * normalizeCode("console.log('test'); return msg;")
+ * // Returns: "console.log('test');"
+ */
 function normalizeCode(code: string): string {
   const normalized = code
     .replace(/\/\*[\s\S]*?\*\//g, '') // Remove block comments
@@ -50,13 +136,94 @@ function normalizeCode(code: string): string {
   return normalized;
 }
 
+/**
+ * Generates MD5 hash of normalized code.
+ * Used for matching Node-RED function code to dist files.
+ *
+ * @param code - Raw JavaScript code
+ * @returns 32-character hexadecimal MD5 hash
+ *
+ * @example
+ * getCodeHash("console.log('test'); return msg;")
+ * // Returns: "a1b2c3d4e5f6..." (32 chars)
+ */
 function getCodeHash(code: string): string {
   return crypto.createHash('md5').update(normalizeCode(code)).digest('hex');
 }
 
+/**
+ * Detects placeholder/utility nodes that should not be mapped.
+ *
+ * Placeholder characteristics:
+ * - Contains "should not be deployed" comment
+ * - Contains "utility module" comment
+ * - Normalized code < 100 characters (minimal/stub code)
+ *
+ * These nodes are typically created as placeholders or represent utility
+ * modules that were mistakenly added as Node-RED functions.
+ *
+ * @param code - Raw function node code
+ * @returns true if node is a placeholder, false otherwise
+ *
+ * @example
+ * isPlaceholderNode("// This file appears to be a utility module\nreturn msg;")
+ * // Returns: true
+ *
+ * isPlaceholderNode("const result = msg.payload.filter(x => x.state === 'on'); return msg;")
+ * // Returns: false
+ */
+function isPlaceholderNode(code: string): boolean {
+  // Check for explicit utility/placeholder comments
+  if (code.includes('should not be deployed') || code.includes('utility module')) {
+    return true;
+  }
+
+  // Check if normalized code is too short (< 100 chars = likely stub/empty)
+  const normalized = normalizeCode(code);
+  if (normalized.length < 100) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Maps Node-RED function nodes to TypeScript source files.
+ *
+ * Process:
+ * 1. Load flows.json and extract function nodes
+ * 2. Build flow name map (tabs and subflows)
+ * 3. Scan dist directory and hash all JS files
+ * 4. For each function node:
+ *    a. Calculate hash of node code
+ *    b. Look for matching dist file hash
+ *    c. If single match: exact mapping (confidence: 'exact')
+ *    d. If multiple matches: resolve by name similarity (confidence: 'high')
+ *    e. If no match: mark unmapped (confidence: 'none')
+ *    f. If dist exists but no source: mark orphaned (confidence: 'orphaned')
+ *
+ * Hash collision resolution:
+ * - Normalizes node name to lowercase kebab-case
+ * - Scores each candidate file by name similarity:
+ *   - 10 points if filename contains node name
+ *   - 5 points if node name contains filename
+ *   - 0 points otherwise
+ * - Selects highest scoring candidate
+ *
+ * @param flowsPath - Path to flows.json (default: env NODE_RED_FLOWS_PATH)
+ * @param distDir - Compiled JavaScript directory (default: build/../../../dist)
+ * @param srcDir - TypeScript source directory (default: build/../../../src)
+ * @returns Array of mappings with confidence levels
+ *
+ * @example
+ * const mappings = await mapFunctions();
+ * mappings.forEach(m => {
+ *   console.log(`${m.nodeName} → ${m.tsFile} (${m.confidence})`);
+ * });
+ */
 export async function mapFunctions(
   flowsPath?: string,
-  distDir?: string, 
+  distDir?: string,
   srcDir?: string
 ): Promise<Mapping[]> {
   // Use defaults if not provided
@@ -130,42 +297,41 @@ export async function mapFunctions(
   
   // Map function nodes to files
   const mappings: Mapping[] = [];
-  
+
   for (const node of functionNodes) {
+    // Skip placeholder/utility nodes - they should not be mapped
+    if (isPlaceholderNode(node.func)) {
+      console.log(StyleHelper.colors.muted(`  Skipping placeholder node: "${node.name}" (${node.id})`));
+      continue;
+    }
+
     const nodeHash = getCodeHash(node.func);
     const distFiles = distHashes.get(nodeHash);
-    
+
     if (distFiles && distFiles.length > 0) {
       // Found potential matches
       let bestMatch: string | null = null;
-      let confidence: 'exact' | 'high' | 'medium' = 'exact';
-      
+      let confidence: 'exact' | 'high' = 'exact';
+
       if (distFiles.length === 1) {
-        // Single match - use it
+        // Single match - exact
         bestMatch = distFiles[0];
       } else {
-        // Multiple matches (hash collision) - try to find best match
+        // Multiple matches (hash collision) - resolve via name similarity
         console.log(StyleHelper.warning(`Hash collision detected for node "${node.name}"`, `${distFiles.length} candidates`));
-        
-        // Try to match by node name similarity
+
         const normalizedNodeName = node.name.replace(/\s+/g, '-').toLowerCase();
         const candidateScores = distFiles.map(file => {
           const fileName = path.basename(file, '.js').toLowerCase();
-          const score = fileName.includes(normalizedNodeName) ? 10 : 
+          const score = fileName.includes(normalizedNodeName) ? 10 :
                        normalizedNodeName.includes(fileName) ? 5 : 0;
           return { file, score };
         });
-        
+
         const bestCandidate = candidateScores.sort((a, b) => b.score - a.score)[0];
-        if (bestCandidate.score > 0) {
-          bestMatch = bestCandidate.file;
-          confidence = 'high'; // Lower confidence due to collision resolution
-        } else {
-          // No good name match - use first file but mark as medium confidence
-          bestMatch = distFiles[0];
-          confidence = 'medium';
-          console.log(StyleHelper.colors.muted(`  No clear best match for "${node.name}", using first candidate: ${bestMatch}`));
-        }
+        bestMatch = bestCandidate.file;
+        confidence = 'high';
+        console.log(StyleHelper.colors.muted(`  Best match for "${node.name}": ${bestMatch}`));
       }
       
       const tsFile = distToSrc.get(bestMatch);
@@ -194,67 +360,16 @@ export async function mapFunctions(
         });
       }
     } else {
-      // Try to find by source file comment
-      const sourceMatch = node.func.match(/\/\/\s*(?:src\/)?(.+\.ts)/);
-      if (sourceMatch) {
-        const tsFile = sourceMatch[1].startsWith('src/') ? sourceMatch[1] : `src/${sourceMatch[1]}`;
-        mappings.push({
-          nodeId: node.id,
-          nodeName: node.name,
-          tsFile,
-          distFile: tsFile.replace(/^src\//, 'dist/').replace(/\.ts$/, '.js'),
-          flowId: node.z,
-          flowName: flowMap.get(node.z),
-          confidence: 'high'
-        });
-      } else {
-        // Try name-based matching by searching all directories
-        const normalizedName = node.name.replace(/\s+/g, '-').toLowerCase();
-        let found = false;
-        
-        // Search for possible TypeScript files
-        function searchForFile(dir: string, baseName: string): string | null {
-          const files = fs.readdirSync(dir);
-          for (const file of files) {
-            const fullPath = path.join(dir, file);
-            const stat = fs.statSync(fullPath);
-            
-            if (stat.isDirectory() && !file.startsWith('.') && file !== 'node_modules') {
-              const result = searchForFile(fullPath, baseName);
-              if (result) return result;
-            } else if (file === `${baseName}.ts` || file === normalizedName + '.ts') {
-              return path.relative(srcDir, fullPath);
-            }
-          }
-          return null;
-        }
-        
-        const foundPath = searchForFile(srcDir, normalizedName);
-        if (foundPath) {
-          mappings.push({
-            nodeId: node.id,
-            nodeName: node.name,
-            tsFile: `src/${foundPath}`,
-            distFile: `dist/${foundPath.replace(/\.ts$/, '.js')}`,
-            flowId: node.z,
-            flowName: flowMap.get(node.z),
-            confidence: 'medium'
-          });
-          found = true;
-        }
-        
-        if (!found) {
-          mappings.push({
-            nodeId: node.id,
-            nodeName: node.name,
-            tsFile: 'unmapped',
-            distFile: 'unmapped',
-            flowId: node.z,
-            flowName: flowMap.get(node.z),
-            confidence: 'none'
-          });
-        }
-      }
+      // No hash match - mark as unmapped for AI reconciliation
+      mappings.push({
+        nodeId: node.id,
+        nodeName: node.name,
+        tsFile: 'unmapped',
+        distFile: 'unmapped',
+        flowId: node.z,
+        flowName: flowMap.get(node.z),
+        confidence: 'none'
+      });
     }
   }
   
@@ -263,8 +378,52 @@ export async function mapFunctions(
 
 import { reconcileUnmappedFunctions, exportReconciliationResults } from '../reconcile';
 
+/**
+ * Generates node-mappings.json file with hash-based and AI reconciliation.
+ *
+ * Output structure:
+ * - mappings: Object mapping source files to arrays of mapped nodes
+ * - orphaned: Nodes with compiled JS but missing source TS
+ * - unmapped: Nodes without matches (pre-AI) or failed AI matches
+ * - stats: Summary counts (total, exact, high, orphaned, unmapped)
+ *
+ * Display sections:
+ * 1. Mapping Summary: Total files, built count, cached count, failed count
+ * 2. Confidence Levels: Exact matches, high confidence, orphaned, unmapped
+ * 3. Shared Functions: Files mapped to multiple nodes (potential reusable functions)
+ * 4. Orphaned Functions: Compiled JS exists but source TS missing
+ * 5. Unmapped Functions: No hash match, suggests running --ai flag
+ * 6. AI Reconciliation: If useAI=true, runs GPT-5 semantic matching
+ *
+ * AI reconciliation:
+ * - Processes unmapped functions in batches (token limit)
+ * - Saves mappings incrementally after each successful match
+ * - Removes matched files from candidate pool
+ * - Exports reconciliation results to reconcile-results.json
+ *
+ * @param options - Configuration options
+ * @param options.useAI - Enable AI reconciliation (default: false)
+ * @param options.flowsPath - Path to flows.json
+ * @param options.distDir - Compiled JavaScript directory
+ * @param options.srcDir - TypeScript source directory
+ *
+ * @example
+ * // Basic mapping (hash-only):
+ * await generateMappingFile();
+ *
+ * // With AI reconciliation:
+ * await generateMappingFile({ useAI: true });
+ *
+ * // Custom paths:
+ * await generateMappingFile({
+ *   flowsPath: '/custom/flows.json',
+ *   distDir: './dist',
+ *   srcDir: './src',
+ *   useAI: true
+ * });
+ */
 export async function generateMappingFile(
-  options: { 
+  options: {
     useAI?: boolean;
     flowsPath?: string;
     distDir?: string;
@@ -287,17 +446,15 @@ export async function generateMappingFile(
   // Group by confidence
   const exact = mappings.filter(m => m.confidence === 'exact');
   const high = mappings.filter(m => m.confidence === 'high');
-  const medium = mappings.filter(m => m.confidence === 'medium');
   const orphaned = mappings.filter(m => m.confidence === 'orphaned');
   const unmapped = mappings.filter(m => m.confidence === 'none');
-  
+
   const config = {
     generated: new Date().toISOString(),
     stats: {
       total: mappings.length,
       exact: exact.length,
       high: high.length,
-      medium: medium.length,
       orphaned: orphaned.length,
       unmapped: unmapped.length
     },
@@ -344,15 +501,14 @@ export async function generateMappingFile(
   console.log(StyleHelper.section("Mapping Summary"));
   console.log(StyleHelper.summary({
     total: mappings.length,
-    built: exact.length + high.length + medium.length,
+    built: exact.length + high.length,
     cached: exact.length,
     failed: orphaned.length + unmapped.length
   }));
-  
+
   console.log(StyleHelper.info("Confidence levels:"));
   console.log(StyleHelper.colors.success(`  ✓ Exact matches: ${exact.length}`));
   console.log(StyleHelper.colors.success(`  ✓ High confidence: ${high.length}`));
-  console.log(StyleHelper.colors.warning(`  ~ Medium confidence: ${medium.length}`));
   if (orphaned.length > 0) {
     console.log(StyleHelper.colors.error(`  ⚠ Orphaned: ${orphaned.length}`));
   }
@@ -448,13 +604,16 @@ export async function generateMappingFile(
     });
     
     const srcDir = options.srcDir || path.join(__dirname, '../../../src');
+    const mappingsFilePath = path.join(mappingsDir, 'node-mappings.json');
+
     const {results, cleanedMappings} = await reconcileUnmappedFunctions(
-      unmappedNodes.filter(n => n.func), // Only process nodes with function code
+      unmappedNodes.filter(n => n.func),
       srcDir,
-      config.mappings
+      config.mappings,
+      mappingsFilePath  // Pass path for incremental saves
     );
 
     // Export results - this will update node-mappings.json and create reconcile-results.json
-    exportReconciliationResults(results, path.join(mappingsDir, 'node-mappings.json'), cleanedMappings);
+    exportReconciliationResults(results, mappingsFilePath, cleanedMappings);
   }
 }

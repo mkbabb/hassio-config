@@ -199,10 +199,9 @@ async function matchFunctionToFiles(
         { role: 'system', content: 'You are an expert at analyzing code and finding matching implementations.' },
         { role: 'user', content: prompt }
       ],
-      temperature: 0.2,
       response_format: { type: 'json_object' }
     });
-    
+
     const result = JSON.parse(response.choices[0].message.content || '{"matches":[]}');
     return result.matches || [];
   } catch (error) {
@@ -262,10 +261,9 @@ async function selectBestMatch(
         { role: 'system', content: 'You are an expert at selecting the best code match. Be very conservative - prefer no match over a wrong match.' },
         { role: 'user', content: prompt }
       ],
-      temperature: 0.1,
       response_format: { type: 'json_object' }
     });
-    
+
     const result = JSON.parse(response.choices[0].message.content || '{}');
     return {
       nodeId: node.id,
@@ -335,7 +333,8 @@ export async function cleanStaleMappings(
 export async function reconcileUnmappedFunctions(
   unmappedNodes: FunctionNode[],
   srcDir: string,
-  existingMappings: Record<string, any[]>
+  existingMappings: Record<string, any[]>,
+  mappingsPath?: string
 ): Promise<{results: ReconciliationResult[], cleanedMappings: Record<string, any[]>}> {
   console.log(StyleHelper.section("AI Function Reconciliation"));
 
@@ -354,20 +353,20 @@ export async function reconcileUnmappedFunctions(
 
   // Get set of already mapped files (using cleaned mappings)
   const mappedFiles = new Set(Object.keys(cleaned));
-  
+
   // Get unmapped TypeScript files
-  const unmappedFiles = await getUnmappedTypeScriptFiles(srcDir, mappedFiles);
+  let unmappedFiles = await getUnmappedTypeScriptFiles(srcDir, mappedFiles);
   console.log(StyleHelper.info(`Found ${unmappedFiles.length} unmapped TypeScript files`));
-  
+
   if (unmappedFiles.length === 0) {
     console.log(StyleHelper.warning("No unmapped TypeScript files to match against"));
-    return [];
+    return {results: [], cleanedMappings: cleaned};
   }
-  
+
   // Create file chunks
-  const fileChunks = createFileChunks(unmappedFiles, MAX_TOKENS_PER_REQUEST);
+  let fileChunks = createFileChunks(unmappedFiles, MAX_TOKENS_PER_REQUEST);
   console.log(StyleHelper.info(`Created ${fileChunks.length} file chunks for analysis`));
-  
+
   const results: ReconciliationResult[] = [];
 
   // Process each unmapped node
@@ -400,20 +399,72 @@ export async function reconcileUnmappedFunctions(
     // Select best match
     const result = await selectBestMatch(node, allMatches);
     results.push(result);
-    
+
     if (result.selectedFile) {
-      const resultContent = [
-        `${StyleHelper.colors.success(StyleHelper.symbols.success)} ${StyleHelper.colors.success('Match found')}`,
-        StyleHelper.keyValue('File', result.selectedFile),
-        StyleHelper.keyValue('Confidence', `${result.confidence}%`, StyleHelper.colors.muted, StyleHelper.colors.success)
-      ];
-      console.log(StyleHelper.panel(resultContent));
+      // Validate file existence - reject matches to non-existent files
+      // Strip "src/" prefix if present, since srcDir already includes it
+      const relativePath = result.selectedFile.replace(/^src\//, '');
+      const fullPath = path.join(srcDir, relativePath);
+
+      if (!fs.existsSync(fullPath)) {
+        console.log(`    ${StyleHelper.colors.error('✗ File does not exist')}: ${result.selectedFile}`);
+        console.log(`    ${StyleHelper.colors.muted(`Full path checked: ${fullPath}`)}`);
+        console.log(`    ${StyleHelper.colors.muted('Rejecting AI match to non-existent file')}`);
+        // Update result to indicate failure
+        const failedFile = result.selectedFile;
+        result.selectedFile = null;
+        result.confidence = 0;
+        result.reasoning = `File does not exist: ${failedFile}`;
+      } else {
+        const resultContent = [
+          `${StyleHelper.colors.success(StyleHelper.symbols.success)} ${StyleHelper.colors.success('Match found')}`,
+          StyleHelper.keyValue('File', result.selectedFile),
+          StyleHelper.keyValue('Confidence', `${result.confidence}%`, StyleHelper.colors.muted, StyleHelper.colors.success)
+        ];
+        console.log(StyleHelper.panel(resultContent));
+      }
+
+      // Save immediately after successful match (only if file exists and confidence is high)
+      if (result.selectedFile && mappingsPath && result.confidence >= CONFIDENCE_THRESHOLD) {
+        if (!cleaned[result.selectedFile]) {
+          cleaned[result.selectedFile] = [];
+        }
+
+        // Check if this nodeId already exists - prevent duplicates
+        const existingIndex = cleaned[result.selectedFile].findIndex(n => n.nodeId === result.nodeId);
+        const newMapping = {
+          nodeId: result.nodeId,
+          nodeName: result.nodeName,
+          flowId: result.flowId,
+          flowName: result.flowName,
+          confidence: 'ai-reconciled' as const,
+          aiConfidence: result.confidence
+        };
+
+        if (existingIndex >= 0) {
+          // Update existing entry (in case confidence changed)
+          cleaned[result.selectedFile][existingIndex] = newMapping;
+        } else {
+          // Add new entry
+          cleaned[result.selectedFile].push(newMapping);
+        }
+
+        // Write immediately
+        const mappingsData = JSON.parse(fs.readFileSync(mappingsPath, 'utf8'));
+        mappingsData.mappings = cleaned;
+        mappingsData.generated = new Date().toISOString();
+        fs.writeFileSync(mappingsPath, JSON.stringify(mappingsData, null, 2));
+
+        // DON'T remove matched file from pool - this breaks shared function mapping!
+        // Multiple nodes can (and should) map to the same source file.
+        // Incremental saving via hash checking already prevents redundant AI calls.
+      }
     } else {
       console.log(`    ${StyleHelper.colors.muted('✗ No suitable match found')}`);
     }
-    
+
     console.log(''); // Add spacing between nodes
-    
+
     // Add small delay to avoid rate limits
     await new Promise(resolve => setTimeout(resolve, 500));
   }
@@ -444,17 +495,26 @@ export function exportReconciliationResults(
       if (!mappingsData.mappings[result.selectedFile]) {
         mappingsData.mappings[result.selectedFile] = [];
       }
-      
-      mappingsData.mappings[result.selectedFile].push({
+
+      // Check if this nodeId already exists - prevent duplicates
+      const existingIndex = mappingsData.mappings[result.selectedFile].findIndex(n => n.nodeId === result.nodeId);
+      const newMapping = {
         nodeId: result.nodeId,
         nodeName: result.nodeName,
         flowId: result.flowId,
         flowName: result.flowName,
-        confidence: 'ai-reconciled',
+        confidence: 'ai-reconciled' as const,
         aiConfidence: result.confidence
-      });
-      
-      newMappings++;
+      };
+
+      if (existingIndex >= 0) {
+        // Update existing entry (in case confidence changed)
+        mappingsData.mappings[result.selectedFile][existingIndex] = newMapping;
+      } else {
+        // Add new entry
+        mappingsData.mappings[result.selectedFile].push(newMapping);
+        newMappings++;
+      }
     }
   }
   
