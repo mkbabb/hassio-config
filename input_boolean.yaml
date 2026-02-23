@@ -10,3 +10,9 @@ schedule_pause:
 presence_pause:
     name: "Presence Pause"
     icon: mdi:account-off
+plants_trigger_on:
+    name: "Trigger Plants On"
+    icon: mdi:leaf
+plants_trigger_off:
+    name: "Trigger Plants Off"
+    icon: mdi:leaf-off
