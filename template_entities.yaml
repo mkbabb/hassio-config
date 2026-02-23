@@ -82,3 +82,103 @@
         18:00:00
       {% endif %}
     icon: mdi:weather-sunset-down
+
+- light:
+    - name: "Office Monitor Light"
+      unique_id: office_monitor_light
+      state: >-
+        {{ (states('input_text.office_monitor_light_state') | from_json).state == 'on' }}
+      level: >-
+        {{ ((states('input_text.office_monitor_light_state') | from_json).brightness | float) * 255.0 }}
+      temperature: >-
+        {{ 154 + (((states('input_text.office_monitor_light_state') | from_json).color_temp | float) * (500 - 154)) }}
+      turn_on:
+        - action: rest_command.remote_light_command
+          data:
+            domain: "light"
+            service: "turn_on"
+            controller_id: "remote.office_rm4_mini"
+            device: "office_monitor_light"
+            entity_id: "light.office_monitor_light"
+            state: "on"
+      turn_off:
+        - action: rest_command.remote_light_command
+          data:
+            domain: "light"
+            service: "turn_off"
+            controller_id: "remote.office_rm4_mini"
+            device: "office_monitor_light"
+            entity_id: "light.office_monitor_light"
+            state: "off"
+      set_level:
+        - action: rest_command.remote_light_command
+          data:
+            domain: "light"
+            service: "turn_on"
+            controller_id: "remote.office_rm4_mini"
+            device: "office_monitor_light"
+            entity_id: "light.office_monitor_light"
+            state: "on"
+            brightness_pct: "{{ ((brightness | float) / 255.0) * 100.0 }}"
+      set_temperature:
+        - action: rest_command.remote_light_command
+          data:
+            domain: "light"
+            service: "turn_on"
+            controller_id: "remote.office_rm4_mini"
+            device: "office_monitor_light"
+            entity_id: "light.office_monitor_light"
+            state: "on"
+            color_temp: "{{ color_temp }}"
+
+- fan:
+    - name: "Guest Bedroom Dyson Fan"
+      unique_id: guest_bedroom_dyson_fan
+      state: >-
+        {{ (states('input_text.guest_bedroom_dyson_fan_state') | from_json).state == 'on' }}
+      percentage: >-
+        {{ (((states('input_text.guest_bedroom_dyson_fan_state') | from_json).speed | float) * 100) | int }}
+      preset_mode: >-
+        {{ (states('input_text.guest_bedroom_dyson_fan_state') | from_json).preset_mode }}
+      oscillating: >-
+        {{ (states('input_text.guest_bedroom_dyson_fan_state') | from_json).oscillating }}
+      speed_count: 10
+      turn_on:
+        - action: rest_command.remote_fan_command
+          data:
+            domain: "fan"
+            service: "turn_on"
+            controller_id: "remote.guest_bedroom_rm4_mini"
+            device: "guest_bedroom_dyson_fan"
+            entity_id: "fan.guest_bedroom_dyson_fan"
+            state: "on"
+            percentage: "100"
+      turn_off:
+        - action: rest_command.remote_fan_command
+          data:
+            domain: "fan"
+            service: "turn_off"
+            controller_id: "remote.guest_bedroom_rm4_mini"
+            device: "guest_bedroom_dyson_fan"
+            entity_id: "fan.guest_bedroom_dyson_fan"
+            state: "off"
+            percentage: "0"
+      set_percentage:
+        - action: rest_command.remote_fan_command
+          data:
+            domain: "fan"
+            service: "turn_on"
+            controller_id: "remote.guest_bedroom_rm4_mini"
+            device: "guest_bedroom_dyson_fan"
+            entity_id: "fan.guest_bedroom_dyson_fan"
+            state: "on"
+            percentage: "{{ percentage }}"
+      set_oscillating:
+        - action: rest_command.remote_fan_command
+          data:
+            domain: "fan"
+            service: "oscillate"
+            controller_id: "remote.guest_bedroom_rm4_mini"
+            device: "guest_bedroom_dyson_fan"
+            entity_id: "fan.guest_bedroom_dyson_fan"
+            oscillating: "{{ oscillating | bool }}"
