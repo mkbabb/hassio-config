@@ -39,6 +39,9 @@ message.entities = entities;
 
 message.cachedStates = cachedStates;
 
+// Set cache status for downstream publish-cache-state.ts
+message.state = "away";
+
 // the next node will execute this payload.
 message.payload = groupActions(awayPayload);
 

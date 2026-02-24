@@ -33,11 +33,13 @@ export type Schedule = {
     type?: "continuous" | "trigger";  // Default to "trigger"
     durationModifier?: number; // 0-1, shrinks window centered (0.5 = 50% duration)
     conditions?: ScheduleCondition[];
+    clearStaticOnTransition?: boolean; // Clear external static states on schedule active→inactive or inactive→active transition
     interpolation?: {
         enabled?: boolean;
         preamble_minutes?: number;
         postamble_minutes?: number;
         events?: boolean;
+        entities?: string[];  // Entity IDs or "regex:..." patterns for interpolation
     };
     // Default states for entities in this schedule (can be overridden per entity)
     defaultStates?: {
@@ -69,6 +71,7 @@ export type NormalizedSchedule = {
         preamble_minutes?: number;
         postamble_minutes?: number;
         events?: boolean;
+        entities?: string[];
     };
     defaultStates?: {
         on?: EntityState;

@@ -45,10 +45,11 @@ if (!name) {
             const now = new Date().toISOString();
 
             if (isStatic) {
-                // Static schedules: only allow enabled, precedence, conditions
+                // Static schedules: only allow enabled, precedence, conditions, clearStaticOnTransition
                 if (body.enabled != null) schedule.enabled = body.enabled;
                 if (body.precedence != null) schedule.precedence = body.precedence;
                 if (body.conditions != null) schedule.conditions = body.conditions;
+                if (body.clearStaticOnTransition != null) schedule.clearStaticOnTransition = body.clearStaticOnTransition;
             } else {
                 // Dynamic schedules: allow all fields
                 if (body.start != null) schedule.start = body.start;
@@ -62,6 +63,7 @@ if (!name) {
                 if (body.interpolation !== undefined) schedule.interpolation = body.interpolation;
                 if (body.defaultStates !== undefined) schedule.defaultStates = body.defaultStates;
                 if (body.enabled != null) schedule.enabled = body.enabled;
+                if (body.clearStaticOnTransition != null) schedule.clearStaticOnTransition = body.clearStaticOnTransition;
                 if (body.helperEntities !== undefined) schedule.helperEntities = body.helperEntities;
             }
 

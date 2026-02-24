@@ -38,7 +38,13 @@ import {
     filterAvailableEntities,
     getEntitiesById
 } from "../../utils/entities";
-import { shouldFilterEntity } from "../../utils/static-states";
+import {
+    shouldFilterEntity,
+    recordExternalModification,
+    clearExternalModificationsForSchedule,
+    pruneExternalModifications,
+    getExternalModificationSummary
+} from "../../utils/static-states";
 import { shouldSkipAction } from "../../utils/validation";
 import { checkConditions } from "./conditions";
 import { normalizeEntityMatch, matchesEntity, matchesEntityByTag } from "./entity-matching";
@@ -326,11 +332,40 @@ if (message.payload && Array.isArray(message.payload)) {
     entitiesToCheck = Array.from(entityMap.values());
 }
 
+// STEP 4b: Schedule transition detection — clear static states on active↔inactive transitions
+// @ts-ignore
+const prevActiveStates: Record<string, boolean> = flow.get("scheduleActiveStates", "memory") ?? {};
+const currentActiveStates: Record<string, boolean> = {};
+
+for (const schedule of normalizedSchedules) {
+    const isActive = isTimeInRange(now, schedule.start, schedule.end);
+    currentActiveStates[schedule.name] = isActive;
+
+    const wasActive = prevActiveStates[schedule.name] ?? false;
+    if (wasActive !== isActive) {
+        // Transition detected
+        const regSchedule = registry.schedules[schedule.name];
+        if (regSchedule?.clearStaticOnTransition) {
+            clearExternalModificationsForSchedule(schedule.name);
+        }
+    }
+}
+// @ts-ignore
+flow.set("scheduleActiveStates", currentActiveStates, "memory");
+
+// STEP 4c: Prune stale external modifications (>24h old)
+pruneExternalModifications(24 * 60 * 60 * 1000);
+
 // STEP 5: Process each entity against matching schedules
 const serviceActions: Partial<Hass.Service>[] = [];
 const entityScheduleMatches: any[] = [];
 const debugMatches: any[] = []; // Track blind matches for debugging
 const skippedActions: any[] = []; // Track actions skipped by validation
+
+// Track expected states for external modification detection
+// @ts-ignore
+const prevExpectedStates: Record<string, { state: string; schedule: string }> = flow.get("scheduleExpectedStates", "memory") ?? {};
+const currentExpectedStates: Record<string, { state: string; schedule: string }> = {};
 
 entitiesToCheck.forEach((entity) => {
     // Skip entities that are:
@@ -429,6 +464,32 @@ entitiesToCheck.forEach((entity) => {
         }
     }
 
+    // STEP 5b: Track expected state for external modification detection
+    // For continuous schedules that are active, we know what state the entity should be in
+    if (activeSchedule.type === "continuous" && isActive && activeSchedule.defaultStates?.on) {
+        const expectedState = activeSchedule.defaultStates.on.state || "on";
+        currentExpectedStates[entity.entity_id] = {
+            state: expectedState,
+            schedule: activeSchedule.name
+        };
+
+        // Check if entity diverged from the expected state we set last cycle
+        const prevExpected = prevExpectedStates[entity.entity_id];
+        if (prevExpected && prevExpected.schedule === activeSchedule.name) {
+            // We previously expected this state — check if entity diverged
+            const actualState = entity.state;
+            if (actualState !== prevExpected.state && actualState !== "unavailable" && actualState !== "unknown") {
+                // Entity state changed externally — record it
+                recordExternalModification(
+                    entity.entity_id,
+                    prevExpected.state,
+                    actualState,
+                    activeSchedule.name
+                );
+            }
+        }
+    }
+
     // Track match info
     entityScheduleMatches.push({
         entity_id: entity.entity_id,
@@ -445,7 +506,12 @@ normalizedSchedules.forEach((schedule) => {
     allScheduleEvents.push(...events);
 });
 
+// STEP 6b: Save expected states for next cycle's divergence detection
+// @ts-ignore
+flow.set("scheduleExpectedStates", currentExpectedStates, "memory");
+
 // STEP 7: Prepare debug information
+const externalModSummary = getExternalModificationSummary();
 const debugInfo = {
     schedulesFound: schedules.length,
     entitiesChecked: entitiesToCheck.length,
@@ -461,7 +527,8 @@ const debugInfo = {
             endTime: s.endTime
         })),
     blindMatches: debugMatches.length > 0 ? debugMatches : "No blind entities matched",
-    skippedActions: skippedActions.length > 0 ? skippedActions : "No actions skipped by validation"
+    skippedActions: skippedActions.length > 0 ? skippedActions : "No actions skipped by validation",
+    externalModifications: externalModSummary.count > 0 ? externalModSummary : "None detected"
 };
 
 // STEP 8: Clean up stale trigger states (>24 hours old)

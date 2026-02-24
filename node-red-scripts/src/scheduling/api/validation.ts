@@ -144,7 +144,7 @@ export function validateUpdateSchedule(
     const errors: string[] = [];
 
     if (isStatic) {
-        const allowedKeys = ["enabled", "precedence", "conditions"];
+        const allowedKeys = ["enabled", "precedence", "conditions", "clearStaticOnTransition"];
         const extraKeys = Object.keys(body).filter(k => !allowedKeys.includes(k));
         if (extraKeys.length > 0) {
             errors.push(`static schedules only allow updating: ${allowedKeys.join(", ")}. Got extra keys: ${extraKeys.join(", ")}`);
@@ -160,6 +160,10 @@ export function validateUpdateSchedule(
 
     if (body.enabled != null && typeof body.enabled !== "boolean") {
         errors.push("enabled must be a boolean");
+    }
+
+    if (body.clearStaticOnTransition != null && typeof body.clearStaticOnTransition !== "boolean") {
+        errors.push("clearStaticOnTransition must be a boolean");
     }
 
     if (body.start != null) validateTime(body.start, "start", errors);

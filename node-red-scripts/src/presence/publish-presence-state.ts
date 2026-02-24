@@ -16,8 +16,8 @@ const message = msg;
 
 const PUBLISHED_KEY = "publishedPresenceStates";
 
-// @ts-ignore
-const lastPublished: Record<string, any> = flow.get(PUBLISHED_KEY) ?? {};
+// @ts-ignore — ephemeral dedup cache, not persisted across restarts
+const lastPublished: Record<string, any> = flow.get(PUBLISHED_KEY, "memory") ?? {};
 
 const topic: string = message.topic || "unknown";
 const presenceState: string = message.presenceState || "unknown";
@@ -109,8 +109,8 @@ if (!topic || topic === "unknown" || !message.presenceState) {
         newPublished[key] = current;
     }
 
-    // @ts-ignore
-    flow.set(PUBLISHED_KEY, newPublished);
+    // @ts-ignore — ephemeral dedup cache (memory store)
+    flow.set(PUBLISHED_KEY, newPublished, "memory");
 
     // @ts-ignore
     msg.payload = changedUpdates.length > 0 ? changedUpdates : null;

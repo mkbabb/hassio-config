@@ -5,7 +5,7 @@
 
 ## Architecture Overview
 
-Sophisticated multi-protocol smart home automation with TypeScript-driven Node-RED logic, Bayesian presence detection, ESPresense Bluetooth triangulation, and energy optimization.
+Multi-protocol smart home automation with TypeScript-driven Node-RED logic, registry-based scheduling, room-level presence detection, scene rollback, and energy optimization.
 
 ### System Stack
 
@@ -22,20 +22,22 @@ Sophisticated multi-protocol smart home automation with TypeScript-driven Node-R
 │  └─ Cloud: Tesla, LG SmartThinQ, Tuya                       │
 ├─────────────────────────────────────────────────────────────┤
 │  Automation Layer                                            │
-│  ├─ Node-RED: TypeScript (60+ modules, 7693 LOC)           │
+│  ├─ Node-RED: TypeScript (80+ modules, ~10K LOC)           │
 │  ├─ HA Automations: YAML (5 native automations)            │
 │  └─ Blueprints: Reusable templates                          │
 ├─────────────────────────────────────────────────────────────┤
 │  Intelligence Layer                                          │
-│  ├─ ESPresense: 11 BLE nodes, 3 floors, room triangulation │
+│  ├─ Scheduling: Registry-based, precedence + CRUD API      │
+│  ├─ Presence DFA: 9 areas, dynamic cooldown, registry      │
+│  ├─ ESPresense: 11 BLE nodes, 3 floors, triangulation      │
 │  ├─ Bayesian: Probabilistic presence (90%/95% thresholds)  │
-│  ├─ Presence State Machine: Dynamic cooldown (10-30min)    │
-│  └─ Scheduling: Time-based continuous enforcement          │
+│  └─ State Publishing: 30+ HA sensors from Node-RED         │
 ├─────────────────────────────────────────────────────────────┤
 │  Data Layer                                                  │
 │  ├─ InfluxDB: Metrics (nodered DB, 8 measurements)         │
-│  ├─ SQLite: State history (141MB home-assistant_v2.db)     │
-│  └─ Flow Context: Per-topic state machines                  │
+│  ├─ SQLite: State history (home-assistant_v2.db)           │
+│  ├─ Global Context: Registries (schedule, presence)        │
+│  └─ Flow Context: Per-room DFA state machines              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -46,220 +48,163 @@ Sophisticated multi-protocol smart home automation with TypeScript-driven Node-R
 ├── configuration.yaml              # Main entrypoint
 ├── automations.yaml               # 5 native HA automations
 ├── binary_sensors.yaml            # 2 Bayesian presence sensors
-├── scenes.yaml                    # 4 state snapshots (1193 lines)
-├── template_entities.yaml         # 8 derived sensors
-├── rest_commands.yaml             # 2 remote entity endpoints
-├── input_*.yaml                   # 18 helper entities
+├── scenes.yaml                    # 4 state snapshots
+├── template_entities.yaml         # Template sensors (wakeup/sleep, schedule count)
+├── rest_commands.yaml             # Remote entity + schedule API endpoints
+├── input_*.yaml                   # 22 helper entities
 ├── secrets.yaml                   # Credentials (gitignored)
-├── .HA_VERSION                    # Core version tracker
 │
-├── node-red-scripts/              # TypeScript automation (SEE: node-red-scripts/CLAUDE.md)
-│   ├── src/                       # 60 TS files, 7693 LOC
-│   │   ├── presence/              # Motion detection, state machine
-│   │   ├── scheduling/            # Time-based automation
-│   │   ├── plants/                # Grow light control
-│   │   ├── cache-states/          # Scene management
-│   │   ├── remote-entities/       # IR/RF abstraction
-│   │   ├── batteries/             # Battery monitoring
-│   │   └── utils/                 # Shared utilities
+├── docs/                          # System documentation
+│   ├── SCHEDULING.md              # Schedule engine, registry, precedence
+│   ├── PRESENCE.md                # Presence DFA, areas, cooldown
+│   ├── CACHE-STATES.md            # Home/away cache + scene rollback
+│   ├── PLANTS.md                  # Grow light automation
+│   ├── API.md                     # REST API reference (9 endpoints)
+│   ├── NODE-RED-FLOWS.md          # Flow tabs, subflows, node mapping
+│   └── BUILD-DEPLOY.md            # TypeScript build + deploy pipeline
+│
+├── node-red-scripts/              # TypeScript automation
+│   ├── src/                       # 80+ TS files, ~10K LOC
+│   │   ├── presence/              # 13 files — DFA, registry, API, publishing
+│   │   ├── scheduling/            # 24 files — Engine, registry, API, publishing
+│   │   ├── cache-states/          # 14 files — Away/home cache, rollback
+│   │   ├── plants/                # 5 files — Grow light control
+│   │   ├── remote-entities/       # 3 files — IR/RF abstraction
+│   │   ├── batteries/             # 2 files — Battery monitoring
+│   │   └── utils/                 # 6 files — Shared utilities
 │   ├── dist/                      # Compiled JS (37 files)
-│   └── build/                     # Build system (SEE: build/CLAUDE.md)
-│       ├── index.ts               # esbuild orchestrator
-│       ├── dependency-graph.ts    # Incremental compilation
-│       └── deploy/                # Node-RED deployment
+│   └── build/                     # Build system
+│       └── deploy/                # Node-RED deployment + mappings
 │
-├── custom_components/             # 5 integrations (SEE: custom_components/CLAUDE.md)
+├── custom_components/             # 6 integrations
 │   ├── entity_guard/              # Conditional entity blocking
+│   ├── scene_rollback/            # Pre-scene state capture
 │   ├── hacs/                      # Community integration manager
 │   ├── smartthinq_sensors/        # LG appliances
 │   ├── tesla_custom/              # Vehicle integration
 │   └── dwains_dashboard/          # Custom UI framework
 │
 ├── espresense/                    # Bluetooth presence
-│   └── config.yaml                # 11 nodes, room mapping
-│
 ├── blueprints/                    # Reusable templates
-│   ├── automation/                # motion_light, notify_leaving_zone
-│   ├── script/                    # confirmable_notification
-│   └── template/                  # inverted_binary_sensor
-│
 ├── python-scripts/                # Utilities
-│   └── entities-to-scene.py       # Scene converter with color conversion
-│
-├── group/                         # Entity collections
-│   ├── all_locks.yaml             # Lock grouping
-│   └── climate.yaml               # HVAC grouping
-│
-├── sensor/                        # Platform configs
-│   └── esp_presence.yaml          # MQTT room tracking
-│
-├── light/, fan/, lock/, cover/    # Template entities
-│
-├── themes/ios-themes/             # iOS-inspired UI
-│
-├── www/                           # Frontend resources
-│   └── community/                 # Custom cards (mushroom, weather, auto-entities)
-│
-├── home-assistant_v2.db           # 141MB SQLite database
-├── zigbee.db                      # ZHA device database
-└── zwcfg_0xc596a377.xml          # Z-Wave network config
+└── group/, sensor/, light/, fan/, lock/, cover/
 ```
+
+## Core Systems
+
+### Scheduling Engine (See: `docs/SCHEDULING.md`)
+- **Registry**: `global.get("scheduleRegistry")` — 13 static schedules, dynamic CRUD via API
+- **Types**: Continuous (enforce state) and Trigger (fire once at ±10min window)
+- **Precedence**: Higher number wins when multiple schedules match same entity
+- **Conditions**: Presence-gated (home/away), entity state-gated
+- **Interpolation**: Sunrise/sunset simulation with brightness + color temp fading
+- **REST API**: 6 endpoints at `/endpoint/schedules/` + `/endpoint/schedule-status`
+- **Sensors**: `sensor.schedule_{name}_status`, `sensor.schedule_{name}_progress`, aggregates
+
+### Presence Detection (See: `docs/PRESENCE.md`)
+- **DFA**: 5 states (off, on, pending_off, unknown, reset)
+- **9 Areas**: Data-driven from `global.get("presenceRegistry")` with 1-4 sensors each
+- **Cooldown**: Dynamic — `baseCoolDown + sqrt(dwellMinutes) × 120`, max 30min
+- **Namespace Blacklist**: Presence entities excluded from scheduling + cache restore
+- **REST API**: 3 endpoints at `/endpoint/presence/`
+- **Sensors**: `sensor.presence_{topic}_state`, `sensor.presence_{topic}_cooldown`
+
+### Plant Automation (See: `docs/PLANTS.md`)
+- **Global Schedule**: 6AM-11PM via `input_datetime` entities
+- **Bedroom**: Wakeup-Sleep times (weekday/weekend aware)
+- **Warocqueanum**: 5 sub-schedules, presence-dependent
+- **Shelf Override**: Bonus room motion → immediate turn-on, 10min cooldown
+- **Entities**: 15+ grow light switches/lights (globally blacklisted from cache/presence)
+
+### Cache States & Rollback (See: `docs/CACHE-STATES.md`)
+- **Away**: Snapshot all entities, generate away payload (lights off, fans 33%, climate away)
+- **Home**: Restore non-presence entities from cache
+- **Scene Rollback**: LIFO stack, captures pre-scene state via custom component
+- **Presence Filtering**: 5 files exclude presence-tracked entities from cache operations
+
+### Energy Optimization
+- **Time-of-Use**: Summer/winter rate schedules
+- **Pre-cooling**: 30min before peak periods
+- **Details**: `node-red-scripts/src/time-of-use.ts`
 
 ## Connection Information
 
 ### Home Assistant API
 - **URL**: `http://homeassistant.local:8123`
-- **API Base**: `http://homeassistant.local:8123/api/`
-- **States**: `GET /api/states`
-- **Services**: `POST /api/services/<domain>/<service>`
 - **Auth**: Bearer token (from `secrets.yaml`)
 
 ### Node-RED
 - **URL**: `http://homeassistant.local:1880`
-- **API**: REST endpoints at `/endpoint/remote/`
-- **Admin API**: `POST /flows` (hot reload deployment)
+- **REST API**: 12 endpoints under `/endpoint/` (See: `docs/API.md`)
+- **Admin API**: `POST /flows` (hot reload, currently falls back to file-based)
 - **Credentials**: `node-red-scripts/.env`
 
 ### InfluxDB
 - **URL**: `http://homeassistant.local:8086`
-- **Databases**:
-  - `homeassistant` - State history
-  - `nodered` - Automation metrics (8 measurements)
-  - `_internal` - InfluxDB metrics
-- **Credentials**: `secrets.yaml` (`influxdb_username`, `influxdb_password`)
-
-### Querying InfluxDB
-```bash
-# Show databases
-curl -G "http://homeassistant.local:8086/query" \
-  --data-urlencode "u=${INFLUXDB_USERNAME}" \
-  --data-urlencode "p=${INFLUXDB_PASSWORD}" \
-  --data-urlencode "q=SHOW DATABASES"
-
-# Query presence events (last hour)
-curl -G "http://homeassistant.local:8086/query" \
-  --data-urlencode "u=${INFLUXDB_USERNAME}" \
-  --data-urlencode "p=${INFLUXDB_PASSWORD}" \
-  --data-urlencode "db=nodered" \
-  --data-urlencode "q=SELECT * FROM presence_events WHERE time > now() - 1h"
-```
-
-## Core Systems
-
-### Presence Detection
-- **ESPresense**: 11 ESP32 nodes, Bluetooth RSSI triangulation
-- **Bayesian Sensors**: 90% threshold (mike_presence), 95% threshold (mike_asleep_status)
-- **State Machine**: Dynamic cooldown (10min default, 30min max), exponential backoff
-- **InfluxDB**: `presence_events`, `get_flow_info_events` measurements
-- **Details**: See `node-red-scripts/CLAUDE.md` → Presence Detection
-
-### Plant Automation
-- **Global Schedule**: 6AM-11PM (via `input_datetime` entities)
-- **Bedroom Schedule**: Wakeup-Sleep times (weekday/weekend aware)
-- **Warocqueanum**: 5 sub-schedules, presence-dependent (home/away)
-- **Entities**: 15+ grow light switches/lights
-- **Details**: See `node-red-scripts/CLAUDE.md` → Plant Automation
-
-### Energy Optimization
-- **Time-of-Use**: Summer/winter rate schedules
-- **Pre-cooling**: 30min before peak periods
-- **Climate Control**: Dynamic setpoint adjustment
-- **Details**: `node-red-scripts/src/time-of-use.ts`
-
-### State Caching
-- **Scene Snapshots**: All entity states (filtered by blacklist)
-- **Away Mode**: Automatic state conversion (lights off, climate away, fans low)
-- **Attribute Preservation**: Brightness, color, position, temperature
-- **Details**: See `node-red-scripts/CLAUDE.md` → Cache States
+- **Databases**: `homeassistant` (state history), `nodered` (8 measurements)
 
 ## Entity Summary
 
 | Domain | Count | Notes |
 |--------|-------|-------|
-| light | 35+ | Grouped fixtures (5 groups), individual lights, template (monitor) |
+| light | 35+ | Grouped fixtures, individual, template (monitor) |
 | binary_sensor | 2 | Bayesian presence/sleep |
-| sensor | 10+ | ESPresense (2), template (8) |
+| sensor | 40+ | ESPresense (2), template (8), schedule (28+), presence (18) |
 | switch | 20+ | Grow lights, smart plugs |
-| fan | 1 | Template (Dyson IR control) |
+| fan | 1 | Template (Dyson IR) |
 | cover | 6 | Blind groups + individuals |
 | lock | 2 | Front/back doors |
 | climate | 2 | Upstairs/downstairs zones |
-| input_boolean | 4 | State flags |
+| input_boolean | 7 | schedule_pause, presence_pause, plants_trigger_on/off, scene_rollback |
 | input_datetime | 6 | Schedule time pickers |
-| input_select | 4 | Status selectors |
+| input_select | 4 | home_status, day_status, awake_status, force_day_status |
 | input_text | 4 | Remote entity state JSON |
-| scene | 4 | State snapshots |
-| group | 6 | Collections |
-| automation | 5 | Native HA automations |
-
-## Key Integrations
-
-### Custom Components (See: custom_components/CLAUDE.md)
-- **Entity Guard** v1.0.0 - Conditional entity blocking
-- **HACS** v2.0.5 - Community integration manager
-- **SmartThinQ** v0.41.2 - LG appliance control
-- **Tesla Custom** v3.25.3 - Vehicle integration
-- **Dwains Dashboard** v3.8.0 - Custom UI
-
-### Protocol Integrations
-- **Zigbee**: Third Reality smart plugs, lights
-- **Z-Wave**: GE/Enbrighten switches, Ecolink sensors
-- **MQTT**: ESPresense room tracking
-- **WiFi**: LIFX bulbs, Ecobee thermostats, Sonos, HomePods
-- **Cloud**: Tesla vehicles, LG SmartThinQ, Tuya
 
 ## Development Workflow
 
-### Node-RED TypeScript Development
 ```bash
-# Watch mode (auto-rebuild on file changes)
 cd node-red-scripts
+
+# Standard loop
+npm run build && npm run deploy -- src/presence/presence.ts
+
+# Watch mode (auto-rebuild)
 npm run watch
 
-# Build and deploy
-npm run build
-npm run deploy -- src/presence/presence.ts
+# Deploy all
+npm run build && npm run deploy:all
 
-# Or combined
-npm run build:deploy
+# Generate mappings (after adding new function nodes)
+npm run map
 ```
 
-### Generate Function Mappings (Initial Setup)
-```bash
-cd node-red-scripts
-npm run map           # Hash-based mapping
-npm run map -- --ai   # With AI reconciliation (requires OPENAI_API_KEY)
-```
-
-### Deploy to Node-RED
-```bash
-# Single file
-npm run deploy -- src/presence/presence.ts
-
-# All mapped functions
-npm run deploy:all
-
-# Dry run (preview only)
-npm run deploy -- src/presence/presence.ts --dry-run
-```
+See: `docs/BUILD-DEPLOY.md` for full pipeline details.
 
 ## Critical Configuration
 
-### Service Call Format (Updated 2025-08-04)
+### Service Call Format
 ```yaml
-# DEPRECATED (old format)
-domain: light
-service: turn_on
-
 # USE (modern format)
 action: "light.turn_on"
+
+# DEPRECATED
+domain: light
+service: turn_on
 ```
 
-### Presence Detection State Machine
-- **States**: off, on, pending_off, unknown, reset
-- **Critical**: Treat `pending_off` as `off` for re-triggering
-- **Logging**: Store last 10 state transitions in flow history
-- **Debug Flags**: `wasPendingOffTreatedAsOff`, `coolDownCancelled`
+### Node-RED Standards
+- **HA Server**: Always use `79544c2b.6ccc64`
+- **Node Versions**: state-changed v6, api-call-service v7, api-current-state v3
+- **httpNodeRoot**: `/endpoint/` (auto-prepended — http-in URLs omit this prefix)
+
+### Global Context Keys (Registries)
+- `scheduleRegistry` — All schedule definitions + metadata
+- `presenceRegistry` — All presence area configurations
+- `cachedStates` — Home/away entity state snapshots
+- `rollbackStack` — Scene undo entry (LIFO, depth=1)
+- `rollbackLog` — Scene undo audit trail (ring buffer, max 20)
+- `staticStates` — Namespace-aware entity state overrides
+- `staticBlacklist` — Namespace-aware entity blacklists
 
 ### InfluxDB Data Types
 - **Booleans**: Convert to integers (0/1) via `safeBooleanAsInt()`
@@ -267,20 +212,14 @@ action: "light.turn_on"
 - **Strings**: Use `safeString()` for proper encoding
 - **Numbers**: Use `safeNumber()` to handle null/undefined
 
-### Node-RED Standards
-- **HA Server**: Always use `79544c2b.6ccc64`
-- **Node Versions**: state-changed v6, api-call-service v7, api-current-state v3
-- **Naming**: Lowercase descriptive (e.g., "state_changed: input_boolean.plants_trigger_on")
-- **Positioning**: Align evenly (state nodes x=680, current_state x=1180, service x=1610)
-
 ## Blacklisted Entities
 
-Global blacklist (applies to presence, cache-states, etc.):
+Global blacklist (excluded from presence, cache-states, scheduling):
 ```typescript
 [
   "son_of_toast",              // Tesla vehicle
-  /.*grow.*/i,                 // Grow lights
-  /.*blinds.*/i,               // Window covers
+  /.*grow.*/i,                 // Grow lights (scheduled separately)
+  /.*blinds.*/i,               // Window covers (scheduled separately)
   /.*air_purifier.*/i,         // Air quality
   "switch.washing_machine",
   "switch.dryer",
@@ -289,46 +228,47 @@ Global blacklist (applies to presence, cache-states, etc.):
 ]
 ```
 
-## Common Queries
-
-### InfluxDB Debugging
-```sql
--- Recent presence events for a room
-SELECT time, presence_state, previous_state, action, sensor_states
-FROM nodered.presence_events
-WHERE topic =~ /bathroom/ AND time > now() - 1h
-
--- Failed light activations
-SELECT time, presence_state, action, sensor_states
-FROM nodered.presence_events
-WHERE action = 'none' AND presence_state = 'on'
-
--- Plant schedule activity
-SELECT entity_id, schedule_name, schedule_active
-FROM nodered.plant_events
-WHERE time > now() - 24h
-```
+Namespace blacklist `"presence"` — presence-tracked entities (registered by `seed-registry.ts`). Excluded from schedule enforcement and cache restoration.
 
 ## File References
 
+- **System Docs**: `docs/` (scheduling, presence, cache, plants, API, flows, build)
 - **Node-RED Automation**: `node-red-scripts/CLAUDE.md`
-- **Build System**: `node-red-scripts/build/CLAUDE.md`
+- **Build System**: `node-red-scripts/build/README.md`
+- **Handoff Notes**: `node-red-scripts/HANDOFF.md`
+- **State Machine Plan**: `STATE_MACHINE.md`
+- **Energy Reference**: `ENERGY.md`
 - **Custom Components**: `custom_components/CLAUDE.md`
-- **ESPresense Config**: `espresense/config.yaml`
-- **Bayesian Sensors**: `binary_sensors.yaml`
-- **Templates**: `template_entities.yaml`
-- **Scenes**: `scenes.yaml`
 
-## Version Information
+## Common Queries
 
-- **Home Assistant**: 2025.7.2
-- **Node-RED**: TypeScript 5.9.3, esbuild 0.25.11
-- **Python**: 3.12+ (for utilities)
-- **InfluxDB**: Latest (via addon)
-- **Mosquitto MQTT**: 6.5.1
+```bash
+# Schedule API
+curl -s http://homeassistant.local:1880/endpoint/schedules/ | python3 -m json.tool
+curl -s http://homeassistant.local:1880/endpoint/schedule-status | python3 -m json.tool
+
+# Presence API
+curl -s http://homeassistant.local:1880/endpoint/presence/ | python3 -m json.tool
+
+# HA Sensors
+curl -s http://homeassistant.local:8123/api/states/sensor.active_schedule_count \
+  -H "Authorization: Bearer $HA_TOKEN" | python3 -m json.tool
+```
+
+```sql
+-- InfluxDB: Recent presence events
+SELECT time, presence_state, previous_state, action
+FROM nodered.presence_events
+WHERE topic =~ /bathroom/ AND time > now() - 1h
+
+-- Schedule activity
+SELECT active_schedule_names, actions_generated
+FROM nodered.schedule_events
+WHERE time > now() - 24h
+```
 
 ---
 
-**Last Updated**: 2025-11-16
+**Last Updated**: 2026-02-23
 **Git Branch**: master
-**Total Source Files**: 60 TypeScript (7693 LOC) + 37 YAML configs
+**Total Source Files**: 80+ TypeScript (~10K LOC) + 37 YAML configs

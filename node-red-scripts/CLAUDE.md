@@ -1,59 +1,110 @@
 # Node-RED TypeScript Automation
 
-**60 TypeScript modules | 7693 LOC | 37 compiled outputs**
+**80+ TypeScript modules | ~10K LOC | 48 deploy mappings**
 
 Production-grade Home Assistant automation framework with incremental compilation, dependency tracking, and hot-reload deployment.
 
 ## Architecture
 
 ```
-src/                           dist/
-├── presence/                  ├── presence/
-│   ├── presence.ts (11.6KB)  │   ├── presence.js
-│   ├── utils.ts              │   ├── utils.js
-│   ├── debounce.ts           │   ├── debounce.js
-│   ├── get-flow-info.ts      │   ├── get-flow-info.js
-│   ├── influx-logger.ts      │   └── influx-logger.js
-│   └── test-runner.ts        │
-├── scheduling/                ├── scheduling/
-│   ├── schedule/              │   └── schedule/
-│   │   ├── index.ts (16KB)   │       ├── index.js
-│   │   ├── schedules/         │       └── schedules/
-│   │   │   ├── plants-schedules.ts
-│   │   │   ├── day-night-schedules.ts
-│   │   │   └── blinds-schedules.ts
-│   ├── cache-schedule-entity.ts
-│   └── types.ts              │
-├── plants/                    ├── plants/
-│   ├── set-static-state.ts   │   ├── set-static-state.js
-│   └── influx-logger.ts      │   └── influx-logger.js
-├── cache-states/              ├── cache-states/
-│   ├── cache-house-state.ts  │   ├── cache-house-state.js
-│   ├── states-to-actions.ts  │   ├── states-to-actions.js
-│   └── utils.ts              │   └── utils.js
-├── remote-entities/           ├── remote-entities/
-│   └── service-call/          │   └── service-call/
-│       ├── light.ts          │       ├── light.js
-│       └── fan.ts            │       └── fan.js
-├── batteries/                 ├── batteries/
-│   ├── battery.ts            │   ├── battery.js
-│   └── influx-logger.ts      │   └── influx-logger.js
-├── utils/                     ├── utils/
-│   ├── entities.ts           │   ├── entities.ts
-│   ├── datetime.ts           │   ├── datetime.js
-│   ├── service-calls.ts      │   ├── service-calls.js
-│   ├── influx-logger-base.ts │   ├── influx-logger-base.js
-│   └── static-states.ts      │   └── static-states.js
+src/
+├── presence/                       # 13 files, 1827 LOC
+│   ├── presence.ts (360 LOC)      # Core DFA state machine
+│   ├── types.ts                    # PresenceAreaConfig, PresenceRegistry
+│   ├── utils.ts                    # Cooldown calc, state aggregation
+│   ├── debounce.ts                 # 1s input / 30s reset debounce
+│   ├── get-flow-info.ts            # Cooldown check at trigger time
+│   ├── get-flow-info-logger.ts     # get_flow_info_events logging
+│   ├── influx-logger.ts            # presence_events logging
+│   ├── seed-registry.ts            # 9 area definitions + blacklist
+│   ├── publish-presence-state.ts   # HA sensor publishing
+│   ├── test-runner.ts              # 6 test scenarios
+│   └── api/
+│       ├── list-areas.ts           # GET /endpoint/presence/
+│       ├── area-status.ts          # GET /endpoint/presence/:topic/status
+│       └── configure-area.ts       # POST /endpoint/presence/
+│
+├── scheduling/                     # 24 files, ~2900 LOC
+│   ├── types.ts                    # Schedule, RegistrySchedule, ScheduleRegistry
+│   ├── schedule/
+│   │   ├── index.ts (497 LOC)     # Main engine
+│   │   ├── conditions.ts          # Presence/state condition checks
+│   │   ├── entity-matching.ts     # Regex/tag/exact matching
+│   │   ├── schedule-processing.ts # Continuous vs trigger logic
+│   │   ├── state-mapping.ts       # Domain→state→service
+│   │   └── schedules/
+│   │       ├── index.ts           # Registry seeding
+│   │       ├── plants-schedules.ts
+│   │       ├── day-night-schedules.ts
+│   │       ├── blinds-schedules.ts
+│   │       └── lock-schedules.ts
+│   ├── api/
+│   │   ├── registry.ts            # CRUD utilities
+│   │   ├── validation.ts          # Schema validation
+│   │   ├── list-schedules.ts      # GET /endpoint/schedules/
+│   │   ├── get-schedule.ts        # GET /endpoint/schedules/:name
+│   │   ├── create-schedule.ts     # POST /endpoint/schedules/
+│   │   ├── update-schedule.ts     # PUT /endpoint/schedules/:name
+│   │   ├── delete-schedule.ts     # DELETE /endpoint/schedules/:name
+│   │   └── schedule-status.ts     # GET /endpoint/schedule-status
+│   ├── publish-schedule-state.ts  # HA sensor publishing with dedup
+│   ├── simulate-sun.ts            # Brightness/color interpolation
+│   ├── cache-schedule-entity.ts   # input_datetime caching
+│   ├── pop-schedule-entites.ts    # Cached time retrieval
+│   └── influx-logger.ts           # schedule_events logging
+│
+├── cache-states/                   # 14 files, 978 LOC
+│   ├── cache-house-state.ts       # Snapshot + away payload (presence split)
+│   ├── home-status.ts             # 5min/30s debouncer
+│   ├── filter-blacklisted-entities.ts
+│   ├── merge-cached-states.ts     # Merge with presence filter
+│   ├── merge-scene-cached-states.ts
+│   ├── push-cache-states.ts
+│   ├── states-to-actions.ts
+│   ├── action-node.ts             # Smart action filter
+│   ├── publish-cache-state.ts     # HA sensor publishing
+│   ├── rollback-push.ts           # Scene capture (HTTP POST)
+│   ├── rollback-pop.ts            # Scene undo (input_boolean)
+│   ├── rollback-influx-logger.ts
+│   ├── influx-logger.ts
+│   └── utils.ts                   # createServiceCall, createAwayPayload
+│
+├── plants/                         # 5 files, 175 LOC
+│   ├── presence-override.ts       # Motion → static state → turn_on
+│   ├── remove-override.ts         # Clear after cooldown
+│   ├── set-static-state.ts
+│   ├── set-static-blacklist.ts
+│   └── influx-logger.ts
+│
+├── remote-entities/                # IR/RF abstraction
+│   ├── service-call/index.ts      # Dispatch (light/fan)
+│   ├── get-entity-attributes-id.ts
+│   └── influx-logger.ts
+│
+├── batteries/                      # Battery monitoring
+│   ├── battery.ts
+│   └── influx-logger.ts
+│
+├── utils/                          # Shared utilities
+│   ├── entities.ts                # HA entity API (5s TTL cache)
+│   ├── datetime.ts                # Time manipulation
+│   ├── service-calls.ts           # Domain→service mapping
+│   ├── influx-logger-base.ts      # Type-safe InfluxDB conversion
+│   ├── static-states.ts           # Namespace-aware state/blacklist
+│   └── utils.ts                   # General helpers
+│
 └── types/
-    ├── hass.d.ts
-    └── influx-messages.d.ts
+    ├── hass.d.ts                   # Hass.State, Hass.Service, Hass.Action
+    └── influx-messages.d.ts        # Per-flow message type definitions
 ```
 
 ## Core Modules
 
 ### Presence Detection (`src/presence/`)
 
-**Purpose**: Room-level occupancy with dynamic cooldown
+**Purpose**: Room-level occupancy with dynamic cooldown, data-driven registry, REST API, and sensor publishing.
+
+**Full documentation**: `docs/PRESENCE.md`
 
 **State Machine**:
 ```
@@ -62,121 +113,85 @@ OFF ──motion──> ON ──no motion──> PENDING_OFF ──expires─�
                  └──────motion──────────┘
 ```
 
-**Files**:
-- `presence.ts` (11.6KB) - Main state machine, sensor aggregation, action grouping
-- `utils.ts` - `calculateCoolDown()`, `determinePresenceState()`, `isOnUnknownOffSequence()`
-- `debounce.ts` - 1s debounce window for rapid state changes
-- `get-flow-info.ts` - Cooldown status checks at trigger execution
-- `influx-logger.ts` - `presence_events` measurement logging
-- `test-runner.ts` - Unit tests for state machine logic
+**Files** (13 total, 1827 LOC):
+- `presence.ts` (360 LOC) - Core DFA, sensor aggregation, action grouping
+- `utils.ts` (67 LOC) - `calculateCoolDown()`, `determinePresenceState()`
+- `debounce.ts` (48 LOC) - 1s input / 30s reset debounce
+- `get-flow-info.ts` (63 LOC) - Cooldown checks at trigger execution
+- `get-flow-info-logger.ts` (88 LOC) - `get_flow_info_events` logging
+- `influx-logger.ts` (130 LOC) - `presence_events` logging
+- `seed-registry.ts` (179 LOC) - 9 area definitions + namespace blacklist
+- `publish-presence-state.ts` (119 LOC) - HA sensor publishing with dedup
+- `test-runner.ts` (482 LOC) - 6 test scenarios
+- `types.ts` (29 LOC) - PresenceAreaConfig, PresenceRegistry
+- `api/list-areas.ts` (69 LOC) - GET /endpoint/presence/
+- `api/area-status.ts` (87 LOC) - GET /endpoint/presence/:topic/status
+- `api/configure-area.ts` (106 LOC) - POST /endpoint/presence/
 
-**Key Constants**:
-```typescript
-DEFAULT_COOL_DOWN = 10 * 60      // 10 minutes
-MAX_COOL_DOWN = 30 * 60          // 30 minutes
-DEBOUNCE_TIME_MS = 1000          // 1 second
-```
+**Registry**: `global.get("presenceRegistry")` — 9 areas, each with sensors, entities, cooldown config. Presence-tracked entities registered in `"presence"` namespace blacklist.
 
-**Cooldown Formula**:
-```typescript
-coolDown = baseCoolDown + (sqrt(dwellMinutes) * 120)
-// Capped at MAX_COOL_DOWN
-```
-
-**Flow Context State** (per topic):
-```typescript
-{
-  state: "on" | "off" | "pending_off" | "unknown",
-  prevState: string,
-  prevPrevState: string,        // Detects on→unknown→off pathology
-  lastOn: number,               // Timestamp (ms)
-  lastOff: number,
-  delay: number,                // Current cooldown (ms)
-  coolDownEndTime: number       // Absolute expiry timestamp
-}
-```
-
-**InfluxDB Measurements**:
-- `presence_events` - State transitions, timing, sensor states
-- `get_flow_info_events` - Cooldown checks
+**Published Sensors**: `sensor.presence_{topic}_state`, `sensor.presence_{topic}_cooldown`
 
 **Critical**: Treat `pending_off` as `off` for re-triggering (`wasPendingOffTreatedAsOff` flag)
 
 ### Scheduling Engine (`src/scheduling/`)
 
-**Purpose**: Time-based automation with continuous/trigger modes
+**Purpose**: Registry-based scheduling with continuous/trigger modes, REST CRUD API, and sensor publishing.
+
+**Full documentation**: `docs/SCHEDULING.md` | **API**: `docs/API.md`
+
+**Files** (24 total, ~2900 LOC):
+- `schedule/index.ts` (497 LOC) - Main engine: entity matching, precedence, actions
+- `schedule/schedules/*.ts` (4 files, ~240 LOC) - Static schedule definitions
+- `schedule/conditions.ts` (43 LOC) - Presence/state condition checks
+- `schedule/entity-matching.ts` (154 LOC) - Regex/tag/exact matching
+- `schedule/schedule-processing.ts` (93 LOC) - Continuous vs trigger logic
+- `schedule/state-mapping.ts` (142 LOC) - Domain→state→service resolution
+- `api/*.ts` (8 files, ~800 LOC) - REST CRUD + status endpoints
+- `publish-schedule-state.ts` (214 LOC) - HA sensor publishing with dedup
+- `simulate-sun.ts` (304 LOC) - Brightness/color temp interpolation
+- `types.ts` (112 LOC) - Schedule, RegistrySchedule, ScheduleRegistry
+
+**Registry**: `global.get("scheduleRegistry")` — 13 static schedules, seeded on startup, dynamic schedules via POST API. Static schedules cannot be deleted (only disabled).
 
 **Schedule Types**:
 - **Continuous**: Enforce state throughout active window (plants, climate)
 - **Trigger**: Fire once at start/end with ±10min window (blinds, locks)
 
-**Key Files**:
-- `schedule/index.ts` (16KB) - Main orchestration, entity matching, precedence resolution
-- `schedule/schedules/plants-schedules.ts` - Grow light definitions
-- `schedule/schedules/day-night-schedules.ts` - Day/night automation
-- `schedule/entity-matching.ts` - Regex/tag-based matching
-- `schedule/conditions.ts` - Presence-based conditions
-- `types.ts` - Schedule type definitions
+**REST API**: 6 endpoints — CRUD at `/endpoint/schedules/` + `/endpoint/schedule-status`
 
-**Schedule Structure**:
-```typescript
-{
-  name: string,
-  entities: string[] | { entity_id, states }[],
-  tags?: string[],
-  start: "HH:MM" | { entity_id: "input_datetime.X" },
-  end: "HH:MM" | { entity_id: "input_datetime.X" },
-  precedence: number,          // Higher wins conflicts
-  type: "continuous" | "trigger",
-  conditions?: [{ type: "presence", value: "home" | "away" }],
-  interpolation?: {
-    enabled: boolean,
-    preamble_minutes: number,  // Ramp-up before start
-    postamble_minutes: number  // Ramp-down after end
-  }
-}
-```
+**Published Sensors**: `sensor.schedule_{name}_status`, `sensor.schedule_{name}_progress`, `sensor.active_schedule_count`, `sensor.schedule_engine_last_run`
 
-**Plant Schedules**:
-- **Global**: 6AM-11PM (precedence 100)
-- **Bedroom**: Wakeup-Sleep times (precedence 110)
-- **Warocqueanum**: 5 sub-schedules, presence-dependent (precedence 120/30)
+**Key Concepts**:
+- Precedence: higher number wins when multiple schedules match same entity
+- `durationModifier`: Centered window shrink (0.5 = 50% of parent window)
+- Interpolation: Preamble/postamble phases with `t` value 0→1 for ramp simulation
 
-**Matching Strategies**:
-1. Regex patterns: `regex:(switch|light)\..*grow.*`
-2. Tag-based: `tags: ["plants"]` → `tagDefinitions.plants`
-3. Exact IDs: `"light.titanic_light"`
+### Cache States & Rollback (`src/cache-states/`)
 
-**Time Resolution**:
-- Static: `"06:00"` → parsed directly
-- Entity: `{ entity_id: "sensor.wakeup_time" }` → fetch state
-- Midnight crossing: If end < start, adds 1 day to end
+**Purpose**: Scene snapshots with away-mode conversion, scene rollback stack, and presence-aware filtering.
 
-### Cache States (`src/cache-states/`)
+**Full documentation**: `docs/CACHE-STATES.md`
 
-**Purpose**: Scene snapshots with away-mode conversion
+**Files** (14 total, 978 LOC):
+- `cache-house-state.ts` (46 LOC) - Snapshot + away payload (presence split)
+- `states-to-actions.ts` (9 LOC) - Service call → action format
+- `merge-cached-states.ts` (26 LOC) - Merge with presence filter
+- `merge-scene-cached-states.ts` (36 LOC) - Scene state merge with filter
+- `filter-blacklisted-entities.ts` (27 LOC) - Global + namespace filtering
+- `home-status.ts` (104 LOC) - 5min/30s debouncer
+- `publish-cache-state.ts` (90 LOC) - Sensor publishing
+- `push-cache-states.ts` (30 LOC) - Push to global store
+- `rollback-push.ts` (99 LOC) - Pre-scene capture (POST /endpoint/scene-cache/)
+- `rollback-pop.ts` (80 LOC) - Scene undo (input_boolean trigger)
+- `rollback-influx-logger.ts` (36 LOC) - rollback_events logging
+- `action-node.ts` (105 LOC) - Smart action filter (skip unchanged)
+- `influx-logger.ts` (53 LOC) - cache_events logging
+- `utils.ts` (237 LOC) - createServiceCall, createAwayPayload, filterAttributes
 
-**Key Functions**:
-```typescript
-createServiceCall(entity: Hass.State) → Hass.Service
-  // Maps entity state to turn_on/off with attributes
+**Presence Filtering**: 5 files exclude presence-tracked entities via `shouldFilterEntity(entityId, { namespace: "presence" })`. Away payload still turns off presence lights; home restore does NOT restore them.
 
-filterAttributes(domain, service, attrs) → Record<string, any>
-  // Preserves: brightness, color, position, temperature
-  // Filters by domain: light (8 attrs), fan (1), climate (3), cover (1)
-
-createAwayPayload(states: Hass.Service[]) → Hass.Action[]
-  // Light/switch: off, Fan: 33%, Climate: away, Lock: locked, Cover: closed
-```
-
-**Files**:
-- `cache-house-state.ts` - Snapshot all entities → away payload
-- `states-to-actions.ts` - Convert states to action format
-- `merge-cached-states.ts` - Merge incoming with global store
-- `filter-blacklisted-entities.ts` - Exclude blacklist patterns
-- `utils.ts` - Domain-specific attribute filtering
-
-**Supported Domains**: light, switch, fan, climate, lock, cover, media_player
+**Published Sensors**: `sensor.cache_state_status`, `sensor.cache_state_last_operation`, `sensor.scene_rollback_status`
 
 ### Remote Entities (`src/remote-entities/`)
 
@@ -395,9 +410,8 @@ npm run deploy -- --rename-only
 **Mapping Stats** (current):
 ```json
 {
-  "total": 35,
-  "exact": 23,
-  "ai-reconciled": 11,
+  "total": 48,
+  "exact": 48,
   "unmapped": 1
 }
 ```
@@ -523,10 +537,11 @@ npm run build -- --debug
 - **String Safety**: Use `safeString()` for null/undefined
 - **Sanitization**: Auto-detects field types, filters null values
 
-### Static States
-- **Namespace Aware**: `plants`, `default` namespaces
+### Static States & Namespaces
+- **Namespaces**: `plants` (grow light overrides), `presence` (presence-tracked entities), `default`
 - **Override Priority**: Static state > schedule > default
-- **Blacklist Checked**: Before entity processing
+- **Blacklist**: Global (regex patterns) + per-namespace (entity IDs)
+- `shouldFilterEntity(entityId, { namespace })` — checks both levels
 
 ## Performance Optimizations
 
@@ -564,7 +579,8 @@ npm run build -- --debug
 
 ---
 
-**Last Updated**: 2025-11-16
-**Total LOC**: 7693 (TypeScript)
-**Modules**: 60 source files, 37 compiled outputs
-**Deployment**: API-based hot reload (no restart)
+**Last Updated**: 2026-02-23
+**Total LOC**: ~10,000 (TypeScript)
+**Modules**: 80+ source files, 48 deploy mappings
+**Deployment**: File-based + addon restart (API hot-reload returns 400)
+**System Docs**: See `docs/` directory for detailed subsystem documentation

@@ -9,28 +9,34 @@
  *       → [influxdb out]
  *     → [api-call-service: input_boolean.turn_off scene_rollback]
  *
- * Reads the stored rollback entry, converts to grouped actions, outputs them.
- * Clears the rollback stack after pop.
+ * Pops from N-deep LIFO stack. Before restoring, captures current state
+ * as an auto-save entry so the user can undo the undo.
  */
 
 import { serviceToActionCall, groupActions } from "../utils/service-calls";
+import { createServiceCall } from "./utils";
+import { getAllEntities } from "../utils/entities";
+import { filterBlacklistedEntity } from "../utils/utils";
+import { shouldFilterEntity } from "../utils/static-states";
 
 // @ts-ignore - Node-RED global
 const message = msg;
 
 const ROLLBACK_STACK_KEY = "rollbackStack";
+const MAX_STACK_DEPTH = 10;
 
 interface RollbackEntry {
     sceneIds: string[];
     serviceCalls: Hass.Service[];
     entityCount: number;
     timestamp: number;
+    label: string;
 }
 
 // @ts-ignore - Node-RED global context
-const entry: RollbackEntry | null = global.get(ROLLBACK_STACK_KEY);
+const stack: RollbackEntry[] = global.get(ROLLBACK_STACK_KEY) || [];
 
-if (!entry || !entry.serviceCalls || entry.serviceCalls.length === 0) {
+if (stack.length === 0) {
     // Nothing to roll back
     message.payload = null;
 
@@ -42,37 +48,89 @@ if (!entry || !entry.serviceCalls || entry.serviceCalls.length === 0) {
         timestamp: Date.now(),
     };
 } else {
-    const ageMs = Date.now() - entry.timestamp;
+    // Determine which entry to pop (default: most recent)
+    const targetIndex = message.rollbackIndex != null
+        ? Math.min(Math.max(0, message.rollbackIndex), stack.length - 1)
+        : stack.length - 1;
+
+    const targetEntry = stack[targetIndex];
+    const ageMs = Date.now() - targetEntry.timestamp;
+
+    // Auto-save: capture current state of entities that will be restored
+    const targetEntityIds = new Set(
+        targetEntry.serviceCalls.map(sc => sc.data?.entity_id).filter(Boolean)
+    );
+
+    const allEntities = getAllEntities();
+    const autoSaveCalls: Hass.Service[] = [];
+
+    if (allEntities) {
+        for (const entityId of targetEntityIds) {
+            const entity = allEntities[entityId];
+            if (entity && filterBlacklistedEntity(entity) &&
+                !shouldFilterEntity(entityId, { checkBlacklist: true, checkStaticState: false, namespace: "presence" })) {
+                const sc = createServiceCall(entity);
+                if (sc) autoSaveCalls.push(sc);
+            }
+        }
+    }
+
+    // Remove the target entry from stack
+    stack.splice(targetIndex, 1);
+
+    // Push auto-save onto stack (so user can undo the undo)
+    if (autoSaveCalls.length > 0) {
+        const autoSaveEntry: RollbackEntry = {
+            sceneIds: ["auto-save"],
+            serviceCalls: autoSaveCalls,
+            entityCount: autoSaveCalls.length,
+            timestamp: Date.now(),
+            label: `Auto-save before restoring "${targetEntry.label}"`
+        };
+        stack.push(autoSaveEntry);
+        if (stack.length > MAX_STACK_DEPTH) {
+            stack.shift();
+        }
+    }
+
+    // @ts-ignore
+    global.set(ROLLBACK_STACK_KEY, stack);
 
     // Convert stored service calls to action format and group
-    const actions = groupActions(entry.serviceCalls.map(serviceToActionCall));
+    const actions = groupActions(targetEntry.serviceCalls.map(serviceToActionCall));
 
     message.payload = actions;
 
     message.debug = {
         operation: "pop",
-        entityCount: entry.entityCount,
-        sceneIds: entry.sceneIds.join(","),
+        entityCount: targetEntry.entityCount,
+        sceneIds: targetEntry.sceneIds.join(","),
+        label: targetEntry.label,
         ageMs,
+        autoSaveCount: autoSaveCalls.length,
+        remainingStackDepth: stack.length,
         timestamp: Date.now(),
     };
-
-    // Clear the rollback stack
-    // @ts-ignore - Node-RED global context
-    global.set(ROLLBACK_STACK_KEY, null);
 }
 
 // Publish rollback status sensor to HA
+const updatedStack: RollbackEntry[] = stack;
 message.rollbackSensorUpdate = {
     entity_id: "sensor.scene_rollback_status",
-    state: "empty",
+    state: updatedStack.length > 0 ? "available" : "empty",
     attributes: {
         friendly_name: "Scene Rollback Status",
         icon: "mdi:undo-variant",
-        scene_ids: "",
-        entity_count: 0,
-        captured_at: null,
-        age_minutes: 0
+        stack_depth: updatedStack.length,
+        max_depth: MAX_STACK_DEPTH,
+        entries: updatedStack.map((e, i) => ({
+            index: i,
+            label: e.label,
+            scene_ids: e.sceneIds.join(", "),
+            entity_count: e.entityCount,
+            age_minutes: Math.round((Date.now() - e.timestamp) / 60000),
+            timestamp: new Date(e.timestamp).toISOString()
+        }))
     }
 };
 

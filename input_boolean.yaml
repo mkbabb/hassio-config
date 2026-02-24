@@ -19,3 +19,6 @@ plants_trigger_off:
 scene_rollback:
     name: "Scene Rollback"
     icon: mdi:undo-variant
+clear_static_states:
+    name: "Clear Static States"
+    icon: mdi:broom

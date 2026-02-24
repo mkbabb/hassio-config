@@ -10,15 +10,11 @@ const message = msg;
 const data = message.data || {};
 const topic = message.topic || 'unknown';
 
-// Get flow context for current states
+// Get global context for current states (migrated from flow context)
 // @ts-ignore
-const flowInfoKey = `flowInfo.${topic}`;
+const flowInfo = global.get(`presenceFlowInfo.${topic}`) || {};
 // @ts-ignore
-const presenceStatesKey = `presenceStates.${topic}`;
-// @ts-ignore
-const flowInfo = flow.get(flowInfoKey) || {};
-// @ts-ignore
-const presenceStates = flow.get(presenceStatesKey) || {};
+const presenceStates = global.get(`presenceStates.${topic}`) || {};
 
 // Determine if any sensors are on
 const sensorsOn = Object.values(presenceStates).filter(state => state === 'on').length;

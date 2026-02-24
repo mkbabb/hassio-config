@@ -22,14 +22,14 @@ if (!registry) {
     message.statusCode = 500;
 } else {
     const areas = Object.values(registry.areas).map(area => {
-        // Read current flow state for this area
-        const flowInfoKey = `flowInfo.${area.topic}`;
+        // Read current state from global context (migrated from flow for cross-tab access)
+        const flowInfoKey = `presenceFlowInfo.${area.topic}`;
         const presenceStatesKey = `presenceStates.${area.topic}`;
 
         // @ts-ignore
-        const flowInfo = flow.get(flowInfoKey) || {};
+        const flowInfo = global.get(flowInfoKey) || {};
         // @ts-ignore
-        const presenceStates = flow.get(presenceStatesKey) || {};
+        const presenceStates = global.get(presenceStatesKey) || {};
 
         const now = Date.now();
         const inCooldown = flowInfo.coolDownEndTime ? now < flowInfo.coolDownEndTime : false;

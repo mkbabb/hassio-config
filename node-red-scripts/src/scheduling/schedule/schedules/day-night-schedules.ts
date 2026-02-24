@@ -9,11 +9,16 @@ export const dayNightSchedules: Schedule[] = [
         end: { entity_id: "sensor.sleep_time" }, // Template sensor
         precedence: 50,
         type: "continuous", // Keep state until next change
+        clearStaticOnTransition: true, // Clear external overrides on day↔night transition
         interpolation: {
             enabled: true,
             preamble_minutes: 60, // 1 hour sunrise simulation
             postamble_minutes: 60, // 1 hour sunset simulation
-            events: true
+            events: true,
+            entities: [
+                "regex:light\\.master_bedroom.*",
+                "light.upstairs_hallway_lights"
+            ]
         },
         defaultStates: {
             on: {

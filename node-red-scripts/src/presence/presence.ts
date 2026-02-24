@@ -111,20 +111,20 @@ const entities: Hass.State[] = rawEntities.map(e =>
 const filteredEntities = entities.filter((e) => filterBlacklistedEntity(e));
 
 
-// Flow context keys
+// Global context keys (accessible from API endpoints and publishers on other tabs)
 const presenceStatesKey = `presenceStates.${topic}`;
-const flowInfoKey = `flowInfo.${topic}`;
-const debounceKey = `debounce.${topic}`;
+const flowInfoKey = `presenceFlowInfo.${topic}`;
+const debounceKey = `presenceDebounce.${topic}`;
 
-// Initialize presence states if needed
+// Initialize presence states if needed (global context for cross-tab access)
 // @ts-ignore
-let presenceStates: Record<string, string> = flow.get(presenceStatesKey) || {};
+let presenceStates: Record<string, string> = global.get(presenceStatesKey) || {};
 // @ts-ignore
-flow.set(presenceStatesKey, presenceStates);
+global.set(presenceStatesKey, presenceStates);
 
-// Initialize flow info if needed
+// Initialize flow info if needed (global context for API/publisher access)
 // @ts-ignore
-let flowInfo = flow.get(flowInfoKey) || {
+let flowInfo = global.get(flowInfoKey) || {
     state: PresenceState.OFF,
     prevState: PresenceState.OFF,
     prevPrevState: PresenceState.OFF,
@@ -133,9 +133,9 @@ let flowInfo = flow.get(flowInfoKey) || {
     delay: 0
 };
 
-// Initialize debounce tracking
+// Initialize debounce tracking (global context for consistency)
 // @ts-ignore
-let debounceInfo = flow.get(debounceKey) || {
+let debounceInfo = global.get(debounceKey) || {
     lastUpdate: 0,
     pendingState: null
 };
@@ -158,9 +158,9 @@ if (isReset) {
 
     presenceStates = {};
     // @ts-ignore
-    flow.set(presenceStatesKey, presenceStates);
+    global.set(presenceStatesKey, presenceStates);
     // @ts-ignore
-    flow.set(flowInfoKey, flowInfo);
+    global.set(flowInfoKey, flowInfo);
 
     // @ts-ignore
     msg.payload = createPayload(filteredEntities, action);
@@ -190,7 +190,7 @@ if (
     debounceInfo.pendingState = normalizedState;
     debounceInfo.lastUpdate = now;
     // @ts-ignore
-    flow.set(debounceKey, debounceInfo);
+    global.set(debounceKey, debounceInfo);
     // Exit early - no state change, return empty message
     // @ts-ignore
     msg.payload = null;
@@ -317,13 +317,13 @@ if (
     flowInfo.prevPrevState = flowInfo.prevState;
     flowInfo.prevState = prevState;
 
-    // Update flow context
+    // Update global context (accessible from API endpoints and publishers)
     // @ts-ignore
-    flow.set(flowInfoKey, flowInfo);
+    global.set(flowInfoKey, flowInfo);
     // @ts-ignore
-    flow.set(presenceStatesKey, presenceStates);
+    global.set(presenceStatesKey, presenceStates);
     // @ts-ignore
-    flow.set(debounceKey, debounceInfo);
+    global.set(debounceKey, debounceInfo);
 
     // Add debug information to message
     // @ts-ignore

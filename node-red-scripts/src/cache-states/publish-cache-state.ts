@@ -12,20 +12,30 @@
  */
 
 import { GLOBAL_CACHED_STATES_KEY } from "../utils/utils";
+import { getEntity } from "../utils/entities";
 
 // @ts-ignore - Node-RED global
 const message = msg;
 
 const PUBLISHED_KEY = "publishedCacheStates";
 
-// @ts-ignore
-const lastPublished: Record<string, any> = flow.get(PUBLISHED_KEY) ?? {};
+// @ts-ignore — ephemeral dedup cache, not persisted across restarts
+const lastPublished: Record<string, any> = flow.get(PUBLISHED_KEY, "memory") ?? {};
 
 const now = new Date();
 const debug = message.debug || {};
 
-const cacheStatus = message.state || "unknown";
-const cachedStates: any[] = Array.isArray(message.cachedStates) ? message.cachedStates : [];
+// Fallback: read home_status entity if msg.state is not set
+const homeStatusEntity = getEntity("input_select.home_status");
+const cacheStatus = message.state || homeStatusEntity?.state || "unknown";
+
+// Fallback: read from global context if msg.cachedStates is not set
+// @ts-ignore
+const globalCached: any[] | undefined = global.get(GLOBAL_CACHED_STATES_KEY);
+const cachedStates: any[] = Array.isArray(message.cachedStates)
+    ? message.cachedStates
+    : (Array.isArray(globalCached) ? globalCached : []);
+
 const operation = debug.operation || (cacheStatus === "away" ? "snapshot" : cacheStatus === "home" ? "restore" : "unknown");
 
 interface SensorUpdate {
@@ -81,8 +91,8 @@ for (const update of updates) {
     newPublished[key] = current;
 }
 
-// @ts-ignore
-flow.set(PUBLISHED_KEY, newPublished);
+// @ts-ignore — ephemeral dedup cache (memory store)
+flow.set(PUBLISHED_KEY, newPublished, "memory");
 
 // @ts-ignore
 msg.payload = changedUpdates.length > 0 ? changedUpdates : null;

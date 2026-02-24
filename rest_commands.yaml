@@ -38,3 +38,24 @@ remote_fan_command:
             "oscillating": "{{ oscillating }}"
           }
         }
+schedule_update:
+    url: "http://localhost:1880/endpoint/schedules/{{ name }}"
+    method: PUT
+    headers:
+        Content-Type: application/json
+    payload: '{{ payload }}'
+    content_type: "application/json"
+presence_configure:
+    url: "http://localhost:1880/endpoint/presence/"
+    method: POST
+    headers:
+        Content-Type: application/json
+    payload: '{{ payload }}'
+    content_type: "application/json"
+clear_static_states:
+    url: "http://localhost:1880/endpoint/static-states/clear"
+    method: POST
+    headers:
+        Content-Type: application/json
+    payload: '{{ payload }}'
+    content_type: "application/json"

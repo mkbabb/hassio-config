@@ -6,7 +6,7 @@ export const lockSchedules: Schedule[] = [
     {
         name: "night_auto_lock",
         entities: ["lock.front_door", "lock.back_door", "lock.garage_door"],
-        start: "23:00",
+        start: "02:00",
         precedence: 100,
         type: "trigger", // Trigger once at night
         conditions: [{ type: "state", value: "on", entity_id: "binary_sensor.mike_asleep_status" }],

@@ -21,6 +21,7 @@ import {
     dateToTimeString
 } from "../utils/datetime";
 import { getEntity } from "../utils/entities";
+import { getExternalModificationSummary } from "../utils/static-states";
 
 // @ts-ignore - Node-RED global
 const message = msg;
@@ -31,8 +32,8 @@ const now = new Date();
 // @ts-ignore
 const registry: ScheduleRegistry = global.get("scheduleRegistry") ?? { version: 1, schedules: {}, tagDefinitions: {}, lastSeeded: null };
 
-// @ts-ignore
-const lastPublished: Record<string, any> = flow.get(PUBLISHED_KEY) ?? {};
+// @ts-ignore — ephemeral dedup cache, not persisted across restarts
+const lastPublished: Record<string, any> = flow.get(PUBLISHED_KEY, "memory") ?? {};
 
 const debug = message.debug || {};
 const scheduleEvents: ScheduleEvent[] = message.scheduleEvents || [];
@@ -50,22 +51,27 @@ interface SensorUpdate {
 
 const updates: SensorUpdate[] = [];
 
-// Per-schedule sensors
+// Per-schedule sensors (publish all schedules, including disabled ones for dashboard visibility)
 for (const schedule of Object.values(registry.schedules)) {
-    if (!schedule.enabled) continue;
 
     const scheduleKey = schedule.name.replace(/[^a-z0-9_]/g, "_");
     const statusEntityId = `sensor.schedule_${scheduleKey}_status`;
     const progressEntityId = `sensor.schedule_${scheduleKey}_progress`;
 
-    // Resolve times
+    // Resolve times (skip for disabled schedules)
     let startTimeStr = "";
     let endTimeStr: string | null = null;
     let active = false;
     let progress = 0;
     let phase = "inactive";
 
-    try {
+    if (!schedule.enabled) {
+        // Disabled — still resolve times for display but skip active checks
+        try {
+            startTimeStr = resolveTime(schedule.start);
+            endTimeStr = schedule.end ? resolveTime(schedule.end) : null;
+        } catch { /* ignore */ }
+    } else try {
         startTimeStr = resolveTime(schedule.start);
         endTimeStr = schedule.end ? resolveTime(schedule.end) : null;
         const scheduleType = schedule.type || "trigger";
@@ -120,8 +126,9 @@ for (const schedule of Object.values(registry.schedules)) {
     // Count matched entities for this schedule
     const matchedCount = entityMatches.filter(m => m.schedule === schedule.name).length;
 
-    // Status sensor
-    const statusState = active ? (phase !== "inactive" ? phase : "active") : "inactive";
+    // Status sensor — disabled schedules always show "disabled"
+    const statusState = !schedule.enabled ? "disabled"
+        : active ? (phase !== "inactive" ? phase : "active") : "inactive";
     updates.push({
         entity_id: statusEntityId,
         state: statusState,
@@ -135,6 +142,8 @@ for (const schedule of Object.values(registry.schedules)) {
             type: schedule.type || "trigger",
             precedence: schedule.precedence,
             source: schedule.source,
+            enabled: schedule.enabled,
+            clear_static_on_transition: schedule.clearStaticOnTransition ?? false,
             matched_entity_count: matchedCount,
             conditions: JSON.stringify(schedule.conditions || [])
         }
@@ -171,6 +180,8 @@ updates.push({
     }
 });
 
+const externalModSummary = getExternalModificationSummary();
+
 updates.push({
     entity_id: "sensor.schedule_engine_last_run",
     state: now.toISOString(),
@@ -181,7 +192,24 @@ updates.push({
         actions_generated: debug.actionsGenerated || 0,
         actions_skipped: debug.actionsSkipped || 0,
         entities_checked: debug.entitiesChecked || 0,
-        current_time: debug.currentTime || dateToTimeString(now)
+        current_time: debug.currentTime || dateToTimeString(now),
+        external_overrides: externalModSummary.count,
+        external_override_entities: externalModSummary.entities.join(",") || "none"
+    }
+});
+
+// External modification sensor
+updates.push({
+    entity_id: "sensor.external_overrides",
+    state: String(externalModSummary.count),
+    attributes: {
+        friendly_name: "External State Overrides",
+        icon: externalModSummary.count > 0 ? "mdi:hand-back-right" : "mdi:check-circle",
+        entities: externalModSummary.entities.join(",") || "none",
+        schedules: externalModSummary.schedules.join(",") || "none",
+        oldest_age_minutes: externalModSummary.oldestMs
+            ? Math.round((Date.now() - externalModSummary.oldestMs) / 60000)
+            : 0
     }
 });
 
@@ -201,9 +229,9 @@ for (const update of updates) {
     newPublished[key] = current;
 }
 
-// Save last-published state for next dedup check
+// Save last-published state for next dedup check (ephemeral — memory store)
 // @ts-ignore
-flow.set(PUBLISHED_KEY, newPublished);
+flow.set(PUBLISHED_KEY, newPublished, "memory");
 
 // Output only changed sensors for downstream split → api chain
 // @ts-ignore

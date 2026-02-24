@@ -1,4 +1,4 @@
-import { getEntity, getEntities, getEntitiesByDomain } from "../utils/entities";
+import { getEntity, getEntities, getEntitiesByDomain, getEntitiesByPattern } from "../utils/entities";
 import { getEntityDomain } from "../utils/utils";
 import { groupActions, serviceToActionCall } from "../utils/service-calls";
 import type { EntityState } from "./types";
@@ -53,6 +53,9 @@ const DEFAULT_SUNSET_STATE: EntityState = {
 const WARM_KELVIN = 2200;   // Warm candlelight
 const COOL_KELVIN = 3000;   // Max allowed cool white
 
+// Brightness hysteresis threshold (turn off at this value or below)
+const BRIGHTNESS_OFF_THRESHOLD = 3;
+
 // Convert Kelvin to mireds for Home Assistant
 function kelvinToMireds(kelvin: number): number {
     return Math.round(1000000 / kelvin);
@@ -66,7 +69,33 @@ interface SimulateSunOptions {
     entities?: string[];          // Override default entity selection
 }
 
-// Get master bedroom lights for sunrise
+// Resolve entity patterns (supports "regex:..." prefix and literal entity IDs)
+function resolveEntityPatterns(patterns: string[]): Hass.State[] {
+    const results = new Map<string, Hass.State>();
+
+    for (const pattern of patterns) {
+        if (pattern.startsWith("regex:")) {
+            const regexStr = pattern.slice(6);
+            try {
+                const matches = getEntitiesByPattern(new RegExp(regexStr));
+                for (const entity of matches) {
+                    results.set(entity.entity_id, entity);
+                }
+            } catch {
+                // Invalid regex — skip
+            }
+        } else {
+            const entity = getEntity(pattern);
+            if (entity) {
+                results.set(entity.entity_id, entity);
+            }
+        }
+    }
+
+    return Array.from(results.values());
+}
+
+// Get master bedroom lights for sunrise (default fallback)
 function getMasterBedroomLights(): Hass.State[] {
     return getEntities({
         domain: "light",
@@ -102,55 +131,97 @@ function lerpValue(t: number, start: number, end: number): number {
     return start + (end - start) * t;
 }
 
-// Exponential interpolation for probabilistic sampling (75% to 100%)
-function expLerp(t: number): number {
-    // Map t from [0.75, 1] to [0, 1] for exponential curve
-    const normalizedT = Math.max(0, (t - 0.75) / 0.25);
-    // Exponential curve: x^3 for smooth acceleration
-    return Math.pow(normalizedT, 3);
+// Binary light state tracking — prevents flicker from stateless probability
+const BINARY_STATES_KEY = "sunriseBinaryStates";
+
+function getBinaryStates(): Record<string, boolean> {
+    // @ts-ignore — ephemeral, memory store
+    return flow.get(BINARY_STATES_KEY, "memory") || {};
+}
+
+function setBinaryStates(states: Record<string, boolean>): void {
+    // @ts-ignore
+    flow.set(BINARY_STATES_KEY, states, "memory");
+}
+
+// Deterministic binary light control with state tracking
+// Once turned on, stays on. Once turned off (sunset), stays off.
+function shouldBinaryLightBeOn(entityId: string, t: number, phase: "sunrise" | "sunset"): boolean {
+    const binaryStates = getBinaryStates();
+    const currentlyOn = binaryStates[entityId] ?? false;
+
+    if (phase === "sunrise") {
+        if (currentlyOn) return true; // Already on, keep on
+
+        // Probability threshold: lights turn on progressively after 75%
+        // Use a deterministic hash based on entity ID to stagger timing
+        const hash = entityId.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+        const threshold = 0.75 + (hash % 25) / 100; // 0.75 to 1.0
+
+        if (t >= threshold) {
+            binaryStates[entityId] = true;
+            setBinaryStates(binaryStates);
+            return true;
+        }
+        return false;
+    } else {
+        // Sunset: turn off progressively after 75%
+        if (!currentlyOn) return false; // Already off, keep off
+
+        const hash = entityId.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+        const threshold = 0.75 + (hash % 25) / 100;
+
+        if (t >= threshold) {
+            binaryStates[entityId] = false;
+            setBinaryStates(binaryStates);
+            return false; // Turn off
+        }
+        return true; // Keep on
+    }
 }
 
 // Create service call for light with interpolated values
 function createLightServiceCall(
-    entity: Hass.State, 
-    t: number, 
+    entity: Hass.State,
+    t: number,
     phase: "sunrise" | "sunset",
     targetState: EntityState
 ): Partial<Hass.Service> | null {
     const domain = getEntityDomain(entity.entity_id);
-    
+
     if (domain !== "light") return null;
-    
+
     const serviceData: Record<string, any> = {
         entity_id: entity.entity_id
     };
-    
+
     if (phase === "sunrise") {
         // Sunrise: fade from off to target brightness/color
         if (supportsBrightness(entity)) {
             const targetBrightness = targetState.data?.brightness || 255;
             serviceData.brightness = Math.round(lerpValue(t, 1, targetBrightness));
         }
-        
+
         if (supportsColorTemp(entity)) {
+            // Interpolate in mireds directly to avoid Kelvin rounding drift
             const targetKelvin = targetState.data?.kelvin || COOL_KELVIN;
-            // Start warm and transition to target color temp
-            const interpolatedKelvin = Math.round(lerpValue(t, WARM_KELVIN, targetKelvin));
-            serviceData.color_temp = kelvinToMireds(interpolatedKelvin);
+            const warmMireds = kelvinToMireds(WARM_KELVIN);
+            const targetMireds = kelvinToMireds(targetKelvin);
+            serviceData.color_temp = Math.round(lerpValue(t, warmMireds, targetMireds));
         }
-        
-        // For non-brightness lights, use probabilistic sampling after 75%
-        if (!supportsBrightness(entity) && t >= 0.75) {
-            const probability = expLerp(t);
-            if (Math.random() < probability) {
-                serviceData.state = "on";
-            } else {
-                return null; // Don't turn on yet
+
+        // For non-brightness lights, use deterministic state tracking
+        if (!supportsBrightness(entity)) {
+            if (shouldBinaryLightBeOn(entity.entity_id, t, "sunrise")) {
+                return {
+                    domain: "light",
+                    service: "turn_on",
+                    data: serviceData
+                };
             }
-        } else if (!supportsBrightness(entity)) {
-            return null; // Don't control non-brightness lights before 75%
+            return null; // Don't turn on yet
         }
-        
+
         return {
             domain: "light",
             service: "turn_on",
@@ -161,9 +232,9 @@ function createLightServiceCall(
         if (supportsBrightness(entity)) {
             const currentBrightness = getLightBrightness(entity) || 255;
             const newBrightness = Math.round(lerpValue(t, currentBrightness, 1));
-            
-            if (newBrightness <= 1) {
-                // Turn off when brightness gets too low
+
+            if (newBrightness <= BRIGHTNESS_OFF_THRESHOLD) {
+                // Turn off when brightness gets too low (hysteresis at 3 to prevent edge flicker)
                 return {
                     domain: "light",
                     service: "turn_off",
@@ -173,31 +244,26 @@ function createLightServiceCall(
                 serviceData.brightness = newBrightness;
             }
         }
-        
+
         if (supportsColorTemp(entity)) {
             const currentMireds = getLightColorTemp(entity) || kelvinToMireds(COOL_KELVIN);
-            const currentKelvin = Math.round(1000000 / currentMireds);
-            // Fade to warm during sunset
-            const interpolatedKelvin = Math.round(lerpValue(t, currentKelvin, WARM_KELVIN));
-            serviceData.color_temp = kelvinToMireds(interpolatedKelvin);
+            const warmMireds = kelvinToMireds(WARM_KELVIN);
+            // Interpolate directly in mireds
+            serviceData.color_temp = Math.round(lerpValue(t, currentMireds, warmMireds));
         }
-        
-        // For non-brightness lights, use probabilistic sampling after 75%
-        if (!supportsBrightness(entity) && t >= 0.75) {
-            const probability = expLerp(t);
-            if (Math.random() < probability) {
+
+        // For non-brightness lights, use deterministic state tracking
+        if (!supportsBrightness(entity)) {
+            if (!shouldBinaryLightBeOn(entity.entity_id, t, "sunset")) {
                 return {
                     domain: "light",
                     service: "turn_off",
                     data: { entity_id: entity.entity_id }
                 };
-            } else {
-                return null; // Don't turn off yet
             }
-        } else if (!supportsBrightness(entity)) {
-            return null; // Don't control non-brightness lights before 75%
+            return null; // Keep on for now
         }
-        
+
         return {
             domain: "light",
             service: "turn_on",
@@ -214,18 +280,24 @@ const message = msg;
 let options: SimulateSunOptions;
 if (message.scheduleEvents && Array.isArray(message.scheduleEvents)) {
     // Find relevant schedule events ONLY from day_status schedule
-    const relevantEvent = message.scheduleEvents.find((event: any) => 
+    const relevantEvent = message.scheduleEvents.find((event: any) =>
         event.schedule === "day_status" && (
             (event.type === "ramp_up" && event.phase === "sunrise") ||
             (event.type === "ramp_down" && event.phase === "sunset")
         )
     );
-    
+
     if (relevantEvent) {
+        // Look up interpolation.entities from the schedule registry
+        // @ts-ignore
+        const registry = global.get("scheduleRegistry");
+        const dayStatusSchedule = registry?.schedules?.["day_status"];
+        const interpolationEntities = dayStatusSchedule?.interpolation?.entities;
+
         options = {
             t: relevantEvent.t,
             phase: relevantEvent.phase as "sunrise" | "sunset",
-            entities: message.options?.entities
+            entities: message.options?.entities || interpolationEntities
         };
     } else {
         // Fallback to options if no relevant event from day_status
@@ -248,57 +320,58 @@ if (!isHome()) {
     msg.debug = { reason: "not_home", presence_state: getEntity(PRESENCE_STATE_ENTITY_ID)?.state };
 } else {
     // Get target entities based on phase and options
-let targetEntities: Hass.State[];
-if (options.entities) {
-    // Use specified entities
-    targetEntities = options.entities.map(getEntity).filter(Boolean) as Hass.State[];
-} else if (phase === "sunrise") {
-    // Default: master bedroom lights
-    targetEntities = getMasterBedroomLights();
-} else {
-    // Default: currently ON lights
-    targetEntities = getCurrentlyOnLights();
-}
-
-// Create service calls for each entity
-const serviceActions: Partial<Hass.Service>[] = [];
-const entityDebugInfo: any[] = [];
-
-targetEntities.forEach(entity => {
-    const targetState = phase === "sunrise" ? DEFAULT_SUNRISE_STATE : DEFAULT_SUNSET_STATE;
-    const action = createLightServiceCall(entity, t, phase, targetState);
-    
-    if (action) {
-        serviceActions.push(action);
+    let targetEntities: Hass.State[];
+    if (options.entities && options.entities.length > 0) {
+        // Use specified entities (supports regex: prefix)
+        targetEntities = resolveEntityPatterns(options.entities);
+    } else if (phase === "sunrise") {
+        // Default: master bedroom lights
+        targetEntities = getMasterBedroomLights();
+    } else {
+        // Default: currently ON lights
+        targetEntities = getCurrentlyOnLights();
     }
-    
-    const brightness = getLightBrightness(entity);
-    const colorTemp = getLightColorTemp(entity);
-    
-    entityDebugInfo.push({
-        entity_id: entity.entity_id,
-        current_state: entity.state,
-        brightness,
-        color_temp: colorTemp,
-        color_temp_kelvin: colorTemp ? Math.round(1000000 / colorTemp) : null,
-        supports_brightness: supportsBrightness(entity),
-        supports_color_temp: supportsColorTemp(entity),
-        action_created: !!action
+
+    // Create service calls for each entity
+    const serviceActions: Partial<Hass.Service>[] = [];
+    const entityDebugInfo: any[] = [];
+
+    targetEntities.forEach(entity => {
+        const targetState = phase === "sunrise" ? DEFAULT_SUNRISE_STATE : DEFAULT_SUNSET_STATE;
+        const action = createLightServiceCall(entity, t, phase, targetState);
+
+        if (action) {
+            serviceActions.push(action);
+        }
+
+        const brightness = getLightBrightness(entity);
+        const colorTemp = getLightColorTemp(entity);
+
+        entityDebugInfo.push({
+            entity_id: entity.entity_id,
+            current_state: entity.state,
+            brightness,
+            color_temp: colorTemp,
+            color_temp_kelvin: colorTemp ? Math.round(1000000 / colorTemp) : null,
+            supports_brightness: supportsBrightness(entity),
+            supports_color_temp: supportsColorTemp(entity),
+            action_created: !!action
+        });
     });
-});
 
-// Group and output actions
-// @ts-ignore
-msg.payload = groupActions(serviceActions.map(serviceToActionCall));
+    // Group and output actions
+    // @ts-ignore
+    msg.payload = groupActions(serviceActions.map(serviceToActionCall));
 
-// Debug information
-// @ts-ignore
-msg.debug = {
-    phase,
-    t,
-    entities_found: targetEntities.length,
-    actions_generated: serviceActions.length,
-    presence_state: getEntity(PRESENCE_STATE_ENTITY_ID)?.state,
-    entity_details: entityDebugInfo
-};
+    // Debug information
+    // @ts-ignore
+    msg.debug = {
+        phase,
+        t,
+        entities_found: targetEntities.length,
+        actions_generated: serviceActions.length,
+        presence_state: getEntity(PRESENCE_STATE_ENTITY_ID)?.state,
+        entity_selection: options.entities ? "configured" : "default",
+        entity_details: entityDebugInfo
+    };
 }

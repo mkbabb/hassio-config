@@ -10,10 +10,10 @@ const topic = message.topic || message.data?.entity_id;
 // Debounce settings
 const RESET_DEBOUNCE_TIME = 30000; // 30 seconds
 
-// Check if we're in reset debounce mode
+// Check if we're in reset debounce mode (ephemeral — memory store)
 const debounceKey = `resetDebounce.${topic}`;
 // @ts-ignore
-const debounceInfo = flow.get(debounceKey) || { active: false, startTime: 0 };
+const debounceInfo = flow.get(debounceKey, "memory") || { active: false, startTime: 0 };
 
 const now = Date.now();
 
@@ -37,9 +37,9 @@ if (state === "reset") {
     }
 }
 
-// Save debounce state
+// Save debounce state (ephemeral — memory store)
 // @ts-ignore
-flow.set(debounceKey, debounceInfo);
+flow.set(debounceKey, debounceInfo, "memory");
 
 // Add debug info
 // @ts-ignore

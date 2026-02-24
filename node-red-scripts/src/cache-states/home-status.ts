@@ -8,13 +8,13 @@ const DEBOUNCE_DELAY_MS = 30 * 1000; // 30 seconds
 //@ts-ignore
 const message = msg;
 
-// Get stored values from flow or node context
+// Get stored values from flow context (ephemeral — memory store)
 //@ts-ignore
-const lastState = flow.get("home_status_last_state") || null;
+const lastState = flow.get("home_status_last_state", "memory") || null;
 //@ts-ignore
-const lastChangeTime = flow.get("home_status_last_change_time") || 0;
+const lastChangeTime = flow.get("home_status_last_change_time", "memory") || 0;
 //@ts-ignore
-const pendingTimeout = flow.get("home_status_pending_timeout") || null;
+const pendingTimeout = flow.get("home_status_pending_timeout", "memory") || null;
 
 // Current values
 const currentState = message.payload;
@@ -27,16 +27,16 @@ function processStateChange() {
     if (pendingTimeout) {
         clearTimeout(pendingTimeout);
         //@ts-ignore
-        flow.set("home_status_pending_timeout", null);
+        flow.set("home_status_pending_timeout", null, "memory");
     }
 
     // Logic for state changes
     if (currentState !== lastState) {
         // Update last state
         //@ts-ignore
-        flow.set("home_status_last_state", currentState);
+        flow.set("home_status_last_state", currentState, "memory");
         //@ts-ignore
-        flow.set("home_status_last_change_time", currentTime);
+        flow.set("home_status_last_change_time", currentTime, "memory");
 
         if (timeSinceLastChange > STABLE_PERIOD_MS) {
             // If stable for 5+ minutes, trigger immediately
@@ -82,12 +82,12 @@ function processStateChange() {
                 }
                 // Clear the saved timeout
                 //@ts-ignore
-                flow.set("home_status_pending_timeout", null);
+                flow.set("home_status_pending_timeout", null, "memory");
             }, DEBOUNCE_DELAY_MS);
 
             // Store timeout reference
             //@ts-ignore
-            flow.set("home_status_pending_timeout", timeout);
+            flow.set("home_status_pending_timeout", timeout, "memory");
             return null;
         }
     } else {

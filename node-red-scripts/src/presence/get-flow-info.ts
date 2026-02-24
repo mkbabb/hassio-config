@@ -1,4 +1,6 @@
 import { isInCoolDownPeriod, getRemainingCoolDownMs, PresenceState } from "./utils";
+import { isExternallyModified, clearExternalModification } from "../utils/static-states";
+import type { PresenceRegistry, ExternalOverridePolicy } from "./types";
 
 // @ts-ignore
 const message = msg;
@@ -12,16 +14,29 @@ const dataEntityId = data.entity_id || '';
 const topic: string = message.topic || dataEntityId || 'unknown';
 
 
-const flowInfoKey = `flowInfo.${topic}`;
+const flowInfoKey = `presenceFlowInfo.${topic}`;
 
-// @ts-ignore
-const flowInfo = flow.get(flowInfoKey) ?? {};
+// @ts-ignore — global context for cross-tab access
+const flowInfo = global.get(flowInfoKey) ?? {};
 
 // Get presence states to check current sensor status
 const presenceStatesKey = `presenceStates.${topic}`;
 // @ts-ignore
-const presenceStates = flow.get(presenceStatesKey) || {};
+const presenceStates = global.get(presenceStatesKey) || {};
 const hasPresence = Object.values(presenceStates).some(state => state === 'on');
+
+// Get the area config for external override policy
+// @ts-ignore
+const presenceRegistry: PresenceRegistry | undefined = global.get("presenceRegistry");
+const areaConfig = presenceRegistry?.areas?.[topic];
+const overridePolicy: ExternalOverridePolicy = areaConfig?.externalOverridePolicy || "respect";
+const gracePeriod = areaConfig?.externalOverrideGracePeriod || 300; // 5 min default
+
+// Check if any controlled entity was externally modified
+function hasExternalOverride(): boolean {
+    if (!areaConfig) return false;
+    return areaConfig.entities.some(e => isExternallyModified(e.entity_id));
+}
 
 // The trigger node sends two messages:
 // 1. Immediate: null payload (to reset/cancel)
@@ -37,16 +52,45 @@ if (message.payload) {
         flowInfo.coolDownEndTime = null;
         flowInfo.delay = 0;
         // @ts-ignore
-        flow.set(flowInfoKey, flowInfo);
+        global.set(flowInfoKey, flowInfo);
         // @ts-ignore
         msg.payload = null; // Clear payload to prevent turn_off
-    } else {
-        // No motion detected - proceed with turn off
+    } else if (overridePolicy === "respect" && hasExternalOverride()) {
+        // External override detected and policy says respect it — skip turn-off
         flowInfo.state = PresenceState.OFF;
         flowInfo.coolDownEndTime = null;
         flowInfo.delay = 0;
         // @ts-ignore
-        flow.set(flowInfoKey, flowInfo);
+        global.set(flowInfoKey, flowInfo);
+        // @ts-ignore
+        msg.payload = null; // Don't turn off externally-overridden entities
+    } else if (overridePolicy === "extend" && hasExternalOverride()) {
+        // Extend cooldown by grace period — re-enter PENDING_OFF
+        const extensionMs = gracePeriod * 1000;
+        flowInfo.state = PresenceState.PENDING_OFF;
+        flowInfo.coolDownEndTime = Date.now() + extensionMs;
+        flowInfo.delay = extensionMs;
+        // @ts-ignore
+        global.set(flowInfoKey, flowInfo);
+        // Clear the external modification since we're extending
+        if (areaConfig) {
+            areaConfig.entities.forEach(e => clearExternalModification(e.entity_id));
+        }
+        // Re-send the turn_off with the new delay (trigger node will handle it)
+        // @ts-ignore
+        msg.delay = extensionMs;
+        // Keep payload — it will be delayed again by the trigger node
+    } else {
+        // No motion detected, no external override (or "ignore" policy) - proceed with turn off
+        flowInfo.state = PresenceState.OFF;
+        flowInfo.coolDownEndTime = null;
+        flowInfo.delay = 0;
+        // @ts-ignore
+        global.set(flowInfoKey, flowInfo);
+        // Clear any external modifications for this area's entities since we're turning off
+        if (areaConfig) {
+            areaConfig.entities.forEach(e => clearExternalModification(e.entity_id));
+        }
         // Keep the turn_off payload to execute - it's already in msg.payload
     }
 } else {

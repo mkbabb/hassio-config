@@ -35,17 +35,17 @@ if (!topic) {
             message.payload = { error: `Area "${topic}" not found` };
             message.statusCode = 404;
         } else {
-            // Read all flow state for this area
-            const flowInfoKey = `flowInfo.${topic}`;
+            // Read all state from global context (migrated from flow for cross-tab access)
+            const flowInfoKey = `presenceFlowInfo.${topic}`;
             const presenceStatesKey = `presenceStates.${topic}`;
-            const debounceKey = `debounce.${topic}`;
+            const debounceKey = `presenceDebounce.${topic}`;
 
             // @ts-ignore
-            const flowInfo = flow.get(flowInfoKey) || {};
+            const flowInfo = global.get(flowInfoKey) || {};
             // @ts-ignore
-            const presenceStates = flow.get(presenceStatesKey) || {};
+            const presenceStates = global.get(presenceStatesKey) || {};
             // @ts-ignore
-            const debounceInfo = flow.get(debounceKey) || {};
+            const debounceInfo = global.get(debounceKey) || {};
 
             const now = Date.now();
             const inCooldown = flowInfo.coolDownEndTime ? now < flowInfo.coolDownEndTime : false;
