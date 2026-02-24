@@ -10,6 +10,7 @@
 
 import { createServiceCall } from "./utils";
 import { filterBlacklistedEntity } from "../utils/utils";
+import { shouldFilterEntity } from "../utils/static-states";
 
 // @ts-ignore - Node-RED global
 const message = msg;
@@ -37,9 +38,10 @@ if (!payload || !payload.entities || !Array.isArray(payload.entities)) {
     const entities: Hass.State[] = payload.entities;
     const sceneIds: string[] = payload.scene_ids || [];
 
-    // Filter blacklisted entities and convert to service calls
+    // Filter blacklisted entities and presence-tracked entities, then convert to service calls
     const serviceCalls: Hass.Service[] = entities
         .filter((entity) => filterBlacklistedEntity(entity))
+        .filter((entity) => !shouldFilterEntity(entity.entity_id, { checkBlacklist: true, checkStaticState: false, namespace: "presence" }))
         .map(createServiceCall)
         .filter((x): x is Hass.Service => x !== undefined);
 
@@ -77,6 +79,20 @@ if (!payload || !payload.entities || !Array.isArray(payload.entities)) {
         entityCount: serviceCalls.length,
     };
     message.statusCode = 200;
+
+    // Publish rollback status sensor to HA
+    message.rollbackSensorUpdate = {
+        entity_id: "sensor.scene_rollback_status",
+        state: "available",
+        attributes: {
+            friendly_name: "Scene Rollback Status",
+            icon: "mdi:undo-variant",
+            scene_ids: sceneIds.join(","),
+            entity_count: serviceCalls.length,
+            captured_at: new Date(entry.timestamp).toISOString(),
+            age_minutes: 0
+        }
+    };
 
     // @ts-ignore
     msg = message;

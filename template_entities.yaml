@@ -61,6 +61,18 @@
         {{ (off_lights | length / lights | length * 100) | round(1) }}
       {% endif %}
 
+  - name: "Active Schedule Count"
+    unique_id: active_schedule_count_template
+    state: >
+      {% set ns = namespace(n=0) %}
+      {% for s in states.sensor if s.entity_id.startswith('sensor.schedule_')
+         and s.entity_id.endswith('_status')
+         and s.state in ['active', 'ramp_up', 'ramp_down'] %}
+        {% set ns.n = ns.n + 1 %}
+      {% endfor %}
+      {{ ns.n }}
+    icon: mdi:calendar-clock
+
   - name: "Sunrise"
     unique_id: sunrise
     state: >

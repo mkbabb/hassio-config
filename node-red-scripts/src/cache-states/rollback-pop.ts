@@ -62,5 +62,19 @@ if (!entry || !entry.serviceCalls || entry.serviceCalls.length === 0) {
     global.set(ROLLBACK_STACK_KEY, null);
 }
 
+// Publish rollback status sensor to HA
+message.rollbackSensorUpdate = {
+    entity_id: "sensor.scene_rollback_status",
+    state: "empty",
+    attributes: {
+        friendly_name: "Scene Rollback Status",
+        icon: "mdi:undo-variant",
+        scene_ids: "",
+        entity_count: 0,
+        captured_at: null,
+        age_minutes: 0
+    }
+};
+
 // @ts-ignore
 msg = message;
