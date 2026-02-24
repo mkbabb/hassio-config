@@ -1,5 +1,6 @@
 import { createServiceCall, createAwayPayload } from "./utils";
 import { groupActions } from "../utils/service-calls";
+import { shouldFilterEntity } from "../utils/static-states";
 
 //@ts-ignore
 const message: Hass.Message = msg;
@@ -15,14 +16,24 @@ const entities: {
         return acc;
     }, {});
 
-// create the cached state object that will be saved to the global flow.
+// Check if entity is presence-tracked (registered in "presence" namespace blacklist)
+const isPresenceTracked = (entityId: string): boolean =>
+    shouldFilterEntity(entityId, { checkBlacklist: true, checkStaticState: false, namespace: "presence" });
+
+// Cached snapshot: EXCLUDE presence entities (won't be restored on home transition).
+// Presence-tracked entities are controlled solely by the presence DFA — restoring them
+// on home transition would create stale DFA state.
 const cachedStates: Hass.Service[] = Object.values(entities)
+    .filter(e => !isPresenceTracked(e.entity_id))
     .map(createServiceCall)
     .filter((x) => x !== undefined);
 
-// Creates a set of away states that we'll entry once our away condition is met within hass.
-// For example, we turn off all of the cached lights and switches, and turn on all the fans to low.
-const awayPayload = createAwayPayload(cachedStates);
+// Away payload: INCLUDE all entities (presence lights still turn off when leaving).
+// This ensures lights don't stay on for 30min after departure.
+const allServiceCalls: Hass.Service[] = Object.values(entities)
+    .map(createServiceCall)
+    .filter((x) => x !== undefined);
+const awayPayload = createAwayPayload(allServiceCalls);
 
 message.entities = entities;
 

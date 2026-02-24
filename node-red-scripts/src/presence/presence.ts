@@ -8,6 +8,7 @@ import {
     PresenceState,
     calculateCoolDown
 } from "./utils";
+import type { PresenceRegistry } from "./types";
 
 // Unified payload creator to follow DRY principle
 const createPayload = (entities: Hass.State[], action: "turn_on" | "turn_off") => {
@@ -66,16 +67,36 @@ const message = msg;
 const state = message.state; // State of the sensor
 const data = message.data;
 const dataEntityId = data.entity_id;
-const topic: string = message.topic ?? dataEntityId;
-const coolDown = message.coolDown ?? DEFAULT_COOL_DOWN;
+
+// Registry-based area lookup: if msg.topic is not explicitly set by upstream wiring,
+// look up the area from the presence registry based on the triggering sensor.
+// @ts-ignore
+const presenceRegistry: PresenceRegistry | undefined = global.get("presenceRegistry");
+const registryArea = presenceRegistry
+    ? Object.values(presenceRegistry.areas).find(a =>
+        a.enabled && a.sensors.includes(dataEntityId)
+    )
+    : undefined;
+
+// Topic resolution: prefer msg.topic (upstream wiring), fall back to registry, then entity_id
+const topic: string = message.topic ?? registryArea?.topic ?? dataEntityId;
+
+// Cooldown: prefer msg.coolDown (upstream wiring), then registry, then default
+const coolDown = message.coolDown ?? registryArea?.coolDown ?? DEFAULT_COOL_DOWN;
 
 
 // Filter entities - handle both strings and objects
-const rawEntities = message.entities
+// Prefer msg.entities (backward compat with per-room wiring), fall back to registry
+let rawEntities: any[] = message.entities
     ? (Array.isArray(message.entities) ? message.entities : [message.entities])
     : [];
 
-// If no entities provided, try to infer from topic (e.g., guest_bathroom → light.guest_bathroom_light)
+// If no entities from msg, try registry
+if (rawEntities.length === 0 && registryArea && registryArea.entities.length > 0) {
+    rawEntities = registryArea.entities.map(e => e.entity_id);
+}
+
+// If still no entities, try to infer from topic (e.g., guest_bathroom → light.guest_bathroom_light)
 if (rawEntities.length === 0 && topic && topic !== dataEntityId) {
     // Common pattern: topic like "guest_bathroom" maps to "light.guest_bathroom_light"
     const inferredLight = `light.${topic.replace(/_/g, '_')}_light`;

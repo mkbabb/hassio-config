@@ -1,5 +1,6 @@
 import { createServiceCall, createStatesMap } from "./utils";
 import { GLOBAL_CACHED_STATES_KEY } from "../utils/utils";
+import { shouldFilterEntity } from "../utils/static-states";
 
 // @ts-ignore
 const cachedStates: Partial<Hass.Service>[] = global.get(GLOBAL_CACHED_STATES_KEY) ?? [];
@@ -19,7 +20,12 @@ const sceneStates: Partial<Hass.Service>[] = Object.entries(msg.payload.entities
     .map(createServiceCall)
     .filter((x) => x !== undefined);
 
-const newStatesMap = createStatesMap(sceneStates);
+// Filter presence-tracked entities from scene states before merging
+const filteredSceneStates = sceneStates.filter(s => {
+    const entityId = s.data?.entity_id;
+    return !entityId || !shouldFilterEntity(entityId, { checkBlacklist: true, checkStaticState: false, namespace: "presence" });
+});
+const newStatesMap = createStatesMap(filteredSceneStates);
 
 const mergedStatesMap = new Map([...cachedStatesMap, ...newStatesMap]);
 const mergedStates = Array.from(mergedStatesMap.values());
