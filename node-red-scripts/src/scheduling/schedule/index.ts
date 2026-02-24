@@ -46,7 +46,8 @@ import { processContinuousSchedule, processTriggerSchedule } from "./schedule-pr
 import type {
     NormalizedSchedule,
     Schedule,
-    ScheduleEvent
+    ScheduleEvent,
+    ScheduleRegistry
 } from "../types";
 
 // ============================================================================
@@ -187,9 +188,9 @@ function resolveScheduleTime(
 
 // STEP 1: Initialize context and load configurations
 // @ts-ignore
-const schedules: Schedule[] = flow.get("schedules") ?? [];
-// @ts-ignore
-const tagDefinitions = flow.get("tagDefinitions") ?? {};
+const registry: ScheduleRegistry = global.get("scheduleRegistry") ?? { version: 1, schedules: {}, tagDefinitions: {}, lastSeeded: null };
+const schedules: Schedule[] = Object.values(registry.schedules).filter(s => s.enabled);
+const tagDefinitions = registry.tagDefinitions;
 // @ts-ignore
 const triggeredSchedules = flow.get("triggeredSchedules") ?? {};
 // @ts-ignore

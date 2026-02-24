@@ -92,3 +92,22 @@ export type ScheduleEvent = {
     phase?: "sunrise" | "active" | "sunset_prep" | "sunset" | "inactive";
     entity_id?: string;  // Optional entity this event applies to
 };
+
+// Registry types for runtime schedule management
+
+export type ScheduleSource = "static" | "dynamic";
+
+export interface RegistrySchedule extends Schedule {
+    source: ScheduleSource;
+    enabled: boolean;
+    createdAt: string;          // ISO 8601
+    updatedAt: string;
+    helperEntities?: string[];  // input_datetime entities created for dynamic schedules
+}
+
+export interface ScheduleRegistry {
+    version: number;            // schema version for future migrations
+    schedules: Record<string, RegistrySchedule>;
+    tagDefinitions: Record<string, string[]>;
+    lastSeeded: string | null;
+}
