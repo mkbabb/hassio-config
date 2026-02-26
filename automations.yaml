@@ -149,3 +149,62 @@
         milliseconds: 200
   mode: single
   max_exceeded: silent
+- id: sync_presence_cooldown_to_api
+  alias: Sync Presence Cooldown Sliders to API
+  description: When any presence cooldown input_number changes, call the presence API to update the registry
+  triggers:
+  - trigger: state
+    entity_id:
+    - input_number.presence_cooldown_bonus_room
+    - input_number.presence_cooldown_downstairs_bathroom
+    - input_number.presence_cooldown_garage
+    - input_number.presence_cooldown_guest_bathroom
+    - input_number.presence_cooldown_guest_bedroom
+    - input_number.presence_cooldown_laundry_room
+    - input_number.presence_cooldown_master_bathroom
+    - input_number.presence_cooldown_plant_room
+    - input_number.presence_cooldown_upstairs_hall
+  conditions: []
+  actions:
+  - action: rest_command.presence_configure
+    data:
+      payload: >-
+        {"topic": "{{ trigger.entity_id | replace('input_number.presence_cooldown_', '') }}", "coolDown": {{ states(trigger.entity_id) | int(600) }}}
+  mode: single
+- id: sync_override_policy_to_api
+  alias: Sync Override Policy Selectors to API
+  description: When any override policy input_select changes, call the presence API to update the registry
+  triggers:
+  - trigger: state
+    entity_id:
+    - input_select.override_policy_bonus_room
+    - input_select.override_policy_downstairs_bathroom
+    - input_select.override_policy_garage
+    - input_select.override_policy_guest_bathroom
+    - input_select.override_policy_guest_bedroom
+    - input_select.override_policy_laundry_room
+    - input_select.override_policy_master_bathroom
+    - input_select.override_policy_plant_room
+    - input_select.override_policy_upstairs_hall
+  conditions: []
+  actions:
+  - action: rest_command.presence_configure
+    data:
+      payload: >-
+        {"topic": "{{ trigger.entity_id | replace('input_select.override_policy_', '') }}", "externalOverridePolicy": "{{ states(trigger.entity_id) }}"}
+  mode: single
+- id: sync_shelf_duration_modifier
+  alias: Sync Shelf Duration Modifier to API
+  description: When shelf duration slider changes, update the schedule via REST API
+  triggers:
+  - trigger: state
+    entity_id:
+    - input_number.shelf_duration_modifier
+  conditions: []
+  actions:
+  - action: rest_command.schedule_update
+    data:
+      name: plants_shelf
+      payload: >-
+        {"durationModifier": {{ states('input_number.shelf_duration_modifier') | float(50) / 100 }}}
+  mode: single

@@ -16,15 +16,21 @@
 
   - name: "Wakeup Time"
     state: >
-      {% set weekday = now().weekday() %} {% if weekday < 5 %}
-        {{ states('input_datetime.weekday_wakeup') }}
-      {% else %}
+      {% set wd = now().weekday() %}
+      {% if wd >= 5 %}
         {{ states('input_datetime.weekend_wakeup') }}
+      {% else %}
+        {{ states('input_datetime.weekday_wakeup') }}
       {% endif %}
 
   - name: "Sleep Time"
     state: >
-      {% set weekday = now().weekday() %} {% if weekday < 5 %} {{ states('input_datetime.weekday_sleep') }} {% else %} {{ states('input_datetime.weekend_sleep') }} {% endif %}
+      {% set wd = now().weekday() %}
+      {% if wd == 4 or wd == 5 %}
+        {{ states('input_datetime.weekend_sleep') }}
+      {% else %}
+        {{ states('input_datetime.weekday_sleep') }}
+      {% endif %}
 
   - name: "Day Type"
     state: >

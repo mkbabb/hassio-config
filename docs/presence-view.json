@@ -1,0 +1,1201 @@
+{
+  "title": "Presence",
+  "path": "presence",
+  "icon": "mdi:motion-sensor",
+  "theme": "ios-dark-mode-blue-red",
+  "type": "masonry",
+  "badges": [],
+  "cards": [
+    {
+      "type": "vertical-stack",
+      "cards": [
+        {
+          "type": "custom:mushroom-template-card",
+          "primary": "Presence Summary",
+          "secondary": "{% set ns = namespace(occupied=0, pending=0) %}{% for area in ['bonus_room','downstairs_bathroom','garage','guest_bathroom','guest_bedroom','laundry_room','master_bathroom','plant_room','upstairs_hall'] %}{% set s = states('sensor.presence_' ~ area ~ '_state') %}{% if s == 'on' %}{% set ns.occupied = ns.occupied + 1 %}{% elif s == 'pending_off' %}{% set ns.pending = ns.pending + 1 %}{% endif %}{% endfor %}{{ ns.occupied }} occupied | {{ ns.pending }} cooling down | {{ 9 - ns.occupied - ns.pending }} vacant",
+          "icon": "mdi:home-account",
+          "icon_color": "{% if is_state('input_select.home_status', 'home') %}green{% else %}grey{% endif %}",
+          "layout": "horizontal",
+          "fill_container": true
+        },
+        {
+          "type": "entities",
+          "entities": [
+            {
+              "entity": "input_boolean.presence_pause",
+              "name": "Pause All Presence Detection"
+            },
+            {
+              "entity": "input_select.home_status",
+              "name": "Home Status"
+            }
+          ],
+          "state_color": true
+        }
+      ]
+    },
+    {
+      "type": "vertical-stack",
+      "cards": [
+        {
+          "type": "custom:mushroom-template-card",
+          "primary": "Bonus Room",
+          "secondary": "{% set s = states('sensor.presence_bonus_room_state') %}{% if s == 'on' %}Occupied ({{ state_attr('sensor.presence_bonus_room_state', 'dwell_minutes') | default(0) | round(0) }}min) | {{ state_attr('sensor.presence_bonus_room_state', 'sensors_on') }}/{{ state_attr('sensor.presence_bonus_room_state', 'sensor_count') }} sensors{% elif s == 'pending_off' %}Cooldown: {{ states('sensor.presence_bonus_room_cooldown') | default('0') }}min remaining{% else %}Vacant{% endif %}",
+          "icon": "{% set s = states('sensor.presence_bonus_room_state') %}{% if s == 'on' %}mdi:motion-sensor{% elif s == 'pending_off' %}mdi:timer-sand{% else %}mdi:motion-sensor-off{% endif %}",
+          "icon_color": "{% set s = states('sensor.presence_bonus_room_state') %}{% if s == 'on' %}green{% elif s == 'pending_off' %}amber{% else %}grey{% endif %}",
+          "badge_icon": "{% if states('sensor.presence_bonus_room_state') == 'disabled' %}mdi:pause-circle{% endif %}",
+          "layout": "horizontal",
+          "tap_action": {
+            "action": "more-info",
+            "entity": "sensor.presence_bonus_room_state"
+          }
+        },
+        {
+          "type": "entities",
+          "title": "Controlled Entities",
+          "show_header_toggle": false,
+          "state_color": true,
+          "entities": [
+            {
+              "entity": "light.bonus_room_ceiling_light",
+              "name": "Ceiling Light"
+            },
+            {
+              "entity": "light.bonus_room_light",
+              "name": "Bonus Room Light"
+            },
+            {
+              "entity": "light.fishing_lamp",
+              "name": "Fishing Lamp"
+            },
+            {
+              "entity": "light.hey_lamp_2_2",
+              "name": "Hey Lamp"
+            }
+          ]
+        },
+        {
+          "type": "markdown",
+          "content": "**Base Cooldown:** 600s (10min) | **Override Policy:** respect\n\n**Cooldown Total:** {{ state_attr('sensor.presence_bonus_room_state', 'cooldown_total_min') | default('N/A') }}min{% if state_attr('sensor.presence_bonus_room_state', 'cooldown_remaining_min') | default(0) | float(0) > 0 %} | **Remaining:** {{ state_attr('sensor.presence_bonus_room_state', 'cooldown_remaining_min') | default(0) | round(1) }}min{% endif %}"
+        },
+        {
+          "type": "conditional",
+          "conditions": [
+            {
+              "condition": "state",
+              "entity": "sensor.presence_bonus_room_state",
+              "state_not": "disabled"
+            }
+          ],
+          "card": {
+            "type": "custom:mushroom-chips-card",
+            "chips": [
+              {
+                "type": "action",
+                "icon": "mdi:pause-circle",
+                "tap_action": {
+                  "action": "call-service",
+                  "service": "rest_command.presence_configure",
+                  "data": {
+                    "payload": "{\"topic\": \"bonus_room\", \"enabled\": false}"
+                  },
+                  "confirmation": {
+                    "text": "Disable presence detection for Bonus Room?"
+                  }
+                },
+                "hold_action": {
+                  "action": "none"
+                }
+              }
+            ],
+            "alignment": "center"
+          }
+        },
+        {
+          "type": "conditional",
+          "conditions": [
+            {
+              "condition": "state",
+              "entity": "sensor.presence_bonus_room_state",
+              "state": "disabled"
+            }
+          ],
+          "card": {
+            "type": "custom:mushroom-chips-card",
+            "chips": [
+              {
+                "type": "action",
+                "icon": "mdi:play-circle",
+                "tap_action": {
+                  "action": "call-service",
+                  "service": "rest_command.presence_configure",
+                  "data": {
+                    "payload": "{\"topic\": \"bonus_room\", \"enabled\": true}"
+                  },
+                  "confirmation": {
+                    "text": "Enable presence detection for Bonus Room?"
+                  }
+                },
+                "hold_action": {
+                  "action": "none"
+                }
+              }
+            ],
+            "alignment": "center"
+          }
+        },
+        {
+          "type": "entities",
+          "title": "Sensors",
+          "show_header_toggle": false,
+          "state_color": true,
+          "entities": [
+            {
+              "entity": "binary_sensor.bonus_room_motion_sensor_2",
+              "name": "Motion Sensor 2"
+            },
+            {
+              "entity": "binary_sensor.bonus_room_motion_sensor_occupancy",
+              "name": "Occupancy Sensor"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "vertical-stack",
+      "cards": [
+        {
+          "type": "custom:mushroom-template-card",
+          "primary": "Downstairs Bathroom",
+          "secondary": "{% set s = states('sensor.presence_downstairs_bathroom_state') %}{% if s == 'on' %}Occupied ({{ state_attr('sensor.presence_downstairs_bathroom_state', 'dwell_minutes') | default(0) | round(0) }}min) | {{ state_attr('sensor.presence_downstairs_bathroom_state', 'sensors_on') }}/{{ state_attr('sensor.presence_downstairs_bathroom_state', 'sensor_count') }} sensors{% elif s == 'pending_off' %}Cooldown: {{ states('sensor.presence_downstairs_bathroom_cooldown') | default('0') }}min remaining{% else %}Vacant{% endif %}",
+          "icon": "{% set s = states('sensor.presence_downstairs_bathroom_state') %}{% if s == 'on' %}mdi:motion-sensor{% elif s == 'pending_off' %}mdi:timer-sand{% else %}mdi:motion-sensor-off{% endif %}",
+          "icon_color": "{% set s = states('sensor.presence_downstairs_bathroom_state') %}{% if s == 'on' %}green{% elif s == 'pending_off' %}amber{% else %}grey{% endif %}",
+          "badge_icon": "{% if states('sensor.presence_downstairs_bathroom_state') == 'disabled' %}mdi:pause-circle{% endif %}",
+          "layout": "horizontal",
+          "tap_action": {
+            "action": "more-info",
+            "entity": "sensor.presence_downstairs_bathroom_state"
+          }
+        },
+        {
+          "type": "entities",
+          "title": "Controlled Entities",
+          "show_header_toggle": false,
+          "state_color": true,
+          "entities": [
+            {
+              "entity": "light.downstairs_bathroom_light",
+              "name": "Bathroom Light"
+            },
+            {
+              "entity": "light.downstairs_bathroom_chili_pepper_lights",
+              "name": "Chili Pepper Lights"
+            }
+          ]
+        },
+        {
+          "type": "markdown",
+          "content": "**Base Cooldown:** 600s (10min) | **Override Policy:** respect\n\n**Cooldown Total:** {{ state_attr('sensor.presence_downstairs_bathroom_state', 'cooldown_total_min') | default('N/A') }}min{% if state_attr('sensor.presence_downstairs_bathroom_state', 'cooldown_remaining_min') | default(0) | float(0) > 0 %} | **Remaining:** {{ state_attr('sensor.presence_downstairs_bathroom_state', 'cooldown_remaining_min') | default(0) | round(1) }}min{% endif %}"
+        },
+        {
+          "type": "conditional",
+          "conditions": [
+            {
+              "condition": "state",
+              "entity": "sensor.presence_downstairs_bathroom_state",
+              "state_not": "disabled"
+            }
+          ],
+          "card": {
+            "type": "custom:mushroom-chips-card",
+            "chips": [
+              {
+                "type": "action",
+                "icon": "mdi:pause-circle",
+                "tap_action": {
+                  "action": "call-service",
+                  "service": "rest_command.presence_configure",
+                  "data": {
+                    "payload": "{\"topic\": \"downstairs_bathroom\", \"enabled\": false}"
+                  },
+                  "confirmation": {
+                    "text": "Disable presence detection for Downstairs Bathroom?"
+                  }
+                },
+                "hold_action": {
+                  "action": "none"
+                }
+              }
+            ],
+            "alignment": "center"
+          }
+        },
+        {
+          "type": "conditional",
+          "conditions": [
+            {
+              "condition": "state",
+              "entity": "sensor.presence_downstairs_bathroom_state",
+              "state": "disabled"
+            }
+          ],
+          "card": {
+            "type": "custom:mushroom-chips-card",
+            "chips": [
+              {
+                "type": "action",
+                "icon": "mdi:play-circle",
+                "tap_action": {
+                  "action": "call-service",
+                  "service": "rest_command.presence_configure",
+                  "data": {
+                    "payload": "{\"topic\": \"downstairs_bathroom\", \"enabled\": true}"
+                  },
+                  "confirmation": {
+                    "text": "Enable presence detection for Downstairs Bathroom?"
+                  }
+                },
+                "hold_action": {
+                  "action": "none"
+                }
+              }
+            ],
+            "alignment": "center"
+          }
+        },
+        {
+          "type": "entities",
+          "title": "Sensors",
+          "show_header_toggle": false,
+          "state_color": true,
+          "entities": [
+            {
+              "entity": "binary_sensor.downstairs_bathroom_motion_sensor_2",
+              "name": "Motion Sensor 2"
+            },
+            {
+              "entity": "binary_sensor.downstairs_bathroom_motion_sensor_occupancy",
+              "name": "Occupancy Sensor"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "vertical-stack",
+      "cards": [
+        {
+          "type": "custom:mushroom-template-card",
+          "primary": "Garage",
+          "secondary": "{% set s = states('sensor.presence_garage_state') %}{% if s == 'on' %}Occupied ({{ state_attr('sensor.presence_garage_state', 'dwell_minutes') | default(0) | round(0) }}min) | {{ state_attr('sensor.presence_garage_state', 'sensors_on') }}/{{ state_attr('sensor.presence_garage_state', 'sensor_count') }} sensors{% elif s == 'pending_off' %}Cooldown: {{ states('sensor.presence_garage_cooldown') | default('0') }}min remaining{% else %}Vacant{% endif %}",
+          "icon": "{% set s = states('sensor.presence_garage_state') %}{% if s == 'on' %}mdi:motion-sensor{% elif s == 'pending_off' %}mdi:timer-sand{% else %}mdi:motion-sensor-off{% endif %}",
+          "icon_color": "{% set s = states('sensor.presence_garage_state') %}{% if s == 'on' %}green{% elif s == 'pending_off' %}amber{% else %}grey{% endif %}",
+          "badge_icon": "{% if states('sensor.presence_garage_state') == 'disabled' %}mdi:pause-circle{% endif %}",
+          "layout": "horizontal",
+          "tap_action": {
+            "action": "more-info",
+            "entity": "sensor.presence_garage_state"
+          }
+        },
+        {
+          "type": "entities",
+          "title": "Controlled Entities",
+          "show_header_toggle": false,
+          "state_color": true,
+          "entities": [
+            {
+              "entity": "light.garage_light_1",
+              "name": "Garage Light 1"
+            },
+            {
+              "entity": "light.garage_light_2",
+              "name": "Garage Light 2"
+            },
+            {
+              "entity": "light.garage_shelf_light_1",
+              "name": "Garage Shelf Light"
+            }
+          ]
+        },
+        {
+          "type": "markdown",
+          "content": "**Base Cooldown:** 600s (10min) | **Override Policy:** respect\n\n**Cooldown Total:** {{ state_attr('sensor.presence_garage_state', 'cooldown_total_min') | default('N/A') }}min{% if state_attr('sensor.presence_garage_state', 'cooldown_remaining_min') | default(0) | float(0) > 0 %} | **Remaining:** {{ state_attr('sensor.presence_garage_state', 'cooldown_remaining_min') | default(0) | round(1) }}min{% endif %}"
+        },
+        {
+          "type": "conditional",
+          "conditions": [
+            {
+              "condition": "state",
+              "entity": "sensor.presence_garage_state",
+              "state_not": "disabled"
+            }
+          ],
+          "card": {
+            "type": "custom:mushroom-chips-card",
+            "chips": [
+              {
+                "type": "action",
+                "icon": "mdi:pause-circle",
+                "tap_action": {
+                  "action": "call-service",
+                  "service": "rest_command.presence_configure",
+                  "data": {
+                    "payload": "{\"topic\": \"garage\", \"enabled\": false}"
+                  },
+                  "confirmation": {
+                    "text": "Disable presence detection for Garage?"
+                  }
+                },
+                "hold_action": {
+                  "action": "none"
+                }
+              }
+            ],
+            "alignment": "center"
+          }
+        },
+        {
+          "type": "conditional",
+          "conditions": [
+            {
+              "condition": "state",
+              "entity": "sensor.presence_garage_state",
+              "state": "disabled"
+            }
+          ],
+          "card": {
+            "type": "custom:mushroom-chips-card",
+            "chips": [
+              {
+                "type": "action",
+                "icon": "mdi:play-circle",
+                "tap_action": {
+                  "action": "call-service",
+                  "service": "rest_command.presence_configure",
+                  "data": {
+                    "payload": "{\"topic\": \"garage\", \"enabled\": true}"
+                  },
+                  "confirmation": {
+                    "text": "Enable presence detection for Garage?"
+                  }
+                },
+                "hold_action": {
+                  "action": "none"
+                }
+              }
+            ],
+            "alignment": "center"
+          }
+        },
+        {
+          "type": "entities",
+          "title": "Sensors",
+          "show_header_toggle": false,
+          "state_color": true,
+          "entities": [
+            {
+              "entity": "binary_sensor.garage_entry_door_door",
+              "name": "Entry Door"
+            },
+            {
+              "entity": "binary_sensor.garage_motion_sensor",
+              "name": "Motion Sensor"
+            },
+            {
+              "entity": "binary_sensor.ratgdov25i_4b1c3b_motion",
+              "name": "Garage Door Motion"
+            },
+            {
+              "entity": "binary_sensor.ratgdov25i_4b1c3b_obstruction",
+              "name": "Garage Door Obstruction"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "vertical-stack",
+      "cards": [
+        {
+          "type": "custom:mushroom-template-card",
+          "primary": "Guest Bathroom",
+          "secondary": "{% set s = states('sensor.presence_guest_bathroom_state') %}{% if s == 'on' %}Occupied ({{ state_attr('sensor.presence_guest_bathroom_state', 'dwell_minutes') | default(0) | round(0) }}min) | {{ state_attr('sensor.presence_guest_bathroom_state', 'sensors_on') }}/{{ state_attr('sensor.presence_guest_bathroom_state', 'sensor_count') }} sensors{% elif s == 'pending_off' %}Cooldown: {{ states('sensor.presence_guest_bathroom_cooldown') | default('0') }}min remaining{% else %}Vacant{% endif %}",
+          "icon": "{% set s = states('sensor.presence_guest_bathroom_state') %}{% if s == 'on' %}mdi:motion-sensor{% elif s == 'pending_off' %}mdi:timer-sand{% else %}mdi:motion-sensor-off{% endif %}",
+          "icon_color": "{% set s = states('sensor.presence_guest_bathroom_state') %}{% if s == 'on' %}green{% elif s == 'pending_off' %}amber{% else %}grey{% endif %}",
+          "badge_icon": "{% if states('sensor.presence_guest_bathroom_state') == 'disabled' %}mdi:pause-circle{% endif %}",
+          "layout": "horizontal",
+          "tap_action": {
+            "action": "more-info",
+            "entity": "sensor.presence_guest_bathroom_state"
+          }
+        },
+        {
+          "type": "entities",
+          "title": "Controlled Entities",
+          "show_header_toggle": false,
+          "state_color": true,
+          "entities": [
+            {
+              "entity": "light.guest_bathroom_light",
+              "name": "Bathroom Light"
+            },
+            {
+              "entity": "light.guest_bathroom_peppa_pig_lights",
+              "name": "Peppa Pig Lights"
+            }
+          ]
+        },
+        {
+          "type": "markdown",
+          "content": "**Base Cooldown:** 600s (10min) | **Override Policy:** respect\n\n**Cooldown Total:** {{ state_attr('sensor.presence_guest_bathroom_state', 'cooldown_total_min') | default('N/A') }}min{% if state_attr('sensor.presence_guest_bathroom_state', 'cooldown_remaining_min') | default(0) | float(0) > 0 %} | **Remaining:** {{ state_attr('sensor.presence_guest_bathroom_state', 'cooldown_remaining_min') | default(0) | round(1) }}min{% endif %}"
+        },
+        {
+          "type": "conditional",
+          "conditions": [
+            {
+              "condition": "state",
+              "entity": "sensor.presence_guest_bathroom_state",
+              "state_not": "disabled"
+            }
+          ],
+          "card": {
+            "type": "custom:mushroom-chips-card",
+            "chips": [
+              {
+                "type": "action",
+                "icon": "mdi:pause-circle",
+                "tap_action": {
+                  "action": "call-service",
+                  "service": "rest_command.presence_configure",
+                  "data": {
+                    "payload": "{\"topic\": \"guest_bathroom\", \"enabled\": false}"
+                  },
+                  "confirmation": {
+                    "text": "Disable presence detection for Guest Bathroom?"
+                  }
+                },
+                "hold_action": {
+                  "action": "none"
+                }
+              }
+            ],
+            "alignment": "center"
+          }
+        },
+        {
+          "type": "conditional",
+          "conditions": [
+            {
+              "condition": "state",
+              "entity": "sensor.presence_guest_bathroom_state",
+              "state": "disabled"
+            }
+          ],
+          "card": {
+            "type": "custom:mushroom-chips-card",
+            "chips": [
+              {
+                "type": "action",
+                "icon": "mdi:play-circle",
+                "tap_action": {
+                  "action": "call-service",
+                  "service": "rest_command.presence_configure",
+                  "data": {
+                    "payload": "{\"topic\": \"guest_bathroom\", \"enabled\": true}"
+                  },
+                  "confirmation": {
+                    "text": "Enable presence detection for Guest Bathroom?"
+                  }
+                },
+                "hold_action": {
+                  "action": "none"
+                }
+              }
+            ],
+            "alignment": "center"
+          }
+        },
+        {
+          "type": "entities",
+          "title": "Sensors",
+          "show_header_toggle": false,
+          "state_color": true,
+          "entities": [
+            {
+              "entity": "binary_sensor.guest_bathroom_motion_sensor",
+              "name": "Motion Sensor"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "vertical-stack",
+      "cards": [
+        {
+          "type": "custom:mushroom-template-card",
+          "primary": "Guest Bedroom",
+          "secondary": "{% set s = states('sensor.presence_guest_bedroom_state') %}{% if s == 'on' %}Occupied ({{ state_attr('sensor.presence_guest_bedroom_state', 'dwell_minutes') | default(0) | round(0) }}min) | {{ state_attr('sensor.presence_guest_bedroom_state', 'sensors_on') }}/{{ state_attr('sensor.presence_guest_bedroom_state', 'sensor_count') }} sensors{% elif s == 'pending_off' %}Cooldown: {{ states('sensor.presence_guest_bedroom_cooldown') | default('0') }}min remaining{% else %}Vacant{% endif %}",
+          "icon": "{% set s = states('sensor.presence_guest_bedroom_state') %}{% if s == 'on' %}mdi:motion-sensor{% elif s == 'pending_off' %}mdi:timer-sand{% else %}mdi:motion-sensor-off{% endif %}",
+          "icon_color": "{% set s = states('sensor.presence_guest_bedroom_state') %}{% if s == 'on' %}green{% elif s == 'pending_off' %}amber{% else %}grey{% endif %}",
+          "badge_icon": "{% if states('sensor.presence_guest_bedroom_state') == 'disabled' %}mdi:pause-circle{% endif %}",
+          "layout": "horizontal",
+          "tap_action": {
+            "action": "more-info",
+            "entity": "sensor.presence_guest_bedroom_state"
+          }
+        },
+        {
+          "type": "entities",
+          "title": "Controlled Entities",
+          "show_header_toggle": false,
+          "state_color": true,
+          "entities": [
+            {
+              "entity": "light.guest_bedroom_ceiling_light",
+              "name": "Ceiling Light"
+            },
+            {
+              "entity": "light.goblet_light",
+              "name": "Goblet Light"
+            },
+            {
+              "entity": "light.paintbucket_light",
+              "name": "Paintbucket Light"
+            },
+            {
+              "entity": "light.squiggle_lamp",
+              "name": "Squiggle Lamp"
+            },
+            {
+              "entity": "light.sunflower_light",
+              "name": "Sunflower Light"
+            },
+            {
+              "entity": "light.hey_lamp_3",
+              "name": "Hey Lamp 3"
+            },
+            {
+              "entity": "light.pixar_lamp",
+              "name": "Pixar Lamp"
+            }
+          ]
+        },
+        {
+          "type": "markdown",
+          "content": "**Base Cooldown:** 600s (10min) | **Override Policy:** respect\n\n**Cooldown Total:** {{ state_attr('sensor.presence_guest_bedroom_state', 'cooldown_total_min') | default('N/A') }}min{% if state_attr('sensor.presence_guest_bedroom_state', 'cooldown_remaining_min') | default(0) | float(0) > 0 %} | **Remaining:** {{ state_attr('sensor.presence_guest_bedroom_state', 'cooldown_remaining_min') | default(0) | round(1) }}min{% endif %}"
+        },
+        {
+          "type": "conditional",
+          "conditions": [
+            {
+              "condition": "state",
+              "entity": "sensor.presence_guest_bedroom_state",
+              "state_not": "disabled"
+            }
+          ],
+          "card": {
+            "type": "custom:mushroom-chips-card",
+            "chips": [
+              {
+                "type": "action",
+                "icon": "mdi:pause-circle",
+                "tap_action": {
+                  "action": "call-service",
+                  "service": "rest_command.presence_configure",
+                  "data": {
+                    "payload": "{\"topic\": \"guest_bedroom\", \"enabled\": false}"
+                  },
+                  "confirmation": {
+                    "text": "Disable presence detection for Guest Bedroom?"
+                  }
+                },
+                "hold_action": {
+                  "action": "none"
+                }
+              }
+            ],
+            "alignment": "center"
+          }
+        },
+        {
+          "type": "conditional",
+          "conditions": [
+            {
+              "condition": "state",
+              "entity": "sensor.presence_guest_bedroom_state",
+              "state": "disabled"
+            }
+          ],
+          "card": {
+            "type": "custom:mushroom-chips-card",
+            "chips": [
+              {
+                "type": "action",
+                "icon": "mdi:play-circle",
+                "tap_action": {
+                  "action": "call-service",
+                  "service": "rest_command.presence_configure",
+                  "data": {
+                    "payload": "{\"topic\": \"guest_bedroom\", \"enabled\": true}"
+                  },
+                  "confirmation": {
+                    "text": "Enable presence detection for Guest Bedroom?"
+                  }
+                },
+                "hold_action": {
+                  "action": "none"
+                }
+              }
+            ],
+            "alignment": "center"
+          }
+        },
+        {
+          "type": "entities",
+          "title": "Sensors",
+          "show_header_toggle": false,
+          "state_color": true,
+          "entities": [
+            {
+              "entity": "binary_sensor.guest_bedroom_motion_sensor",
+              "name": "Motion Sensor"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "vertical-stack",
+      "cards": [
+        {
+          "type": "custom:mushroom-template-card",
+          "primary": "Laundry Room",
+          "secondary": "{% set s = states('sensor.presence_laundry_room_state') %}{% if s == 'on' %}Occupied ({{ state_attr('sensor.presence_laundry_room_state', 'dwell_minutes') | default(0) | round(0) }}min) | {{ state_attr('sensor.presence_laundry_room_state', 'sensors_on') }}/{{ state_attr('sensor.presence_laundry_room_state', 'sensor_count') }} sensors{% elif s == 'pending_off' %}Cooldown: {{ states('sensor.presence_laundry_room_cooldown') | default('0') }}min remaining{% else %}Vacant{% endif %}",
+          "icon": "{% set s = states('sensor.presence_laundry_room_state') %}{% if s == 'on' %}mdi:motion-sensor{% elif s == 'pending_off' %}mdi:timer-sand{% else %}mdi:motion-sensor-off{% endif %}",
+          "icon_color": "{% set s = states('sensor.presence_laundry_room_state') %}{% if s == 'on' %}green{% elif s == 'pending_off' %}amber{% else %}grey{% endif %}",
+          "badge_icon": "{% if states('sensor.presence_laundry_room_state') == 'disabled' %}mdi:pause-circle{% endif %}",
+          "layout": "horizontal",
+          "tap_action": {
+            "action": "more-info",
+            "entity": "sensor.presence_laundry_room_state"
+          }
+        },
+        {
+          "type": "entities",
+          "title": "Controlled Entities",
+          "show_header_toggle": false,
+          "state_color": true,
+          "entities": [
+            {
+              "entity": "light.laundry_room_light",
+              "name": "Laundry Room Light"
+            }
+          ]
+        },
+        {
+          "type": "markdown",
+          "content": "**Base Cooldown:** 600s (10min) | **Override Policy:** respect\n\n**Cooldown Total:** {{ state_attr('sensor.presence_laundry_room_state', 'cooldown_total_min') | default('N/A') }}min{% if state_attr('sensor.presence_laundry_room_state', 'cooldown_remaining_min') | default(0) | float(0) > 0 %} | **Remaining:** {{ state_attr('sensor.presence_laundry_room_state', 'cooldown_remaining_min') | default(0) | round(1) }}min{% endif %}"
+        },
+        {
+          "type": "conditional",
+          "conditions": [
+            {
+              "condition": "state",
+              "entity": "sensor.presence_laundry_room_state",
+              "state_not": "disabled"
+            }
+          ],
+          "card": {
+            "type": "custom:mushroom-chips-card",
+            "chips": [
+              {
+                "type": "action",
+                "icon": "mdi:pause-circle",
+                "tap_action": {
+                  "action": "call-service",
+                  "service": "rest_command.presence_configure",
+                  "data": {
+                    "payload": "{\"topic\": \"laundry_room\", \"enabled\": false}"
+                  },
+                  "confirmation": {
+                    "text": "Disable presence detection for Laundry Room?"
+                  }
+                },
+                "hold_action": {
+                  "action": "none"
+                }
+              }
+            ],
+            "alignment": "center"
+          }
+        },
+        {
+          "type": "conditional",
+          "conditions": [
+            {
+              "condition": "state",
+              "entity": "sensor.presence_laundry_room_state",
+              "state": "disabled"
+            }
+          ],
+          "card": {
+            "type": "custom:mushroom-chips-card",
+            "chips": [
+              {
+                "type": "action",
+                "icon": "mdi:play-circle",
+                "tap_action": {
+                  "action": "call-service",
+                  "service": "rest_command.presence_configure",
+                  "data": {
+                    "payload": "{\"topic\": \"laundry_room\", \"enabled\": true}"
+                  },
+                  "confirmation": {
+                    "text": "Enable presence detection for Laundry Room?"
+                  }
+                },
+                "hold_action": {
+                  "action": "none"
+                }
+              }
+            ],
+            "alignment": "center"
+          }
+        },
+        {
+          "type": "entities",
+          "title": "Sensors",
+          "show_header_toggle": false,
+          "state_color": true,
+          "entities": [
+            {
+              "entity": "binary_sensor.garage_entry_door_door",
+              "name": "Garage Entry Door"
+            },
+            {
+              "entity": "binary_sensor.laundry_room_motion_sensor_2",
+              "name": "Motion Sensor 2"
+            },
+            {
+              "entity": "binary_sensor.laundry_room_motion_sensor_occupancy",
+              "name": "Occupancy Sensor"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "vertical-stack",
+      "cards": [
+        {
+          "type": "custom:mushroom-template-card",
+          "primary": "Master Bathroom",
+          "secondary": "{% set s = states('sensor.presence_master_bathroom_state') %}{% if s == 'on' %}Occupied ({{ state_attr('sensor.presence_master_bathroom_state', 'dwell_minutes') | default(0) | round(0) }}min) | {{ state_attr('sensor.presence_master_bathroom_state', 'sensors_on') }}/{{ state_attr('sensor.presence_master_bathroom_state', 'sensor_count') }} sensors{% elif s == 'pending_off' %}Cooldown: {{ states('sensor.presence_master_bathroom_cooldown') | default('0') }}min remaining{% else %}Vacant{% endif %}",
+          "icon": "{% set s = states('sensor.presence_master_bathroom_state') %}{% if s == 'on' %}mdi:motion-sensor{% elif s == 'pending_off' %}mdi:timer-sand{% else %}mdi:motion-sensor-off{% endif %}",
+          "icon_color": "{% set s = states('sensor.presence_master_bathroom_state') %}{% if s == 'on' %}green{% elif s == 'pending_off' %}amber{% else %}grey{% endif %}",
+          "badge_icon": "{% if states('sensor.presence_master_bathroom_state') == 'disabled' %}mdi:pause-circle{% endif %}",
+          "layout": "horizontal",
+          "tap_action": {
+            "action": "more-info",
+            "entity": "sensor.presence_master_bathroom_state"
+          }
+        },
+        {
+          "type": "entities",
+          "title": "Controlled Entities",
+          "show_header_toggle": false,
+          "state_color": true,
+          "entities": [
+            {
+              "entity": "light.master_bathroom_light_1",
+              "name": "Bathroom Light 1"
+            },
+            {
+              "entity": "light.master_bathroom_light_2",
+              "name": "Bathroom Light 2"
+            },
+            {
+              "entity": "light.master_bathroom_chili_pepper_lights",
+              "name": "Chili Pepper Lights"
+            }
+          ]
+        },
+        {
+          "type": "markdown",
+          "content": "**Base Cooldown:** 600s (10min) | **Override Policy:** respect\n\n**Cooldown Total:** {{ state_attr('sensor.presence_master_bathroom_state', 'cooldown_total_min') | default('N/A') }}min{% if state_attr('sensor.presence_master_bathroom_state', 'cooldown_remaining_min') | default(0) | float(0) > 0 %} | **Remaining:** {{ state_attr('sensor.presence_master_bathroom_state', 'cooldown_remaining_min') | default(0) | round(1) }}min{% endif %}"
+        },
+        {
+          "type": "conditional",
+          "conditions": [
+            {
+              "condition": "state",
+              "entity": "sensor.presence_master_bathroom_state",
+              "state_not": "disabled"
+            }
+          ],
+          "card": {
+            "type": "custom:mushroom-chips-card",
+            "chips": [
+              {
+                "type": "action",
+                "icon": "mdi:pause-circle",
+                "tap_action": {
+                  "action": "call-service",
+                  "service": "rest_command.presence_configure",
+                  "data": {
+                    "payload": "{\"topic\": \"master_bathroom\", \"enabled\": false}"
+                  },
+                  "confirmation": {
+                    "text": "Disable presence detection for Master Bathroom?"
+                  }
+                },
+                "hold_action": {
+                  "action": "none"
+                }
+              }
+            ],
+            "alignment": "center"
+          }
+        },
+        {
+          "type": "conditional",
+          "conditions": [
+            {
+              "condition": "state",
+              "entity": "sensor.presence_master_bathroom_state",
+              "state": "disabled"
+            }
+          ],
+          "card": {
+            "type": "custom:mushroom-chips-card",
+            "chips": [
+              {
+                "type": "action",
+                "icon": "mdi:play-circle",
+                "tap_action": {
+                  "action": "call-service",
+                  "service": "rest_command.presence_configure",
+                  "data": {
+                    "payload": "{\"topic\": \"master_bathroom\", \"enabled\": true}"
+                  },
+                  "confirmation": {
+                    "text": "Enable presence detection for Master Bathroom?"
+                  }
+                },
+                "hold_action": {
+                  "action": "none"
+                }
+              }
+            ],
+            "alignment": "center"
+          }
+        },
+        {
+          "type": "entities",
+          "title": "Sensors",
+          "show_header_toggle": false,
+          "state_color": true,
+          "entities": [
+            {
+              "entity": "binary_sensor.master_bathroom_motion_sensor_2",
+              "name": "Motion Sensor 2"
+            },
+            {
+              "entity": "binary_sensor.master_bathroom_motion_sensor_3",
+              "name": "Motion Sensor 3"
+            },
+            {
+              "entity": "binary_sensor.master_bathroom_motion_sensor_occupancy",
+              "name": "Occupancy Sensor"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "vertical-stack",
+      "cards": [
+        {
+          "type": "custom:mushroom-template-card",
+          "primary": "Plant Room",
+          "secondary": "{% set s = states('sensor.presence_plant_room_state') %}{% if s == 'on' %}Occupied ({{ state_attr('sensor.presence_plant_room_state', 'dwell_minutes') | default(0) | round(0) }}min) | {{ state_attr('sensor.presence_plant_room_state', 'sensors_on') }}/{{ state_attr('sensor.presence_plant_room_state', 'sensor_count') }} sensors{% elif s == 'pending_off' %}Cooldown: {{ states('sensor.presence_plant_room_cooldown') | default('0') }}min remaining{% else %}Vacant{% endif %}",
+          "icon": "{% set s = states('sensor.presence_plant_room_state') %}{% if s == 'on' %}mdi:motion-sensor{% elif s == 'pending_off' %}mdi:timer-sand{% else %}mdi:motion-sensor-off{% endif %}",
+          "icon_color": "{% set s = states('sensor.presence_plant_room_state') %}{% if s == 'on' %}green{% elif s == 'pending_off' %}amber{% else %}grey{% endif %}",
+          "badge_icon": "{% if states('sensor.presence_plant_room_state') == 'disabled' %}mdi:pause-circle{% endif %}",
+          "layout": "horizontal",
+          "tap_action": {
+            "action": "more-info",
+            "entity": "sensor.presence_plant_room_state"
+          }
+        },
+        {
+          "type": "entities",
+          "title": "Controlled Entities",
+          "show_header_toggle": false,
+          "state_color": true,
+          "entities": [
+            {
+              "entity": "light.plant_ceiling_light",
+              "name": "Ceiling Light"
+            },
+            {
+              "entity": "light.xbox_light",
+              "name": "Xbox Light"
+            }
+          ]
+        },
+        {
+          "type": "markdown",
+          "content": "**Base Cooldown:** 600s (10min) | **Override Policy:** respect\n\n**Cooldown Total:** {{ state_attr('sensor.presence_plant_room_state', 'cooldown_total_min') | default('N/A') }}min{% if state_attr('sensor.presence_plant_room_state', 'cooldown_remaining_min') | default(0) | float(0) > 0 %} | **Remaining:** {{ state_attr('sensor.presence_plant_room_state', 'cooldown_remaining_min') | default(0) | round(1) }}min{% endif %}"
+        },
+        {
+          "type": "conditional",
+          "conditions": [
+            {
+              "condition": "state",
+              "entity": "sensor.presence_plant_room_state",
+              "state_not": "disabled"
+            }
+          ],
+          "card": {
+            "type": "custom:mushroom-chips-card",
+            "chips": [
+              {
+                "type": "action",
+                "icon": "mdi:pause-circle",
+                "tap_action": {
+                  "action": "call-service",
+                  "service": "rest_command.presence_configure",
+                  "data": {
+                    "payload": "{\"topic\": \"plant_room\", \"enabled\": false}"
+                  },
+                  "confirmation": {
+                    "text": "Disable presence detection for Plant Room?"
+                  }
+                },
+                "hold_action": {
+                  "action": "none"
+                }
+              }
+            ],
+            "alignment": "center"
+          }
+        },
+        {
+          "type": "conditional",
+          "conditions": [
+            {
+              "condition": "state",
+              "entity": "sensor.presence_plant_room_state",
+              "state": "disabled"
+            }
+          ],
+          "card": {
+            "type": "custom:mushroom-chips-card",
+            "chips": [
+              {
+                "type": "action",
+                "icon": "mdi:play-circle",
+                "tap_action": {
+                  "action": "call-service",
+                  "service": "rest_command.presence_configure",
+                  "data": {
+                    "payload": "{\"topic\": \"plant_room\", \"enabled\": true}"
+                  },
+                  "confirmation": {
+                    "text": "Enable presence detection for Plant Room?"
+                  }
+                },
+                "hold_action": {
+                  "action": "none"
+                }
+              }
+            ],
+            "alignment": "center"
+          }
+        },
+        {
+          "type": "entities",
+          "title": "Sensors",
+          "show_header_toggle": false,
+          "state_color": true,
+          "entities": [
+            {
+              "entity": "binary_sensor.plant_room_motion_sensor_2",
+              "name": "Motion Sensor 2"
+            },
+            {
+              "entity": "binary_sensor.plant_room_motion_sensor_occupancy",
+              "name": "Occupancy Sensor"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "vertical-stack",
+      "cards": [
+        {
+          "type": "custom:mushroom-template-card",
+          "primary": "Upstairs Hall",
+          "secondary": "{% set s = states('sensor.presence_upstairs_hall_state') %}{% if s == 'on' %}Occupied ({{ state_attr('sensor.presence_upstairs_hall_state', 'dwell_minutes') | default(0) | round(0) }}min) | {{ state_attr('sensor.presence_upstairs_hall_state', 'sensors_on') }}/{{ state_attr('sensor.presence_upstairs_hall_state', 'sensor_count') }} sensors{% elif s == 'pending_off' %}Cooldown: {{ states('sensor.presence_upstairs_hall_cooldown') | default('0') }}min remaining{% else %}Vacant{% endif %}",
+          "icon": "{% set s = states('sensor.presence_upstairs_hall_state') %}{% if s == 'on' %}mdi:motion-sensor{% elif s == 'pending_off' %}mdi:timer-sand{% else %}mdi:motion-sensor-off{% endif %}",
+          "icon_color": "{% set s = states('sensor.presence_upstairs_hall_state') %}{% if s == 'on' %}green{% elif s == 'pending_off' %}amber{% else %}grey{% endif %}",
+          "badge_icon": "{% if states('sensor.presence_upstairs_hall_state') == 'disabled' %}mdi:pause-circle{% endif %}",
+          "layout": "horizontal",
+          "tap_action": {
+            "action": "more-info",
+            "entity": "sensor.presence_upstairs_hall_state"
+          }
+        },
+        {
+          "type": "entities",
+          "title": "Controlled Entities",
+          "show_header_toggle": false,
+          "state_color": true,
+          "entities": [
+            {
+              "entity": "light.upstairs_hallway_lights",
+              "name": "Hallway Lights"
+            },
+            {
+              "entity": "light.flower_lamp",
+              "name": "Flower Lamp"
+            }
+          ]
+        },
+        {
+          "type": "markdown",
+          "content": "**Base Cooldown:** 600s (10min) | **Override Policy:** respect\n\n**Cooldown Total:** {{ state_attr('sensor.presence_upstairs_hall_state', 'cooldown_total_min') | default('N/A') }}min{% if state_attr('sensor.presence_upstairs_hall_state', 'cooldown_remaining_min') | default(0) | float(0) > 0 %} | **Remaining:** {{ state_attr('sensor.presence_upstairs_hall_state', 'cooldown_remaining_min') | default(0) | round(1) }}min{% endif %}"
+        },
+        {
+          "type": "conditional",
+          "conditions": [
+            {
+              "condition": "state",
+              "entity": "sensor.presence_upstairs_hall_state",
+              "state_not": "disabled"
+            }
+          ],
+          "card": {
+            "type": "custom:mushroom-chips-card",
+            "chips": [
+              {
+                "type": "action",
+                "icon": "mdi:pause-circle",
+                "tap_action": {
+                  "action": "call-service",
+                  "service": "rest_command.presence_configure",
+                  "data": {
+                    "payload": "{\"topic\": \"upstairs_hall\", \"enabled\": false}"
+                  },
+                  "confirmation": {
+                    "text": "Disable presence detection for Upstairs Hall?"
+                  }
+                },
+                "hold_action": {
+                  "action": "none"
+                }
+              }
+            ],
+            "alignment": "center"
+          }
+        },
+        {
+          "type": "conditional",
+          "conditions": [
+            {
+              "condition": "state",
+              "entity": "sensor.presence_upstairs_hall_state",
+              "state": "disabled"
+            }
+          ],
+          "card": {
+            "type": "custom:mushroom-chips-card",
+            "chips": [
+              {
+                "type": "action",
+                "icon": "mdi:play-circle",
+                "tap_action": {
+                  "action": "call-service",
+                  "service": "rest_command.presence_configure",
+                  "data": {
+                    "payload": "{\"topic\": \"upstairs_hall\", \"enabled\": true}"
+                  },
+                  "confirmation": {
+                    "text": "Enable presence detection for Upstairs Hall?"
+                  }
+                },
+                "hold_action": {
+                  "action": "none"
+                }
+              }
+            ],
+            "alignment": "center"
+          }
+        },
+        {
+          "type": "entities",
+          "title": "Sensors",
+          "show_header_toggle": false,
+          "state_color": true,
+          "entities": [
+            {
+              "entity": "binary_sensor.stairwell_motion_sensor_occupancy_2",
+              "name": "Stairwell Occupancy"
+            },
+            {
+              "entity": "binary_sensor.upstairs_hall_motion_sensor_occupancy",
+              "name": "Hall Occupancy"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "history-graph",
+      "title": "Presence History (24h)",
+      "hours_to_show": 24,
+      "entities": [
+        {
+          "entity": "sensor.presence_bonus_room_state",
+          "name": "Bonus Room"
+        },
+        {
+          "entity": "sensor.presence_downstairs_bathroom_state",
+          "name": "Downstairs Bath"
+        },
+        {
+          "entity": "sensor.presence_garage_state",
+          "name": "Garage"
+        },
+        {
+          "entity": "sensor.presence_guest_bathroom_state",
+          "name": "Guest Bath"
+        },
+        {
+          "entity": "sensor.presence_guest_bedroom_state",
+          "name": "Guest Bedroom"
+        },
+        {
+          "entity": "sensor.presence_laundry_room_state",
+          "name": "Laundry Room"
+        },
+        {
+          "entity": "sensor.presence_master_bathroom_state",
+          "name": "Master Bath"
+        },
+        {
+          "entity": "sensor.presence_plant_room_state",
+          "name": "Plant Room"
+        },
+        {
+          "entity": "sensor.presence_upstairs_hall_state",
+          "name": "Upstairs Hall"
+        }
+      ]
+    }
+  ]
+}

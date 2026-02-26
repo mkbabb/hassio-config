@@ -16,9 +16,10 @@ This plan creates a **registry + state publishing** architecture that makes all 
 
 ### Delivery Strategy (Incremental)
 
-**Delivery 1**: Phase 1 (registry refactor) — verify zero behavioral change
-**Delivery 2**: Phase 2 (REST API) — verify CRUD works
-**Delivery 3**: Phases 3-5 (state publishing + presence registry + dashboard) — the transparency layer
+**Delivery 1**: Phase 1 (registry refactor) — verify zero behavioral change ✅ COMPLETE
+**Delivery 2**: Phase 2 (REST API) — verify CRUD works ✅ COMPLETE
+**Delivery 3**: Phases 3-5 (state publishing + presence registry + dashboard) ✅ COMPLETE
+**Delivery 4**: Phase 6 (dashboard refinement + CRUD editing + HACS cards) — IN PROGRESS
 
 ---
 
@@ -669,3 +670,135 @@ Action deduplication is maintained at three existing layers — no new dedup log
 3. **Smart filter** (`cache-states/action-node.ts`): `deepEqual()` comparison of current vs proposed state before execution
 
 The transparency layer (state publishing) adds its own dedup: only publish sensors whose state actually changed (compared against last-published value in flow context). This prevents HA `state_changed` event spam.
+
+---
+
+## Phase 6: Dashboard Refinement & CRUD Editing *(Delivery 4)*
+
+**Goal**: Address 9 UX gaps in the Phase 5 dashboard. Add inline controls, progress bars, smooth graphs, editable fields, clear-cooldown buttons, and HACS cards.
+
+**Status**: Backend complete ✅ | Dashboard v1 deployed ✅ | HomeKit-style redesign in progress
+
+### 6a. New API: Clear Cooldown ✅
+
+**File**: `src/presence/api/clear-cooldown.ts` (NEW)
+**Endpoint**: `POST /endpoint/presence/:topic/clear-cooldown`
+
+Resets active cooldown for a specific presence area:
+- Clears `flowInfo.delay` and `flowInfo.coolDownEndTime`
+- Transitions `pending_off` → `off` (only sets `lastOff` in this case)
+- Returns previous/new state and cleared cooldown duration
+
+**rest_command**: `presence_clear_cooldown` in `rest_commands.yaml`
+
+### 6b. Partial Updates for Presence Areas ✅
+
+**File**: `src/presence/api/configure-area.ts` (MODIFIED)
+
+- `sensors` no longer mandatory for existing areas (preserved from registry)
+- `entities` preserved from existing when not provided
+- Individual field updates: `coolDown`, `enabled`, `externalOverridePolicy`, `externalOverrideGracePeriod`
+- InfluxDB logging metadata on all mutations
+
+### 6c. Static Schedule durationModifier Editing ✅
+
+**File**: `src/scheduling/api/validation.ts` (MODIFIED)
+- Added `durationModifier` to `allowedKeys` for static schedules
+- Added range validation (0 < durationModifier < 1) in `validateUpdateSchedule`
+
+**File**: `src/scheduling/api/update-schedule.ts` (MODIFIED)
+- Applies `durationModifier` for both static and dynamic schedules
+
+### 6d. Guest Bedroom Motion Sensor Re-enabled ✅
+
+**File**: `.storage/core.entity_registry`
+- Changed `binary_sensor.guest_bedroom_motion_sensor` from `disabled_by: "user"` to `disabled_by: null`
+
+### 6e. InfluxDB API Mutation Logging ✅
+
+All three API endpoints attach `message.influxLog` metadata for downstream InfluxDB node:
+- `update-schedule.ts`: measurement `api_events`, tag `schedule_update`
+- `configure-area.ts`: measurement `api_events`, tag `presence_create` / `presence_update`
+- `clear-cooldown.ts`: measurement `api_events`, tag `presence_clear_cooldown`
+
+### 6f. Startup-Republish for Presence Sensors ✅
+
+**File**: `src/utils/startup-republish.ts` (MODIFIED)
+- Changed to multi-output (outputs: 2)
+- Output 1 → schedule engine (existing)
+- Output 2 → array of presence messages (Node-RED fans out automatically)
+- Clears ephemeral dedup caches for all three publishers
+
+### 6g. Presence Enabled Attribute ✅
+
+**File**: `src/presence/publish-presence-state.ts` (MODIFIED)
+- Reads `enabled` from `global.get("presenceRegistry")` per area
+- Published as attribute on `sensor.presence_{topic}_state`
+- Required for dashboard toggle functionality
+
+### 6h. HACS Cards Installed ✅
+
+Downloaded to `/Volumes/config/www/community/`:
+- `mini-graph-card` (122KB) — smooth interpolated line graphs
+- `card-mod` (97KB) — CSS injection for progress bars, inline chips
+- `stack-in-card` (38KB) — borderless card stacking
+
+Registered in `.storage/lovelace_resources`.
+
+### 6i. Input Helpers for Dashboard Editing ✅
+
+**File**: `input_number.yaml` (NEW) — 10 entities:
+- 9 presence cooldown sliders (60-1800s, step 30)
+- 1 shelf duration modifier (10-100%, step 5)
+
+**File**: `input_select.yaml` (MODIFIED) — 9 new entries:
+- Override policy per area (respect/ignore/extend)
+
+### 6j. Sync Automations ✅
+
+**File**: `automations.yaml` (MODIFIED) — 3 new automations:
+- `sync_presence_cooldown_to_api`: input_number → REST API coolDown update
+- `sync_override_policy_to_api`: input_select → REST API externalOverridePolicy update
+- `sync_shelf_duration_modifier`: input_number → REST API durationModifier update
+
+### 6k. flows.json Wiring ✅
+
+- 9 new nodes for clear-cooldown chain, InfluxDB logging, startup presence republish
+- 5 function nodes updated with recompiled JS
+- 15 HTTP endpoints total
+
+### 6l. Dashboard Views — v2 HomeKit Redesign 🔄
+
+**Status**: IN PROGRESS
+
+v1 (mushroom cards) deployed. v2 redesign targeting:
+- HomeKit-style aesthetic with glassmorphism
+- Smooth mini-graph-card line charts
+- card-mod CSS progress bar pills
+- Inline play/pause via tap_action + badge indicators
+- Modal/popup editing for schedule conditions and presence settings
+- Section-based layout for schedule types
+- Clear-cooldown conditional chips
+
+### Verification
+
+```bash
+# 6a - Clear cooldown
+curl -X POST http://homeassistant.local:1880/endpoint/presence/bonus_room/clear-cooldown
+
+# 6b - Partial update (just cooldown)
+curl -X POST http://homeassistant.local:1880/endpoint/presence/ \
+  -H "Content-Type: application/json" \
+  -d '{"topic": "bonus_room", "coolDown": 300}'
+
+# 6c - Update durationModifier on static schedule
+curl -X PUT http://homeassistant.local:1880/endpoint/schedules/plants_shelf \
+  -H "Content-Type: application/json" \
+  -d '{"durationModifier": 0.6}'
+
+# 6d - Guest bedroom sensor active after HA restart
+# 6e - InfluxDB: SELECT * FROM nodered.api_events WHERE time > now() - 1h
+# 6f - All 9 presence sensors publish after NR restart
+# 6h - HACS cards load in browser console (no 404s)
+# 6i-j - Input helpers sync to API on slider/select change
+```

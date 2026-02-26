@@ -1,0 +1,89 @@
+presence_cooldown_bonus_room:
+    name: "Bonus Room Cooldown"
+    min: 60
+    max: 1800
+    step: 30
+    unit_of_measurement: "s"
+    icon: mdi:timer
+    mode: slider
+
+presence_cooldown_downstairs_bathroom:
+    name: "Downstairs Bathroom Cooldown"
+    min: 60
+    max: 1800
+    step: 30
+    unit_of_measurement: "s"
+    icon: mdi:timer
+    mode: slider
+
+presence_cooldown_garage:
+    name: "Garage Cooldown"
+    min: 60
+    max: 1800
+    step: 30
+    unit_of_measurement: "s"
+    icon: mdi:timer
+    mode: slider
+
+presence_cooldown_guest_bathroom:
+    name: "Guest Bathroom Cooldown"
+    min: 60
+    max: 1800
+    step: 30
+    unit_of_measurement: "s"
+    icon: mdi:timer
+    mode: slider
+
+presence_cooldown_guest_bedroom:
+    name: "Guest Bedroom Cooldown"
+    min: 60
+    max: 1800
+    step: 30
+    unit_of_measurement: "s"
+    icon: mdi:timer
+    mode: slider
+
+presence_cooldown_laundry_room:
+    name: "Laundry Room Cooldown"
+    min: 60
+    max: 1800
+    step: 30
+    unit_of_measurement: "s"
+    icon: mdi:timer
+    mode: slider
+
+presence_cooldown_master_bathroom:
+    name: "Master Bathroom Cooldown"
+    min: 60
+    max: 1800
+    step: 30
+    unit_of_measurement: "s"
+    icon: mdi:timer
+    mode: slider
+
+presence_cooldown_plant_room:
+    name: "Plant Room Cooldown"
+    min: 60
+    max: 1800
+    step: 30
+    unit_of_measurement: "s"
+    icon: mdi:timer
+    mode: slider
+
+presence_cooldown_upstairs_hall:
+    name: "Upstairs Hall Cooldown"
+    min: 60
+    max: 1800
+    step: 30
+    unit_of_measurement: "s"
+    icon: mdi:timer
+    mode: slider
+
+shelf_duration_modifier:
+    name: "Shelf Duration"
+    min: 10
+    max: 100
+    step: 5
+    unit_of_measurement: "%"
+    icon: mdi:percent
+    mode: slider

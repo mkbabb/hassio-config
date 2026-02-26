@@ -21,10 +21,82 @@ day_status:
         - "day"
         - "night"
     icon: mdi:weather-sunset-up
-    
+
 force_day_status:
     name: Force Day Status
     options:
         - "day"
         - "night"
     icon: mdi:weather-sunset-up
+
+override_policy_bonus_room:
+    name: "Bonus Room Override Policy"
+    options:
+        - "respect"
+        - "ignore"
+        - "extend"
+    icon: mdi:shield-account
+
+override_policy_downstairs_bathroom:
+    name: "Downstairs Bathroom Override Policy"
+    options:
+        - "respect"
+        - "ignore"
+        - "extend"
+    icon: mdi:shield-account
+
+override_policy_garage:
+    name: "Garage Override Policy"
+    options:
+        - "respect"
+        - "ignore"
+        - "extend"
+    icon: mdi:shield-account
+
+override_policy_guest_bathroom:
+    name: "Guest Bathroom Override Policy"
+    options:
+        - "respect"
+        - "ignore"
+        - "extend"
+    icon: mdi:shield-account
+
+override_policy_guest_bedroom:
+    name: "Guest Bedroom Override Policy"
+    options:
+        - "respect"
+        - "ignore"
+        - "extend"
+    icon: mdi:shield-account
+
+override_policy_laundry_room:
+    name: "Laundry Room Override Policy"
+    options:
+        - "respect"
+        - "ignore"
+        - "extend"
+    icon: mdi:shield-account
+
+override_policy_master_bathroom:
+    name: "Master Bathroom Override Policy"
+    options:
+        - "respect"
+        - "ignore"
+        - "extend"
+    icon: mdi:shield-account
+
+override_policy_plant_room:
+    name: "Plant Room Override Policy"
+    options:
+        - "respect"
+        - "ignore"
+        - "extend"
+    icon: mdi:shield-account
+
+override_policy_upstairs_hall:
+    name: "Upstairs Hall Override Policy"
+    options:
+        - "respect"
+        - "ignore"
+        - "extend"
+    icon: mdi:shield-account
