@@ -1,5 +1,6 @@
 import { filterBlacklistedEntity } from "../utils/utils";
 import { groupActions } from "../utils/service-calls";
+import { getEntity } from "../utils/entities";
 import {
     MAX_COOL_DOWN,
     DEFAULT_COOL_DOWN,
@@ -8,7 +9,19 @@ import {
     PresenceState,
     calculateCoolDown
 } from "./utils";
-import type { PresenceRegistry } from "./types";
+import type { PresenceAreaConfig, PresenceRegistry } from "./types";
+import { getSensorEntityId, normalizeSensorConfig, sensorMatchesEntity } from "./types";
+
+// Check if all presence conditions are met for an area (all must pass)
+const checkPresenceConditions = (area: PresenceAreaConfig | undefined): boolean => {
+    if (!area?.conditions || area.conditions.length === 0) return true;
+    return area.conditions.every(c => {
+        const entity = getEntity(c.entity_id);
+        if (!entity) return false;
+        const states = Array.isArray(c.state) ? c.state : [c.state];
+        return states.includes(entity.state);
+    });
+};
 
 // Unified payload creator to follow DRY principle
 const createPayload = (entities: Hass.State[], action: "turn_on" | "turn_off") => {
@@ -74,7 +87,7 @@ const dataEntityId = data.entity_id;
 const presenceRegistry: PresenceRegistry | undefined = global.get("presenceRegistry");
 const registryArea = presenceRegistry
     ? Object.values(presenceRegistry.areas).find(a =>
-        a.enabled && a.sensors.includes(dataEntityId)
+        a.enabled && a.sensors.some(s => sensorMatchesEntity(s, dataEntityId))
     )
     : undefined;
 
@@ -110,6 +123,8 @@ const entities: Hass.State[] = rawEntities.map(e =>
 
 const filteredEntities = entities.filter((e) => filterBlacklistedEntity(e));
 
+// Check presence conditions — if not met, DFA still updates but no entity actions are sent
+const conditionsMet = checkPresenceConditions(registryArea);
 
 // Global context keys (accessible from API endpoints and publishers on other tabs)
 const presenceStatesKey = `presenceStates.${topic}`;
@@ -197,14 +212,26 @@ if (
     // @ts-ignore
     msg.delay = IMMEDIATE_DELAY_MS;
 } else {
-    // Update the specific sensor's state
+    // Update the specific sensor's state (edge sensors still record changes to trigger DFA)
     presenceStates[dataEntityId] = normalizedState;
     debounceInfo.lastUpdate = now;
     debounceInfo.pendingState = null;
 
-    // Determine aggregate presence state
-    const presenceStatesValues = Object.values(presenceStates);
-    const aggregateState = determinePresenceState(presenceStatesValues);
+    // Resolve sensor configs for edge-trigger filtering
+    const sensorConfigs = registryArea?.sensors.map(s => normalizeSensorConfig(s)) ?? [];
+
+    // For aggregate state, only include "level" sensors (edge sensors trigger DFA but don't sustain presence)
+    const levelSensorStates = Object.entries(presenceStates)
+        .filter(([id]) => {
+            const cfg = sensorConfigs.find(s => s.entity_id === id);
+            return !cfg || cfg.triggerMode !== "edge";
+        })
+        .map(([, state]) => state);
+
+    // Determine aggregate presence state (only from level sensors)
+    const aggregateState = determinePresenceState(
+        levelSensorStates.length > 0 ? levelSensorStates : Object.values(presenceStates)
+    );
 
     // Get previous states
     const prevState = flowInfo.state as PresenceState;
@@ -233,6 +260,7 @@ if (
     msg.payload = null;
 
     // State machine logic - simplified and clear
+    // Note: DFA state always updates; entity actions gated by conditionsMet
     switch (actualState) {
         case PresenceState.ON:
             if (prevState === PresenceState.OFF) {
@@ -242,7 +270,7 @@ if (
                 flowInfo.state = PresenceState.ON;
                 flowInfo.delay = 0;
                 // @ts-ignore
-                msg.payload = createPayload(filteredEntities, "turn_on");
+                if (conditionsMet) msg.payload = createPayload(filteredEntities, "turn_on");
             } else if (prevState === PresenceState.PENDING_OFF) {
                 // Cancel pending off - presence detected during cool-down
                 flowInfo.state = PresenceState.ON;
@@ -252,7 +280,7 @@ if (
                 // Don't update lastOn - maintain dwell time calculation
                 // Send turn_on to ensure lights stay on (counteract any pending turn_off)
                 // @ts-ignore
-                msg.payload = createPayload(filteredEntities, "turn_on");
+                if (conditionsMet) msg.payload = createPayload(filteredEntities, "turn_on");
                 // @ts-ignore
                 msg.delay = IMMEDIATE_DELAY_MS; // Immediate action
             } else if (prevState === PresenceState.UNKNOWN && !inCoolDown) {
@@ -262,7 +290,7 @@ if (
                     flowInfo.lastOn = Date.now();
                 }
                 // @ts-ignore
-                msg.payload = createPayload(filteredEntities, "turn_on");
+                if (conditionsMet) msg.payload = createPayload(filteredEntities, "turn_on");
             }
             // If already ON, do nothing (no payload)
             break;
@@ -282,7 +310,7 @@ if (
                 // @ts-ignore
                 msg.delay = delayMs;
                 // @ts-ignore
-                msg.payload = createPayload(filteredEntities, "turn_off");
+                if (conditionsMet) msg.payload = createPayload(filteredEntities, "turn_off");
             } else if (
                 prevState === PresenceState.UNKNOWN &&
                 !inCoolDown &&
@@ -294,7 +322,7 @@ if (
                 flowInfo.lastOn = null;
                 flowInfo.coolDownEndTime = null;
                 // @ts-ignore
-                msg.payload = createPayload(filteredEntities, "turn_off");
+                if (conditionsMet) msg.payload = createPayload(filteredEntities, "turn_off");
             } else if (isProblematicSequence) {
                 // On→Unknown→Off sequence detected - skip instant off, just update state
                 flowInfo.state = PresenceState.OFF;
@@ -339,10 +367,13 @@ if (
     // @ts-ignore
     msg.inCoolDown = inCoolDown;
     // @ts-ignore
+    msg.conditionsMet = conditionsMet;
+    // @ts-ignore
     msg.debug = {
         topic: topic,
         sensorCount: Object.keys(presenceStates).length,
         coolDownSeconds: coolDown,
+        conditionsMet: conditionsMet,
         // @ts-ignore
         actualDelayMs: msg.delay,
         stateTransition: `${prevState} → ${flowInfo.state}`,

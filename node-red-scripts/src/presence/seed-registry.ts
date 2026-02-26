@@ -24,7 +24,12 @@ const STATIC_AREAS: PresenceAreaConfig[] = [
             "binary_sensor.bonus_room_motion_sensor_2",
             "binary_sensor.bonus_room_motion_sensor_occupancy"
         ],
-        entities: [],
+        entities: [
+            { entity_id: "light.bonus_room_ceiling_light" },
+            { entity_id: "light.bonus_room_light" },
+            { entity_id: "light.fishing_lamp" },
+            { entity_id: "light.hey_lamp_2_2" }
+        ],
         coolDown: 600,
         enabled: true,
         createdAt: "",
@@ -36,7 +41,10 @@ const STATIC_AREAS: PresenceAreaConfig[] = [
             "binary_sensor.downstairs_bathroom_motion_sensor_2",
             "binary_sensor.downstairs_bathroom_motion_sensor_occupancy"
         ],
-        entities: [{ entity_id: "light.downstairs_bathroom_light" }],
+        entities: [
+            { entity_id: "light.downstairs_bathroom_light" },
+            { entity_id: "light.downstairs_bathroom_chili_pepper_lights" }
+        ],
         coolDown: 600,
         enabled: true,
         createdAt: "",
@@ -45,12 +53,16 @@ const STATIC_AREAS: PresenceAreaConfig[] = [
     {
         topic: "garage",
         sensors: [
-            "binary_sensor.garage_entry_door_door",
+            { entity_id: "binary_sensor.garage_entry_door_door", triggerMode: "edge" },
             "binary_sensor.garage_motion_sensor",
             "binary_sensor.ratgdov25i_4b1c3b_motion",
-            "binary_sensor.ratgdov25i_4b1c3b_obstruction"
+            { entity_id: "binary_sensor.ratgdov25i_4b1c3b_obstruction", triggerMode: "edge" }
         ],
-        entities: [],
+        entities: [
+            { entity_id: "light.garage_light_1" },
+            { entity_id: "light.garage_light_2" },
+            { entity_id: "light.garage_shelf_light_1" }
+        ],
         coolDown: 600,
         enabled: true,
         createdAt: "",
@@ -61,7 +73,10 @@ const STATIC_AREAS: PresenceAreaConfig[] = [
         sensors: [
             "binary_sensor.guest_bathroom_motion_sensor"
         ],
-        entities: [],
+        entities: [
+            { entity_id: "light.guest_bathroom_light" },
+            { entity_id: "light.guest_bathroom_peppa_pig_lights" }
+        ],
         coolDown: 600,
         enabled: true,
         createdAt: "",
@@ -72,7 +87,15 @@ const STATIC_AREAS: PresenceAreaConfig[] = [
         sensors: [
             "binary_sensor.guest_bedroom_motion_sensor"
         ],
-        entities: [],
+        entities: [
+            { entity_id: "light.guest_bedroom_ceiling_light" },
+            { entity_id: "light.goblet_light" },
+            { entity_id: "light.paintbucket_light" },
+            { entity_id: "light.squiggle_lamp" },
+            { entity_id: "light.sunflower_light" },
+            { entity_id: "light.hey_lamp_3" },
+            { entity_id: "light.pixar_lamp" }
+        ],
         coolDown: 600,
         enabled: true,
         createdAt: "",
@@ -81,7 +104,7 @@ const STATIC_AREAS: PresenceAreaConfig[] = [
     {
         topic: "laundry_room",
         sensors: [
-            "binary_sensor.garage_entry_door_door",
+            { entity_id: "binary_sensor.garage_entry_door_door", triggerMode: "edge" },
             "binary_sensor.laundry_room_motion_sensor_2",
             "binary_sensor.laundry_room_motion_sensor_occupancy"
         ],
@@ -98,7 +121,11 @@ const STATIC_AREAS: PresenceAreaConfig[] = [
             "binary_sensor.master_bathroom_motion_sensor_3",
             "binary_sensor.master_bathroom_motion_sensor_occupancy"
         ],
-        entities: [],
+        entities: [
+            { entity_id: "light.master_bathroom_light_1" },
+            { entity_id: "light.master_bathroom_light_2" },
+            { entity_id: "light.master_bathroom_chili_pepper_lights" }
+        ],
         coolDown: 600,
         enabled: true,
         createdAt: "",
@@ -110,7 +137,10 @@ const STATIC_AREAS: PresenceAreaConfig[] = [
             "binary_sensor.plant_room_motion_sensor_2",
             "binary_sensor.plant_room_motion_sensor_occupancy"
         ],
-        entities: [],
+        entities: [
+            { entity_id: "light.plant_ceiling_light" },
+            { entity_id: "light.xbox_light" }
+        ],
         coolDown: 600,
         enabled: true,
         createdAt: "",
@@ -128,6 +158,9 @@ const STATIC_AREAS: PresenceAreaConfig[] = [
         ],
         coolDown: 600,
         enabled: true,
+        conditions: [
+            { entity_id: "input_select.day_status", state: "day" }
+        ],
         createdAt: "",
         updatedAt: ""
     }

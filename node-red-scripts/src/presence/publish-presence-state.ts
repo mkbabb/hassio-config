@@ -11,6 +11,16 @@
  * Deduplication: Only publishes changed state per topic.
  */
 
+// Format duration: never decimal minutes, roll to hours/days with 1 decimal
+const formatDuration = (minutes: number): string => {
+    if (minutes < 1) return "<1 min";
+    if (minutes < 60) return `${Math.round(minutes)} min`;
+    const hours = minutes / 60;
+    if (hours < 24) return `${Math.round(hours * 10) / 10} hr`;
+    const days = hours / 24;
+    return `${Math.round(days * 10) / 10} day`;
+};
+
 // @ts-ignore - Node-RED global
 const message = msg;
 
@@ -24,6 +34,17 @@ const presenceState: string = message.presenceState || "unknown";
 const flowInfo = message.flowInfo || {};
 const presenceStates: Record<string, string> = message.presenceStates || {};
 const debug = message.debug || {};
+
+// Read enabled status and sensor config from registry
+// @ts-ignore
+const registry = global.get("presenceRegistry");
+const areaConfig = registry?.areas?.[topic];
+const enabled = areaConfig?.enabled !== false;
+
+// Resolve sensor configs for edge-trigger info in attributes
+const sensorConfigs: Array<{ entity_id: string; triggerMode: string }> = (areaConfig?.sensors || []).map(
+    (s: any) => typeof s === "string" ? { entity_id: s, triggerMode: "level" } : s
+);
 
 // Skip if no meaningful state
 if (!topic || topic === "unknown" || !message.presenceState) {
@@ -67,14 +88,18 @@ if (!topic || topic === "unknown" || !message.presenceState) {
                 : presenceState === "pending_off" ? "mdi:timer-sand"
                 : "mdi:motion-sensor-off",
             dwell_minutes: Math.round(dwellMinutes * 10) / 10,
+            dwell_formatted: formatDuration(dwellMinutes),
             cooldown_remaining_min: Math.round(cooldownRemainingMin * 10) / 10,
+            cooldown_remaining_formatted: formatDuration(cooldownRemainingMin),
             cooldown_total_min: Math.round(cooldownTotalMin * 10) / 10,
             sensor_count: sensorCount,
             sensors_on: sensorsOn,
             last_on: flowInfo.lastOn ? new Date(flowInfo.lastOn).toISOString() : null,
             last_off: flowInfo.lastOff ? new Date(flowInfo.lastOff).toISOString() : null,
             trigger_sensor: debug.trigger_sensor || message.data?.entity_id || "",
-            trigger_state: message.state || ""
+            trigger_state: message.state || "",
+            enabled,
+            edge_sensors: sensorConfigs.filter(s => s.triggerMode === "edge").map(s => s.entity_id)
         }
     });
 
@@ -86,6 +111,8 @@ if (!topic || topic === "unknown" || !message.presenceState) {
             friendly_name: `Presence ${topic.replace(/_/g, " ")} Cooldown`,
             icon: "mdi:timer-sand",
             unit_of_measurement: "min",
+            cooldown_remaining_ms: Math.round(cooldownRemainingMs),
+            cooldown_total_ms: Math.round(cooldownTotalMs),
             end_time: flowInfo.coolDownEndTime
                 ? new Date(flowInfo.coolDownEndTime).toISOString()
                 : null,

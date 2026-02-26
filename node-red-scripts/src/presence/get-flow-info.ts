@@ -1,5 +1,5 @@
 import { isInCoolDownPeriod, getRemainingCoolDownMs, PresenceState } from "./utils";
-import { isExternallyModified, clearExternalModification } from "../utils/static-states";
+import { isExternallyModified, clearExternalModification, isBlacklisted } from "../utils/static-states";
 import type { PresenceRegistry, ExternalOverridePolicy } from "./types";
 
 // @ts-ignore
@@ -74,7 +74,9 @@ if (message.payload) {
         global.set(flowInfoKey, flowInfo);
         // Clear the external modification since we're extending
         if (areaConfig) {
-            areaConfig.entities.forEach(e => clearExternalModification(e.entity_id));
+            areaConfig.entities
+                .filter(e => isBlacklisted(e.entity_id, "presence"))
+                .forEach(e => clearExternalModification(e.entity_id));
         }
         // Re-send the turn_off with the new delay (trigger node will handle it)
         // @ts-ignore
@@ -89,7 +91,9 @@ if (message.payload) {
         global.set(flowInfoKey, flowInfo);
         // Clear any external modifications for this area's entities since we're turning off
         if (areaConfig) {
-            areaConfig.entities.forEach(e => clearExternalModification(e.entity_id));
+            areaConfig.entities
+                .filter(e => isBlacklisted(e.entity_id, "presence"))
+                .forEach(e => clearExternalModification(e.entity_id));
         }
         // Keep the turn_off payload to execute - it's already in msg.payload
     }
