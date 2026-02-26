@@ -16,6 +16,7 @@ import {
     getExternalModifications,
     getExternalModificationSummary,
     clearExternalModificationsForSchedule,
+    clearExternalModificationsForPresenceEntities,
     clearAllExternalModifications,
     clearAllStaticStates,
     clearNamespace
@@ -58,7 +59,7 @@ if (method === "GET") {
 
 } else if (method === "POST" && subPath === "clear") {
     // POST /static-states/clear — clear modifications
-    const { schedule, namespace, all } = body;
+    const { schedule, namespace, scope, all } = body;
 
     let cleared = 0;
     let description = "";
@@ -68,6 +69,9 @@ if (method === "GET") {
         cleared += clearAllExternalModifications();
         cleared += clearAllStaticStates(["presence"]);
         description = "Cleared all external modifications and static states (preserved presence namespace)";
+    } else if (scope === "presence") {
+        cleared = clearExternalModificationsForPresenceEntities();
+        description = "Cleared external modifications for presence-tracked entities";
     } else if (schedule) {
         // Clear for a specific schedule
         cleared = clearExternalModificationsForSchedule(schedule);

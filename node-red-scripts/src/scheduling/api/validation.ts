@@ -11,7 +11,7 @@ export interface ValidationResult {
 }
 
 const NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
-const TIME_PATTERN = /^\d{2}:\d{2}$/;
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /**
  * Validate a time value — either "HH:MM" string or entity reference
@@ -23,7 +23,7 @@ function validateTime(time: any, fieldName: string, errors: string[]): void {
     }
     if (typeof time === "string") {
         if (!TIME_PATTERN.test(time)) {
-            errors.push(`${fieldName} must be "HH:MM" format, got "${time}"`);
+            errors.push(`${fieldName} must be "HH:MM" format (00:00-23:59), got "${time}"`);
         }
     } else if (typeof time === "object" && time.entity_id) {
         if (typeof time.entity_id !== "string") {
@@ -124,8 +124,8 @@ export function validateCreateSchedule(
 
     // durationModifier
     if (body.durationModifier != null) {
-        if (typeof body.durationModifier !== "number" || body.durationModifier <= 0 || body.durationModifier >= 1) {
-            errors.push("durationModifier must be a number between 0 and 1 (exclusive)");
+        if (typeof body.durationModifier !== "number" || body.durationModifier <= 0 || body.durationModifier > 1) {
+            errors.push("durationModifier must be a number between 0 (exclusive) and 1 (inclusive)");
         }
     }
 
@@ -144,7 +144,7 @@ export function validateUpdateSchedule(
     const errors: string[] = [];
 
     if (isStatic) {
-        const allowedKeys = ["enabled", "precedence", "conditions", "clearStaticOnTransition"];
+        const allowedKeys = ["enabled", "precedence", "conditions", "clearStaticOnTransition", "durationModifier"];
         const extraKeys = Object.keys(body).filter(k => !allowedKeys.includes(k));
         if (extraKeys.length > 0) {
             errors.push(`static schedules only allow updating: ${allowedKeys.join(", ")}. Got extra keys: ${extraKeys.join(", ")}`);
@@ -180,6 +180,12 @@ export function validateUpdateSchedule(
             errors.push("conditions must be an array");
         } else {
             validateConditions(body.conditions, errors);
+        }
+    }
+
+    if (body.durationModifier != null) {
+        if (typeof body.durationModifier !== "number" || body.durationModifier <= 0 || body.durationModifier > 1) {
+            errors.push("durationModifier must be a number between 0 (exclusive) and 1 (inclusive)");
         }
     }
 

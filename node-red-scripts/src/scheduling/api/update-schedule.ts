@@ -45,11 +45,12 @@ if (!name) {
             const now = new Date().toISOString();
 
             if (isStatic) {
-                // Static schedules: only allow enabled, precedence, conditions, clearStaticOnTransition
+                // Static schedules: only allow enabled, precedence, conditions, clearStaticOnTransition, durationModifier
                 if (body.enabled != null) schedule.enabled = body.enabled;
                 if (body.precedence != null) schedule.precedence = body.precedence;
                 if (body.conditions != null) schedule.conditions = body.conditions;
                 if (body.clearStaticOnTransition != null) schedule.clearStaticOnTransition = body.clearStaticOnTransition;
+                if (body.durationModifier !== undefined) schedule.durationModifier = body.durationModifier;
             } else {
                 // Dynamic schedules: allow all fields
                 if (body.start != null) schedule.start = body.start;
@@ -82,6 +83,19 @@ if (!name) {
                 }
             };
             message.statusCode = 200;
+
+            // Attach logging metadata for downstream InfluxDB node
+            message.influxLog = {
+                measurement: "api_events",
+                fields: {
+                    operation: "schedule_update",
+                    schedule_name: name,
+                    source: isStatic ? "static" : "dynamic",
+                    changes: JSON.stringify(body).substring(0, 1000),
+                    timestamp_ms: Date.now()
+                },
+                tags: { flow: "api", event_type: "schedule_update" }
+            };
         }
     }
 

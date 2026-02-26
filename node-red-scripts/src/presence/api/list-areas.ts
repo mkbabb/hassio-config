@@ -35,12 +35,18 @@ if (!registry) {
         const inCooldown = flowInfo.coolDownEndTime ? now < flowInfo.coolDownEndTime : false;
         const cooldownRemainingMs = inCooldown ? flowInfo.coolDownEndTime - now : 0;
 
+        // Normalize sensors to always show full config
+        const normalizedSensors = area.sensors.map((s: any) =>
+            typeof s === "string" ? { entity_id: s, triggerMode: "level" } : s
+        );
+
         return {
             topic: area.topic,
-            sensors: area.sensors,
+            sensors: normalizedSensors,
             entities: area.entities,
             coolDown: area.coolDown,
             enabled: area.enabled,
+            conditions: area.conditions,
             currentState: {
                 state: flowInfo.state || "off",
                 prevState: flowInfo.prevState || "off",

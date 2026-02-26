@@ -114,6 +114,41 @@ Content-Type: application/json
 }
 ```
 
+For existing areas, partial updates are supported — only provide the fields to change:
+```json
+{
+  "topic": "bonus_room",
+  "coolDown": 300,
+  "externalOverridePolicy": "extend"
+}
+```
+
+Updatable fields: `sensors`, `entities`, `coolDown`, `enabled`, `externalOverridePolicy`, `externalOverrideGracePeriod`.
+
+### Clear Cooldown
+```
+POST /endpoint/presence/:topic/clear-cooldown
+```
+Resets active cooldown for a presence area. Clears `delay` and `coolDownEndTime`. Transitions `pending_off` → `off`.
+
+```json
+{
+  "success": true,
+  "topic": "bonus_room",
+  "previousState": "pending_off",
+  "newState": "off",
+  "clearedCooldownMs": 720000
+}
+```
+
+Returns 404 if area not found.
+
+## Schedule Update: Static Schedule Fields
+
+Static schedules allow updating: `enabled`, `precedence`, `conditions`, `clearStaticOnTransition`, `durationModifier`.
+
+`durationModifier` must be between 0 and 1 (exclusive) — it's a centered window shrink factor.
+
 ## Other Endpoints
 
 ### Scene Cache (Rollback Push)

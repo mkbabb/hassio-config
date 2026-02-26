@@ -34,16 +34,68 @@ if (!body || typeof body !== "object") {
         errors.push("topic must match ^[a-z][a-z0-9_]*$");
     }
 
-    if (!body.sensors || !Array.isArray(body.sensors) || body.sensors.length === 0) {
-        errors.push("sensors must be a non-empty array of entity IDs");
+    // Sensors required only for new areas (existing areas preserve current sensors)
+    const existingArea = (() => {
+        if (!body.topic) return undefined;
+        // @ts-ignore
+        const reg: PresenceRegistry = global.get(REGISTRY_KEY);
+        return reg?.areas?.[body.topic];
+    })();
+
+    if (body.sensors != null) {
+        if (!Array.isArray(body.sensors) || body.sensors.length === 0) {
+            errors.push("sensors must be a non-empty array when provided");
+        } else {
+            // Validate each sensor entry (string or {entity_id, triggerMode})
+            for (const s of body.sensors) {
+                if (typeof s === "string") continue;
+                if (typeof s === "object" && s !== null && typeof s.entity_id === "string") {
+                    if (s.triggerMode && !["level", "edge"].includes(s.triggerMode)) {
+                        errors.push(`sensor ${s.entity_id}: triggerMode must be "level" or "edge"`);
+                    }
+                } else {
+                    errors.push("each sensor must be a string or {entity_id: string, triggerMode?: 'level'|'edge'}");
+                }
+            }
+        }
+    } else if (!existingArea) {
+        errors.push("sensors is required for new areas");
     }
 
     if (body.entities && !Array.isArray(body.entities)) {
         errors.push("entities must be an array");
     }
 
+    if (body.externalOverridePolicy && !["respect", "ignore", "extend"].includes(body.externalOverridePolicy)) {
+        errors.push('externalOverridePolicy must be "respect", "ignore", or "extend"');
+    }
+
+    if (body.externalOverrideGracePeriod != null && (typeof body.externalOverrideGracePeriod !== "number" || body.externalOverrideGracePeriod < 0)) {
+        errors.push("externalOverrideGracePeriod must be a non-negative number (seconds)");
+    }
+
     if (body.coolDown != null && (typeof body.coolDown !== "number" || body.coolDown < 0)) {
         errors.push("coolDown must be a non-negative number (seconds)");
+    }
+
+    if (body.enabled != null && typeof body.enabled !== "boolean") {
+        errors.push("enabled must be a boolean");
+    }
+
+    if (body.conditions != null) {
+        if (!Array.isArray(body.conditions)) {
+            errors.push("conditions must be an array");
+        } else {
+            for (const c of body.conditions) {
+                if (typeof c !== "object" || !c || typeof c.entity_id !== "string") {
+                    errors.push("each condition must have an entity_id string");
+                } else if (c.state == null) {
+                    errors.push(`condition for ${c.entity_id}: state is required`);
+                } else if (typeof c.state !== "string" && !Array.isArray(c.state)) {
+                    errors.push(`condition for ${c.entity_id}: state must be a string or array of strings`);
+                }
+            }
+        }
     }
 
     if (errors.length > 0) {
@@ -60,14 +112,25 @@ if (!body || typeof body !== "object") {
         const now = new Date().toISOString();
         const existing = registry.areas[body.topic];
 
+        // For existing areas, preserve fields not provided in the request
+        const sensors = body.sensors ?? existing?.sensors ?? [];
+        const entities = body.entities
+            ? body.entities.map((e: any) => typeof e === "string" ? { entity_id: e } : e)
+            : existing?.entities ?? [];
+
+        const conditions = body.conditions != null
+            ? body.conditions
+            : existing?.conditions;
+
         const area: PresenceAreaConfig = {
             topic: body.topic,
-            sensors: body.sensors,
-            entities: (body.entities || []).map((e: any) =>
-                typeof e === "string" ? { entity_id: e } : e
-            ),
-            coolDown: body.coolDown ?? 600,
-            enabled: body.enabled !== false,
+            sensors,
+            entities,
+            coolDown: body.coolDown ?? existing?.coolDown ?? 600,
+            enabled: body.enabled ?? existing?.enabled ?? true,
+            conditions,
+            externalOverridePolicy: body.externalOverridePolicy ?? existing?.externalOverridePolicy,
+            externalOverrideGracePeriod: body.externalOverrideGracePeriod ?? existing?.externalOverrideGracePeriod,
             createdAt: existing?.createdAt || now,
             updatedAt: now
         };
@@ -95,10 +158,25 @@ if (!body || typeof body !== "object") {
                 sensors: area.sensors,
                 entities: area.entities,
                 coolDown: area.coolDown,
-                enabled: area.enabled
+                enabled: area.enabled,
+                conditions: area.conditions,
+                externalOverridePolicy: area.externalOverridePolicy,
+                externalOverrideGracePeriod: area.externalOverrideGracePeriod
             }
         };
         message.statusCode = existing ? 200 : 201;
+
+        // Attach logging metadata for downstream InfluxDB node
+        message.influxLog = {
+            measurement: "api_events",
+            fields: {
+                operation: existing ? "presence_update" : "presence_create",
+                topic: body.topic,
+                changes: JSON.stringify(body).substring(0, 1000),
+                timestamp_ms: Date.now()
+            },
+            tags: { flow: "api", event_type: existing ? "presence_update" : "presence_create" }
+        };
     }
 
     // @ts-ignore
