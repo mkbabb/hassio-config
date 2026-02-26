@@ -5,6 +5,9 @@
  * When motion detected: sets static states and outputs turn_on actions.
  * When motion clears: outputs entity list with delay for trigger node (cooldown).
  *
+ * Time-gated: only activates when current time is within the plants_global schedule
+ * window (input_datetime.plants_global_schedule_start/end, typically 6AM-11PM).
+ *
  * Wired from state-changed (binary_sensor) → this node → switch (presenceState)
  *   → "on": api-call-service (immediate turn_on)
  *   → "pending_off": trigger (msg.delay ms) → remove-override
@@ -30,6 +33,26 @@ const PRESENCE_OVERRIDES: Record<string, string[]> = {
 const NAMESPACE = "plants";
 const COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
 
+// Check if current time is within the plants_global schedule window
+function isWithinPlantSchedule(): boolean {
+    // @ts-ignore - Node-RED global
+    const startEntity = global.get("homeassistant.homeAssistant.states['input_datetime.plants_global_schedule_start']");
+    // @ts-ignore - Node-RED global
+    const endEntity = global.get("homeassistant.homeAssistant.states['input_datetime.plants_global_schedule_end']");
+
+    if (!startEntity?.state || !endEntity?.state) return false;
+
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+    const [startH, startM] = startEntity.state.split(":").map(Number);
+    const [endH, endM] = endEntity.state.split(":").map(Number);
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+
+    return nowMinutes >= startMinutes && nowMinutes < endMinutes;
+}
+
 // @ts-ignore
 const message = msg;
 
@@ -42,6 +65,10 @@ const entities = room ? PRESENCE_OVERRIDES[room] : undefined;
 
 if (!entities || entities.length === 0) {
     // Not a sensor we care about — stop
+    // @ts-ignore
+    msg.payload = null;
+} else if (sensorState === "on" && !isWithinPlantSchedule()) {
+    // Motion detected but outside plant schedule window — suppress
     // @ts-ignore
     msg.payload = null;
 } else if (sensorState === "on") {

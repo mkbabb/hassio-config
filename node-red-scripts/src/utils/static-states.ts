@@ -196,6 +196,7 @@ export function shouldFilterEntity(
         checkBlacklist?: boolean;
         checkStaticState?: boolean;
         namespace?: string;
+        excludeNamespaces?: string[];
         additionalBlacklist?: string[];
     } = {}
 ): boolean {
@@ -203,24 +204,37 @@ export function shouldFilterEntity(
         checkBlacklist = true,
         checkStaticState = true,
         namespace,
+        excludeNamespaces,
         additionalBlacklist = []
     } = options;
-    
+
     // Check additional blacklist first (e.g., from msg.blacklist)
     if (additionalBlacklist.includes(entityId)) {
         return true;
     }
-    
+
     // Check blacklist
     if (checkBlacklist && isBlacklisted(entityId, namespace)) {
         return true;
     }
-    
+
     // Check static state
-    if (checkStaticState && hasStaticState(entityId, namespace)) {
-        return true;
+    if (checkStaticState) {
+        if (excludeNamespaces && excludeNamespaces.length > 0 && !namespace) {
+            // Check all namespaces except excluded ones
+            // @ts-ignore
+            const staticStates = global.get('staticStates') as StaticStates | undefined;
+            if (staticStates) {
+                for (const ns in staticStates) {
+                    if (excludeNamespaces.includes(ns)) continue;
+                    if (entityId in staticStates[ns]) return true;
+                }
+            }
+        } else if (hasStaticState(entityId, namespace)) {
+            return true;
+        }
     }
-    
+
     return false;
 }
 
@@ -381,6 +395,29 @@ export function clearExternalModificationsForSchedule(scheduleName: string): num
 
     for (const [entityId, mod] of Object.entries(registry.modifications)) {
         if (mod.scheduleName === scheduleName) {
+            delete registry.modifications[entityId];
+            removeStaticState(entityId, "external");
+            cleared++;
+        }
+    }
+
+    if (cleared > 0) {
+        // @ts-ignore
+        global.set(EXTERNAL_MOD_KEY, registry);
+    }
+    return cleared;
+}
+
+// Clear external modifications for presence-tracked entities only
+export function clearExternalModificationsForPresenceEntities(): number {
+    const presenceEntities = getBlacklist("presence");
+    if (presenceEntities.length === 0) return 0;
+
+    const registry = getExternalModifications();
+    let cleared = 0;
+
+    for (const entityId of presenceEntities) {
+        if (entityId in registry.modifications) {
             delete registry.modifications[entityId];
             removeStaticState(entityId, "external");
             cleared++;

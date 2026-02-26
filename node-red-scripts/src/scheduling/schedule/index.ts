@@ -371,10 +371,13 @@ entitiesToCheck.forEach((entity) => {
     // Skip entities that are:
     // 1. In msg.blacklist (temporary blacklist)
     // 2. In global blacklist (any namespace)
-    // 3. Have static state overrides (any namespace)
+    // 3. Have static state overrides (except "plants" namespace — those are
+    //    temporary presence overrides managed by the same plant automation;
+    //    the scheduler must still enforce off when the schedule window closes)
     if (shouldFilterEntity(entity.entity_id, {
         checkBlacklist: true,
         checkStaticState: true,
+        excludeNamespaces: ["plants"],
         additionalBlacklist: additionalBlacklist
     })) {
         return;
