@@ -1,5 +1,5 @@
 // Time constants (in seconds unless specified)
-export const MAX_COOL_DOWN = 30 * 60; // 30 minutes max cool-down
+export const MAX_COOL_DOWN = 20 * 60; // 20 minutes max cool-down
 export const DEFAULT_COOL_DOWN = 10 * 60; // 10 minutes default cool-down
 export const DEBOUNCE_TIME_MS = 1000; // 1 second debounce window (in milliseconds)
 export const IMMEDIATE_DELAY_MS = 1; // 1ms for immediate actions (in milliseconds)
@@ -14,15 +14,18 @@ export enum PresenceState {
     RESET = "reset" // New state for reset sequences
 }
 
-// Calculate exponential backoff with gentler curve
-// Returns the cool-down time in milliseconds
+// Calculate cooldown with linear ramp and hard cap.
+// Short visits (~5min) get base cooldown (10min).
+// Longer visits ramp linearly: +1s per minute dwelled, capped at MAX_COOL_DOWN.
+// Returns the cool-down time in milliseconds.
 export const calculateCoolDown = (
     dwellTimeMs: number,
     baseCoolDown: number
 ): number => {
     const minutesDwelled = Math.floor(dwellTimeMs / (60 * 1000));
-    // Use square root for gentler curve: base + sqrt(minutes) * 120
-    const additionalDelay = Math.sqrt(minutesDwelled) * 120;
+    // Linear: base + min(dwellMinutes, 60) * 10 seconds
+    // 5min dwell → base + 50s, 30min → base + 300s, 60min+ → base + 600s
+    const additionalDelay = Math.min(minutesDwelled, 60) * 10;
 
     const coolDownSeconds = baseCoolDown + additionalDelay;
 
