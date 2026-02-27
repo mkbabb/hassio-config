@@ -59,6 +59,7 @@
     state: "{{ states('sensor.sleep_time') }}"
 
   - name: "Lights Off Percentage"
+    unique_id: lights_off_percentage
     unit_of_measurement: "%"
     state: >
       {% set lights = states.light | map(attribute='state') | list %} {% set off_lights = lights | select('eq', 'off') | list %} {% if lights | length == 0 %}
@@ -66,6 +67,7 @@
       {% else %}
         {{ (off_lights | length / lights | length * 100) | round(1) }}
       {% endif %}
+    availability: "{{ states.light | list | length > 0 }}"
 
   - name: "Active Schedule Count"
     unique_id: active_schedule_count_template

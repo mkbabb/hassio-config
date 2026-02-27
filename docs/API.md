@@ -99,8 +99,6 @@ GET /endpoint/presence/:topic/status
 ```
 Returns full flow state: `flowInfo`, `runtime` (cooldown remaining, dwell), `sensorStates`, `debounce`.
 
-**Known issue**: Returns empty `flowInfo` because per-room state is in subflow-instance flow context, not global.
-
 ### Configure Area
 ```
 POST /endpoint/presence/
@@ -143,6 +141,19 @@ Resets active cooldown for a presence area. Clears `delay` and `coolDownEndTime`
 
 Returns 404 if area not found.
 
+### Clear All Cooldowns
+```
+POST /endpoint/presence/clear-all-cooldowns
+```
+Resets all active cooldowns across all presence areas. Useful for debugging or after system changes.
+
+```json
+{
+  "success": true,
+  "cleared": 3,
+  "areas": ["bonus_room", "garage", "master_bathroom"]
+}
+
 ## Schedule Update: Static Schedule Fields
 
 Static schedules allow updating: `enabled`, `precedence`, `conditions`, `clearStaticOnTransition`, `durationModifier`.
@@ -162,6 +173,13 @@ Called by the `scene_rollback` custom component on every `scene.turn_on`. Receiv
 POST /endpoint/remote/
 ```
 IR/RF command dispatch for template lights/fans.
+
+### Static States
+```
+GET /endpoint/static-states/
+POST /endpoint/static-states/
+```
+View and manage external state overrides (namespace-aware). GET returns all static states and blacklists. POST allows clearing states by namespace.
 
 ### Domain Entities
 ```

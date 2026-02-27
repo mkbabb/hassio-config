@@ -25,7 +25,7 @@ if (!body || typeof body !== "object") {
     const registry = getRegistry();
     const existingNames = Object.keys(registry.schedules);
 
-    const validation = validateCreateSchedule(body, existingNames);
+    const validation = validateCreateSchedule(body, existingNames, registry.schedules);
     if (!validation.valid) {
         message.payload = { error: "Validation failed", details: validation.errors };
         message.statusCode = 400;
@@ -63,7 +63,8 @@ if (!body || typeof body !== "object") {
                 type: schedule.type,
                 precedence: schedule.precedence,
                 createdAt: schedule.createdAt
-            }
+            },
+            ...(validation.warnings && { warnings: validation.warnings })
         };
         message.statusCode = 201;
     }

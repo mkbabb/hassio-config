@@ -3,11 +3,12 @@
  * Schema validation for schedule create/update operations
  */
 
-import type { Schedule, ScheduleCondition } from "../types";
+import type { Schedule, ScheduleCondition, RegistrySchedule } from "../types";
 
 export interface ValidationResult {
     valid: boolean;
     errors: string[];
+    warnings?: string[];
 }
 
 const NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
@@ -71,11 +72,73 @@ function validateEntities(entities: any[], errors: string[]): void {
 }
 
 /**
+ * Extracts entity pattern strings from a schedule body for overlap comparison.
+ * Returns normalized strings (exact IDs or regex patterns).
+ */
+function extractEntityPatterns(body: any): string[] {
+    const patterns: string[] = [];
+    if (body.entities && Array.isArray(body.entities)) {
+        for (const e of body.entities) {
+            if (typeof e === "string") {
+                patterns.push(e);
+            } else if (typeof e === "object" && e.entity_id) {
+                if (typeof e.entity_id === "string") {
+                    patterns.push(e.entity_id);
+                } else if (Array.isArray(e.entity_id)) {
+                    patterns.push(...e.entity_id.filter((id: any) => typeof id === "string"));
+                }
+            }
+        }
+    }
+    if (body.tags && Array.isArray(body.tags)) {
+        patterns.push(...body.tags.map((t: string) => `tag:${t}`));
+    }
+    return patterns;
+}
+
+/**
+ * Check for precedence collisions with existing schedules.
+ * Two schedules collide if they share the same precedence and have
+ * potentially overlapping entity patterns.
+ */
+function checkPrecedenceCollisions(
+    precedence: number,
+    entityPatterns: string[],
+    existingSchedules: Record<string, RegistrySchedule>,
+    excludeName?: string
+): string[] {
+    const warnings: string[] = [];
+
+    for (const [name, schedule] of Object.entries(existingSchedules)) {
+        if (name === excludeName || !schedule.enabled) continue;
+        if (schedule.precedence !== precedence) continue;
+
+        // Check for entity pattern overlap
+        const existingPatterns = extractEntityPatterns(schedule);
+        const overlap = entityPatterns.filter(p => existingPatterns.includes(p));
+
+        if (overlap.length > 0) {
+            warnings.push(
+                `precedence ${precedence} collides with schedule "${name}" on entities: ${overlap.join(", ")}`
+            );
+        } else if (entityPatterns.length > 0 && existingPatterns.length > 0) {
+            // Even without exact overlap, warn about same precedence (regex patterns may overlap at runtime)
+            warnings.push(
+                `precedence ${precedence} matches schedule "${name}" — verify no entity overlap at runtime`
+            );
+        }
+    }
+
+    return warnings;
+}
+
+/**
  * Validate a schedule for creation
  */
 export function validateCreateSchedule(
     body: any,
-    existingNames: string[]
+    existingNames: string[],
+    existingSchedules?: Record<string, RegistrySchedule>
 ): ValidationResult {
     const errors: string[] = [];
 
@@ -129,7 +192,14 @@ export function validateCreateSchedule(
         }
     }
 
-    return { valid: errors.length === 0, errors };
+    // Precedence collision warnings
+    const warnings: string[] = [];
+    if (existingSchedules && body.precedence != null) {
+        const entityPatterns = extractEntityPatterns(body);
+        warnings.push(...checkPrecedenceCollisions(body.precedence, entityPatterns, existingSchedules));
+    }
+
+    return { valid: errors.length === 0, errors, warnings: warnings.length > 0 ? warnings : undefined };
 }
 
 /**
@@ -139,7 +209,9 @@ export function validateCreateSchedule(
  */
 export function validateUpdateSchedule(
     body: any,
-    isStatic: boolean
+    isStatic: boolean,
+    scheduleName?: string,
+    existingSchedules?: Record<string, RegistrySchedule>
 ): ValidationResult {
     const errors: string[] = [];
 
@@ -189,5 +261,13 @@ export function validateUpdateSchedule(
         }
     }
 
-    return { valid: errors.length === 0, errors };
+    // Precedence collision warnings
+    const warnings: string[] = [];
+    if (existingSchedules && body.precedence != null && scheduleName) {
+        const mergedBody = { ...existingSchedules[scheduleName], ...body };
+        const entityPatterns = extractEntityPatterns(mergedBody);
+        warnings.push(...checkPrecedenceCollisions(body.precedence, entityPatterns, existingSchedules, scheduleName));
+    }
+
+    return { valid: errors.length === 0, errors, warnings: warnings.length > 0 ? warnings : undefined };
 }

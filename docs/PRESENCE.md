@@ -1,6 +1,6 @@
 # Presence Detection
 
-Room-level occupancy detection with a 5-state DFA, dynamic cooldown, sensor aggregation, and data-driven area configuration.
+Room-level occupancy detection with a 4-state DFA, dynamic cooldown, sensor aggregation, and data-driven area configuration.
 
 ## State Machine
 
@@ -15,7 +15,6 @@ Room-level occupancy detection with a 5-state DFA, dynamic cooldown, sensor aggr
                          (cooldown)
 
     UNKNOWN: all sensors unavailable
-    RESET: manual override (admin/debug)
 ```
 
 **Critical rule**: `PENDING_OFF` is treated as `OFF` for re-triggering. If motion fires during cooldown, it cancels the pending turn-off and transitions back to `ON`.
@@ -23,12 +22,13 @@ Room-level occupancy detection with a 5-state DFA, dynamic cooldown, sensor aggr
 ## Cooldown Formula
 
 ```
-coolDown(ms) = min(MAX_COOL_DOWN, baseCoolDown + sqrt(dwellMinutes) × 120) × 1000
+coolDown(ms) = min(MAX_COOL_DOWN, baseCoolDown + min(dwellMinutes, 60) × 10) × 1000
 ```
 
 - Base: 10 minutes (600s)
-- Maximum: 30 minutes (1800s)
-- Longer occupancy = longer hysteresis (square root curve, not linear)
+- Maximum: 20 minutes (1200s)
+- Longer occupancy = longer hysteresis (linear ramp, capped at 60min dwell)
+- Examples: 5min dwell → base + 50s, 30min → base + 300s, 60min+ → base + 600s
 
 ## Presence Areas (9 rooms)
 
@@ -72,7 +72,7 @@ Stored as `flow.get("flowInfo.{topic}")` within the Presence Subflow instance:
 }
 ```
 
-**Known limitation**: Per-room state lives in subflow-instance flow context, making it inaccessible from API endpoints on other tabs. The API endpoints (`area-status.ts`) attempt `flow.get()` but get empty results. Fix: migrate to `global.set("presenceFlowInfo.{topic}")`.
+Per-room state is stored in global context as `global.get("presenceFlowInfo.{topic}")` and `global.get("presenceStates.{topic}")`, making it accessible from API endpoints on any tab.
 
 ## REST API
 
@@ -81,6 +81,8 @@ Stored as `flow.get("flowInfo.{topic}")` within the Presence Subflow instance:
 | GET | `/presence/` | list-areas.ts — All areas with runtime state |
 | GET | `/presence/:topic/status` | area-status.ts — Full flow state for one area |
 | POST | `/presence/` | configure-area.ts — Create/update area config |
+| POST | `/presence/:topic/clear-cooldown` | clear-cooldown.ts — Reset cooldown for one area |
+| POST | `/presence/clear-all-cooldowns` | clear-all-cooldowns.ts — Reset all active cooldowns |
 
 ## Published Sensors
 
@@ -105,20 +107,25 @@ This eliminates the need for the old 10-node reset hack on the Presence tab.
 
 ```
 src/presence/
-├── types.ts                     (29 LOC) — PresenceAreaConfig, PresenceRegistry
-├── presence.ts                 (360 LOC) — Core state machine
-├── debounce.ts                  (48 LOC) — 1s input / 30s reset debounce
-├── get-flow-info.ts             (63 LOC) — Cooldown check at trigger time
-├── get-flow-info-logger.ts      (88 LOC) — get_flow_info_events logging
-├── influx-logger.ts            (130 LOC) — presence_events logging
-├── seed-registry.ts            (179 LOC) — 9 area definitions + blacklist
-├── publish-presence-state.ts   (119 LOC) — Sensor publishing with dedup
-├── test-runner.ts              (482 LOC) — 6 test scenarios
-├── utils.ts                     (67 LOC) — Cooldown calc, state aggregation
+├── types.ts                     — PresenceAreaConfig, PresenceRegistry
+├── utils.ts                     — Cooldown calc, state aggregation
+├── presence.ts                  — Core DFA state machine
+├── debounce.ts                  — 1s input / 30s reset debounce
+├── get-flow-info.ts             — Cooldown check at trigger time
+├── get-flow-info-logger.ts      — get_flow_info_events logging
+├── influx-logger.ts             — presence_events logging
+├── seed-registry.ts             — 9 area definitions + blacklist
+├── publish-presence-state.ts    — Sensor publishing with dedup
+├── startup-reconcile.ts         — DFA initialization on restart
+├── cooldown-ticker.ts           — Dashboard cooldown progress updates
+├── condition-enforcer.ts        — Condition gating on day/night changes
+├── test-runner.ts               — 6 test scenarios
 └── api/
-    ├── list-areas.ts            (69 LOC)
-    ├── area-status.ts           (87 LOC)
-    └── configure-area.ts       (106 LOC)
+    ├── list-areas.ts            — GET /endpoint/presence/
+    ├── area-status.ts           — GET /endpoint/presence/:topic/status
+    ├── configure-area.ts        — POST /endpoint/presence/
+    ├── clear-cooldown.ts        — POST /endpoint/presence/:topic/clear-cooldown
+    └── clear-all-cooldowns.ts   — POST /endpoint/presence/clear-all-cooldowns
 ```
 
 ## Node-RED Flow Structure

@@ -10,8 +10,7 @@ export enum PresenceState {
     OFF = "off",
     ON = "on",
     UNKNOWN = "unknown",
-    PENDING_OFF = "pending_off", // New state for cool-down period
-    RESET = "reset" // New state for reset sequences
+    PENDING_OFF = "pending_off" // Cool-down period before turning off
 }
 
 // Calculate cooldown with linear ramp and hard cap.

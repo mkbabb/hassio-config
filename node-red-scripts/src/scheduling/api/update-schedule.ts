@@ -36,7 +36,7 @@ if (!name) {
         message.statusCode = 404;
     } else {
         const isStatic = schedule.source === "static";
-        const validation = validateUpdateSchedule(body, isStatic);
+        const validation = validateUpdateSchedule(body, isStatic, name, registry.schedules);
 
         if (!validation.valid) {
             message.payload = { error: "Validation failed", details: validation.errors };
@@ -80,7 +80,8 @@ if (!name) {
                     enabled: schedule.enabled,
                     precedence: schedule.precedence,
                     updatedAt: schedule.updatedAt
-                }
+                },
+                ...(validation.warnings && { warnings: validation.warnings })
             };
             message.statusCode = 200;
 

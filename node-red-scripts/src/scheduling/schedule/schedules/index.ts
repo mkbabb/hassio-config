@@ -4,6 +4,7 @@ import type {
     RegistrySchedule,
     ScheduleRegistry
 } from "../../types";
+import { restoreDynamicSchedules } from "../../api/registry";
 import { plantSchedules } from "./plants-schedules";
 import { dayNightSchedules } from "./day-night-schedules";
 import { blindsSchedules } from "./blinds-schedules";
@@ -57,8 +58,5 @@ registry.lastSeeded = now;
 // @ts-ignore
 global.set("scheduleRegistry", registry);
 
-// Also write the flat arrays for backward compatibility during Phase 1 verification
-// @ts-ignore
-flow.set("schedules", Object.values(registry.schedules).filter(s => s.enabled));
-// @ts-ignore
-flow.set("tagDefinitions", tagDefinitions);
+// Restore dynamic schedules from file-backed persistence (survives restarts)
+const restoredCount = restoreDynamicSchedules();

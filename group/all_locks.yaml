@@ -4,3 +4,4 @@ office:
   entities:
     - lock.back_door
     - lock.front_door
+    - lock.garage_door

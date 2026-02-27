@@ -22,7 +22,7 @@ Multi-protocol smart home automation with TypeScript-driven Node-RED logic, regi
 │  └─ Cloud: Tesla, LG SmartThinQ, Tuya                       │
 ├─────────────────────────────────────────────────────────────┤
 │  Automation Layer                                            │
-│  ├─ Node-RED: TypeScript (80+ modules, ~10K LOC)           │
+│  ├─ Node-RED: TypeScript (88 modules, ~11.5K LOC)          │
 │  ├─ HA Automations: YAML (5 native automations)            │
 │  └─ Blueprints: Reusable templates                          │
 ├─────────────────────────────────────────────────────────────┤
@@ -64,9 +64,9 @@ Multi-protocol smart home automation with TypeScript-driven Node-RED logic, regi
 │   └── BUILD-DEPLOY.md            # TypeScript build + deploy pipeline
 │
 ├── node-red-scripts/              # TypeScript automation
-│   ├── src/                       # 80+ TS files, ~10K LOC
-│   │   ├── presence/              # 13 files — DFA, registry, API, publishing
-│   │   ├── scheduling/            # 24 files — Engine, registry, API, publishing
+│   ├── src/                       # 88 TS files, ~11.5K LOC
+│   │   ├── presence/              # 18 files — DFA, registry, API, publishing
+│   │   ├── scheduling/            # 25 files — Engine, registry, API, publishing
 │   │   ├── cache-states/          # 14 files — Away/home cache, rollback
 │   │   ├── plants/                # 5 files — Grow light control
 │   │   ├── remote-entities/       # 3 files — IR/RF abstraction
@@ -102,11 +102,11 @@ Multi-protocol smart home automation with TypeScript-driven Node-RED logic, regi
 - **Sensors**: `sensor.schedule_{name}_status`, `sensor.schedule_{name}_progress`, aggregates
 
 ### Presence Detection (See: `docs/PRESENCE.md`)
-- **DFA**: 5 states (off, on, pending_off, unknown, reset)
+- **DFA**: 4 states (off, on, pending_off, unknown)
 - **9 Areas**: Data-driven from `global.get("presenceRegistry")` with 1-4 sensors each
-- **Cooldown**: Dynamic — `baseCoolDown + sqrt(dwellMinutes) × 120`, max 30min
+- **Cooldown**: Dynamic — `baseCoolDown + min(dwellMinutes, 60) × 10`, max 20min
 - **Namespace Blacklist**: Presence entities excluded from scheduling + cache restore
-- **REST API**: 3 endpoints at `/endpoint/presence/`
+- **REST API**: 5 endpoints at `/endpoint/presence/`
 - **Sensors**: `sensor.presence_{topic}_state`, `sensor.presence_{topic}_cooldown`
 
 ### Plant Automation (See: `docs/PLANTS.md`)
@@ -135,7 +135,7 @@ Multi-protocol smart home automation with TypeScript-driven Node-RED logic, regi
 
 ### Node-RED
 - **URL**: `http://homeassistant.local:1880`
-- **REST API**: 12 endpoints under `/endpoint/` (See: `docs/API.md`)
+- **REST API**: 16 endpoints under `/endpoint/` (See: `docs/API.md`)
 - **Admin API**: `POST /flows` (hot reload, currently falls back to file-based)
 - **Credentials**: `node-red-scripts/.env`
 
@@ -269,6 +269,6 @@ WHERE time > now() - 24h
 
 ---
 
-**Last Updated**: 2026-02-23
+**Last Updated**: 2026-02-26
 **Git Branch**: master
-**Total Source Files**: 80+ TypeScript (~10K LOC) + 37 YAML configs
+**Total Source Files**: 88 TypeScript (~11.5K LOC) + 37 YAML configs
