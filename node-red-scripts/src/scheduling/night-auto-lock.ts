@@ -71,13 +71,13 @@ function findActionableItems(): { entityId: string; action: string }[] {
 
     for (const lockId of LOCKS) {
         const lock = getEntity(lockId);
-        if (!lock || lock.state === "locked") continue;
+        if (!lock || lock.state !== "unlocked") continue;
         if (isAjar(lockId)) continue;
         items.push({ entityId: lockId, action: "lock.lock" });
     }
 
     const garage = getEntity(GARAGE_COVER);
-    if (garage && garage.state !== "closed" && !isAjar(GARAGE_COVER)) {
+    if (garage && garage.state === "open" && !isAjar(GARAGE_COVER)) {
         items.push({ entityId: GARAGE_COVER, action: "cover.close_cover" });
     }
 

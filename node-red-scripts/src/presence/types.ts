@@ -18,6 +18,7 @@ export const normalizeSensorConfig = (s: PresenceSensorConfig): { entity_id: str
 
 export interface PresenceTrackedEntity {
     entity_id: string;
+    conditions?: PresenceCondition[];  // Per-entity conditions (all must pass for this entity to be controlled)
     states?: {
         on?: EntityState;   // Custom "on" behavior (default: turn_on)
         off?: EntityState;  // Custom "off" behavior (default: turn_off)

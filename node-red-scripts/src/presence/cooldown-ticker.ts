@@ -19,7 +19,7 @@
 
 import type { PresenceRegistry } from "./types";
 import { normalizeSensorConfig } from "./types";
-import { isSensorStale } from "./utils";
+import { isSensorStale, checkEntityConditions } from "./utils";
 import { getEntity } from "../utils/entities";
 import { groupActions } from "../utils/service-calls";
 import { filterBlacklistedEntity } from "../utils/utils";
@@ -103,7 +103,7 @@ if (!registry?.areas) {
 
             // Get filtered entities for turn_off actions
             const filteredEntities = area.entities
-                .filter(e => filterBlacklistedEntity(e.entity_id));
+                .filter(e => filterBlacklistedEntity(e.entity_id) && checkEntityConditions(e.conditions));
 
             if (anyLiveLevelSensorOn) {
                 // Motion detected during the lost cooldown — transition back to "on"

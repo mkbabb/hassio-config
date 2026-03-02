@@ -8,7 +8,8 @@ import {
     IMMEDIATE_DELAY_MS,
     PresenceState,
     calculateCoolDown,
-    isSensorStale
+    isSensorStale,
+    checkEntityConditions
 } from "./utils";
 import type { PresenceAreaConfig, PresenceRegistry } from "./types";
 import { getSensorEntityId, normalizeSensorConfig, sensorMatchesEntity } from "./types";
@@ -124,7 +125,13 @@ const entities: Hass.State[] = rawEntities.map(e =>
     typeof e === 'string' ? { entity_id: e, state: 'off' } as Hass.State : e
 );
 
-const filteredEntities = entities.filter((e) => filterBlacklistedEntity(e));
+// Filter by global blacklist AND per-entity conditions (day/night gating, etc.)
+const filteredEntities = entities.filter((e) => {
+    if (!filterBlacklistedEntity(e)) return false;
+    // Check per-entity conditions from registry
+    const tracked = registryArea?.entities.find(t => t.entity_id === e.entity_id);
+    return checkEntityConditions(tracked?.conditions);
+});
 
 // Check presence conditions — if not met, DFA still updates but no entity actions are sent
 const conditionsMet = checkPresenceConditions(registryArea);

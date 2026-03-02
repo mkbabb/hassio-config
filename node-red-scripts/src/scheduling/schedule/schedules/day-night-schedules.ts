@@ -11,7 +11,7 @@ export const dayNightSchedules: Schedule[] = [
         type: "continuous", // Keep state until next change
         clearStaticOnTransition: true, // Clear external overrides on day↔night transition
         interpolation: {
-            enabled: true,
+            enabled: false, // TODO: re-enable when simulate-sun is ready
             preamble_minutes: 60, // 1 hour sunrise simulation
             postamble_minutes: 60, // 1 hour sunset simulation
             events: true,

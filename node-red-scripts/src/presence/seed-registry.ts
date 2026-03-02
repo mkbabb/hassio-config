@@ -25,9 +25,9 @@ const STATIC_AREAS: PresenceAreaConfig[] = [
             "binary_sensor.bonus_room_motion_sensor_occupancy"
         ],
         entities: [
-            { entity_id: "light.bonus_room_ceiling_light" },
-            { entity_id: "light.bonus_room_light" },
-            { entity_id: "light.fishing_lamp" },
+            { entity_id: "light.bonus_room_ceiling_light", conditions: [{ entity_id: "input_select.day_status", state: "day" }] },
+            { entity_id: "light.bonus_room_light", conditions: [{ entity_id: "input_select.day_status", state: "day" }] },
+            { entity_id: "light.fishing_lamp", conditions: [{ entity_id: "input_select.day_status", state: "day" }] },
             { entity_id: "light.hey_lamp_2_2" }
         ],
         coolDown: 600,
@@ -42,8 +42,8 @@ const STATIC_AREAS: PresenceAreaConfig[] = [
             "binary_sensor.downstairs_bathroom_motion_sensor_occupancy"
         ],
         entities: [
-            { entity_id: "light.downstairs_bathroom_light" },
-            { entity_id: "light.downstairs_bathroom_chili_pepper_lights" }
+            { entity_id: "light.downstairs_bathroom_light", conditions: [{ entity_id: "input_select.day_status", state: "day" }] },
+            { entity_id: "light.downstairs_bathroom_chili_pepper_lights", conditions: [{ entity_id: "input_select.day_status", state: "night" }] }
         ],
         coolDown: 600,
         enabled: true,
@@ -76,7 +76,7 @@ const STATIC_AREAS: PresenceAreaConfig[] = [
             "binary_sensor.guest_bathroom_motion_sensor"
         ],
         entities: [
-            { entity_id: "light.guest_bathroom_light" },
+            { entity_id: "light.guest_bathroom_light", conditions: [{ entity_id: "input_select.day_status", state: "day" }] },
             { entity_id: "light.guest_bathroom_peppa_pig_lights" }
         ],
         coolDown: 600,
@@ -124,8 +124,8 @@ const STATIC_AREAS: PresenceAreaConfig[] = [
             "binary_sensor.master_bathroom_motion_sensor_occupancy"
         ],
         entities: [
-            { entity_id: "light.master_bathroom_light_1" },
-            { entity_id: "light.master_bathroom_light_2" },
+            { entity_id: "light.master_bathroom_light_1", conditions: [{ entity_id: "input_select.day_status", state: "day" }] },
+            { entity_id: "light.master_bathroom_light_2", conditions: [{ entity_id: "input_select.day_status", state: "day" }] },
             { entity_id: "light.master_bathroom_chili_pepper_lights" }
         ],
         coolDown: 600,
@@ -145,6 +145,9 @@ const STATIC_AREAS: PresenceAreaConfig[] = [
         ],
         coolDown: 600,
         enabled: true,
+        conditions: [
+            { entity_id: "input_select.day_status", state: "day" }
+        ],
         createdAt: "",
         updatedAt: ""
     },

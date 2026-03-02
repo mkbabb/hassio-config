@@ -84,4 +84,17 @@ export const determinePresenceState = (sensorStates: string[]): PresenceState =>
     return PresenceState.OFF;
 };
 
+/** Check if all per-entity conditions are met (same logic as area-level conditions) */
+export const checkEntityConditions = (
+    conditions: { entity_id: string; state: string | string[] }[] | undefined
+): boolean => {
+    if (!conditions || conditions.length === 0) return true;
+    return conditions.every(c => {
+        const entity = getEntity(c.entity_id);
+        if (!entity) return false;
+        const states = Array.isArray(c.state) ? c.state : [c.state];
+        return states.includes(entity.state);
+    });
+};
+
 // Note: Problematic sequence detection moved to reset-handler.ts

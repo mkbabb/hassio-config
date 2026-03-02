@@ -312,12 +312,13 @@ if (message.scheduleEvents && Array.isArray(message.scheduleEvents)) {
 const t = options.t || 0;
 const phase = options.phase || "sunrise";
 
-// Only proceed if we're home
-if (!isHome()) {
+// Only proceed if we're home and awake
+const isAsleep = getEntity("input_select.awake_status")?.state === "asleep";
+if (!isHome() || isAsleep) {
     // @ts-ignore
     msg.payload = null;
     // @ts-ignore
-    msg.debug = { reason: "not_home", presence_state: getEntity(PRESENCE_STATE_ENTITY_ID)?.state };
+    msg.debug = { reason: isAsleep ? "asleep" : "not_home", presence_state: getEntity(PRESENCE_STATE_ENTITY_ID)?.state };
 } else {
     // Get target entities based on phase and options
     let targetEntities: Hass.State[];
