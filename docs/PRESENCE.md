@@ -48,9 +48,18 @@ Areas are defined in `seed-registry.ts` and stored in `global.get("presenceRegis
 
 ## Sensor Aggregation
 
-- **Any sensor = "on"** → presence state = ON
+- **Any non-stale sensor = "on"** → presence state = ON
 - **All sensors = "unknown"** → UNKNOWN
-- **All sensors off/mixed** → OFF
+- **All sensors off/mixed/stale** → OFF
+
+### Stale Sensor Detection
+
+A PIR sensor reporting "on" with no state change for >60 minutes is treated as stuck at the hardware/protocol level (real PIR cycles every 30-120s). Staleness filtering is layered:
+
+1. **`presence.ts`** — on any incoming sensor event, stale "on" sensors are mapped to "off" before aggregation. Catches stuck sensors immediately when another sensor in the area fires.
+2. **`cooldown-ticker.ts`** — on the 15s periodic sweep, `anyLiveLevelSensorOn` excludes stale sensors. If all "on" sensors are stale, the sweep transitions the DFA to "off" and fires turn_off actions immediately (no dwell requirement). Logged via `node.warn()` with entity ID, elapsed minutes, and topic.
+
+Helper: `isSensorStale(entityId, thresholdMs?)` in `utils.ts`. Computes elapsed time from the entity's `last_changed` timestamp in the global HA state cache (not `timeSinceChangedMs`, which is only populated on event payloads).
 
 ## Pathological Sequence Detection
 
@@ -91,7 +100,7 @@ Per-room state is stored in global context as `global.get("presenceFlowInfo.{top
 | `sensor.presence_{topic}_state` | on/off/pending_off/unknown | dwell_minutes, cooldown_remaining_min, sensors_on |
 | `sensor.presence_{topic}_cooldown` | float (minutes remaining) | end_time, total_seconds |
 
-**Known issue**: Publisher may not receive messages due to wiring within the subflow chain. Needs verification after motion events.
+Published by `publish-presence-state.ts` after each DFA transition and by `cooldown-ticker.ts` every 15s for active cooldowns.
 
 ## Namespace Blacklist
 
@@ -108,7 +117,7 @@ This eliminates the need for the old 10-node reset hack on the Presence tab.
 ```
 src/presence/
 ├── types.ts                     — PresenceAreaConfig, PresenceRegistry
-├── utils.ts                     — Cooldown calc, state aggregation
+├── utils.ts                     — Cooldown calc, state aggregation, stale sensor detection
 ├── presence.ts                  — Core DFA state machine
 ├── debounce.ts                  — 1s input / 30s reset debounce
 ├── get-flow-info.ts             — Cooldown check at trigger time
@@ -117,7 +126,7 @@ src/presence/
 ├── seed-registry.ts             — 9 area definitions + blacklist
 ├── publish-presence-state.ts    — Sensor publishing with dedup
 ├── startup-reconcile.ts         — DFA initialization on restart
-├── cooldown-ticker.ts           — Dashboard cooldown progress updates
+├── cooldown-ticker.ts           — Dashboard cooldown progress + stale sensor sweep
 ├── condition-enforcer.ts        — Condition gating on day/night changes
 ├── test-runner.ts               — 6 test scenarios
 └── api/

@@ -1,7 +1,7 @@
 # Home Assistant Configuration
 
 **Version**: 2025.7.2 | **Platform**: macOS Darwin 25.2.0 ARM64
-**Location**: 35.804°N, 78.794°W
+**Location**: Raleigh, NC metro area
 
 ## Architecture Overview
 
@@ -105,6 +105,7 @@ Multi-protocol smart home automation with TypeScript-driven Node-RED logic, regi
 - **DFA**: 4 states (off, on, pending_off, unknown)
 - **9 Areas**: Data-driven from `global.get("presenceRegistry")` with 1-4 sensors each
 - **Cooldown**: Dynamic — `baseCoolDown + min(dwellMinutes, 60) × 10`, max 20min
+- **Stale Sensor Detection**: Sensors "on" for >60min with no state change are treated as stuck (real PIR cycles every 30-120s). Layered: `presence.ts` filters on events, `cooldown-ticker.ts` sweeps every 15s.
 - **Namespace Blacklist**: Presence entities excluded from scheduling + cache restore
 - **REST API**: 5 endpoints at `/endpoint/presence/`
 - **Sensors**: `sensor.presence_{topic}_state`, `sensor.presence_{topic}_cooldown`
@@ -269,6 +270,6 @@ WHERE time > now() - 24h
 
 ---
 
-**Last Updated**: 2026-02-26
+**Last Updated**: 2026-03-02
 **Git Branch**: master
-**Total Source Files**: 88 TypeScript (~11.5K LOC) + 37 YAML configs
+**Total Source Files**: 86 TypeScript (~11.5K LOC) + 37 YAML configs

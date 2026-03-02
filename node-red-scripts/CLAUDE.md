@@ -115,7 +115,7 @@ OFF ──motion──> ON ──no motion──> PENDING_OFF ──expires─�
 
 **Files** (13 total, 1827 LOC):
 - `presence.ts` (360 LOC) - Core DFA, sensor aggregation, action grouping
-- `utils.ts` (67 LOC) - `calculateCoolDown()`, `determinePresenceState()`
+- `utils.ts` - `calculateCoolDown()`, `determinePresenceState()`, `isSensorStale()`
 - `debounce.ts` (48 LOC) - 1s input / 30s reset debounce
 - `get-flow-info.ts` (63 LOC) - Cooldown checks at trigger execution
 - `get-flow-info-logger.ts` (88 LOC) - `get_flow_info_events` logging
@@ -410,9 +410,9 @@ npm run deploy -- --rename-only
 **Mapping Stats** (current):
 ```json
 {
-  "total": 48,
-  "exact": 48,
-  "unmapped": 1
+  "total": 57,
+  "exact": 57,
+  "unmapped": 3
 }
 ```
 
@@ -524,6 +524,7 @@ npm run build -- --debug
 - **Flow State Persistence**: Survives deployments, resets on service restart
 - **Debounce Levels**: Input (1s), Reset (30s)
 - **History Tracking**: Last 3 states (`state`, `prevState`, `prevPrevState`)
+- **Stale Sensor Detection**: `isSensorStale()` checks `last_changed` from HA global state cache (not `timeSinceChangedMs` — only on event payloads). 60min threshold. Layered in `presence.ts` (event-driven) and `cooldown-ticker.ts` (15s sweep)
 
 ### Scheduling
 - **Precedence**: Higher number = higher priority
@@ -579,8 +580,8 @@ npm run build -- --debug
 
 ---
 
-**Last Updated**: 2026-02-23
+**Last Updated**: 2026-03-02
 **Total LOC**: ~10,000 (TypeScript)
-**Modules**: 80+ source files, 48 deploy mappings
+**Modules**: 74 source files, 57 deploy mappings
 **Deployment**: File-based + addon restart (API hot-reload returns 400)
 **System Docs**: See `docs/` directory for detailed subsystem documentation

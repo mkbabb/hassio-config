@@ -123,6 +123,37 @@ if (!registry) {
             coolDownEndTime: null
         };
 
+        // === PRE-CHECK: Stale pending_off with expired cooldown ===
+        // Defense-in-depth: if area is stuck in pending_off with expired cooldown,
+        // force-clear to off regardless of sensor/entity state. The cooldown ticker
+        // sweeper is the primary fix, but this catches cases on restart.
+        const now = Date.now();
+        if (flowInfo.state === "pending_off" && (!flowInfo.coolDownEndTime || now >= flowInfo.coolDownEndTime)) {
+            flowInfo.state = "off";
+            flowInfo.prevState = "pending_off";
+            flowInfo.lastOff = now;
+            flowInfo.delay = 0;
+            flowInfo.coolDownEndTime = null;
+
+            // @ts-ignore
+            global.set(presenceStatesKey, sensorStates);
+            // @ts-ignore
+            global.set(flowInfoKey, flowInfo);
+
+            // Turn off any entities that are still on
+            for (const entityId of filteredEntities) {
+                if (entityStates[entityId] === "on") {
+                    actions.push({
+                        action: "homeassistant.turn_off",
+                        target: { entity_id: entityId }
+                    });
+                }
+            }
+
+            reconciled.push(`${area.topic}: stale pending_off (expired cooldown) → DFA=off, entities OFF`);
+            continue;
+        }
+
         // === RECONCILIATION LOGIC ===
 
         if (anySensorOn && conditionsMet) {

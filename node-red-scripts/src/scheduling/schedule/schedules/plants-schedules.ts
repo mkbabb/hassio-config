@@ -101,7 +101,7 @@ export const plantSchedules: Schedule[] = [
         name: "plants_global",
         entities: ["regex:(switch|light)\\.(.*grow.*)"],
         start: { entity_id: "input_datetime.plants_global_schedule_start" },
-        end: { entity_id: "input_datetime.plants_global_schedule_end" },
+        end: { entity_id: "sensor.plants_global_schedule_end" },
         precedence: 100, // HIGH - plants have their own schedule
         type: "continuous" // Enforce state continuously
     },
@@ -115,7 +115,7 @@ export const plantSchedules: Schedule[] = [
             "switch.grow_light_bookshelf_1_switch"
         ],
         start: { entity_id: "input_datetime.plants_global_schedule_start" },
-        end: { entity_id: "input_datetime.plants_global_schedule_end" },
+        end: { entity_id: "sensor.plants_global_schedule_end" },
         precedence: 105, // Above global (100), below bedroom (110)
         type: "continuous",
         durationModifier: 0.5

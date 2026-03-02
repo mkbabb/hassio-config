@@ -226,6 +226,18 @@ export function isWeekday(date: Date = new Date()): boolean {
     return getPythonWeekday(date) < 5;
 }
 
+// Duration formatting
+
+/** Format minutes to human-readable: <1 min, X min, Y.Z hr, A.B day */
+export const formatDuration = (minutes: number): string => {
+    if (minutes < 1) return "<1 min";
+    if (minutes < 60) return `${Math.round(minutes)} min`;
+    const hours = minutes / 60;
+    if (hours < 24) return `${Math.round(hours * 10) / 10} hr`;
+    const days = hours / 24;
+    return `${Math.round(days * 10) / 10} day`;
+};
+
 // Cleanup utilities
 
 export function isStale(timestamp: string | Date, maxAgeMs: number): boolean {

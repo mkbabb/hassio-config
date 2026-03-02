@@ -257,7 +257,7 @@
       supported_features: 0
       state: 'off'
     lock.back_door:
-      changed_by: Mike Babb
+      changed_by: Owner
       battery_level: 94
       friendly_name: Back Door
       supported_features: 0
@@ -269,7 +269,7 @@
       supported_features: 0
       state: locked
     lock.garage_entry_door:
-      changed_by: Mike Babb
+      changed_by: Owner
       battery_level: 94
       friendly_name: Garage Entry Door
       supported_features: 0

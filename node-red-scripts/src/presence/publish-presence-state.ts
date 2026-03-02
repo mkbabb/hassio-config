@@ -11,15 +11,7 @@
  * Deduplication: Only publishes changed state per topic.
  */
 
-// Format duration: never decimal minutes, roll to hours/days with 1 decimal
-const formatDuration = (minutes: number): string => {
-    if (minutes < 1) return "<1 min";
-    if (minutes < 60) return `${Math.round(minutes)} min`;
-    const hours = minutes / 60;
-    if (hours < 24) return `${Math.round(hours * 10) / 10} hr`;
-    const days = hours / 24;
-    return `${Math.round(days * 10) / 10} day`;
-};
+import { formatDuration } from "../utils/datetime";
 
 // @ts-ignore - Node-RED global
 const message = msg;

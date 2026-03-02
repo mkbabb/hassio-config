@@ -56,4 +56,27 @@ nest/
 
 # Node-RED flow backups
 node-red-backups/
-node-red-backups/
+
+# Environment files
+*.env
+.env*
+!.env.example
+
+# TLS certificates
+*.pem
+*.key
+*.cert
+tls/
+
+# Backups
+backups/
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+
+# Runtime state
+.ha_run.lock

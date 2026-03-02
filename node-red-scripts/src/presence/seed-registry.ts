@@ -61,7 +61,9 @@ const STATIC_AREAS: PresenceAreaConfig[] = [
         entities: [
             { entity_id: "light.garage_light_1" },
             { entity_id: "light.garage_light_2" },
-            { entity_id: "light.garage_shelf_light_1" }
+            { entity_id: "light.garage_light_3" },
+            { entity_id: "light.garage_shelf_light_1" },
+            { entity_id: "light.ratgdov25i_4b1c3b_light" }
         ],
         coolDown: 600,
         enabled: true,

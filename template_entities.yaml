@@ -52,6 +52,14 @@
     icon: >
       {% set icons = ['mdi:calendar-week', 'mdi:calendar-week', 'mdi:calendar-week', 'mdi:calendar-week', 'mdi:calendar-week', 'mdi:calendar-weekend', 'mdi:calendar-weekend'] %} {{ icons[now().weekday()] }}
 
+  - name: "Plants Global Schedule End"
+    state: >
+      {% if is_state('input_boolean.plants_sync_sleep', 'on') %}
+        {{ states('sensor.sleep_time') }}
+      {% else %}
+        {{ states('input_datetime.plants_global_schedule_end') }}
+      {% endif %}
+
   - name: "Bedroom Plants Schedule Start"
     state: "{{ states('sensor.wakeup_time') }}"
 

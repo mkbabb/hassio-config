@@ -1,9 +1,27 @@
+import { getEntity } from "../utils/entities";
+
 // Time constants (in seconds unless specified)
 export const MAX_COOL_DOWN = 20 * 60; // 20 minutes max cool-down
 export const DEFAULT_COOL_DOWN = 10 * 60; // 10 minutes default cool-down
 export const DEBOUNCE_TIME_MS = 1000; // 1 second debounce window (in milliseconds)
 export const IMMEDIATE_DELAY_MS = 1; // 1ms for immediate actions (in milliseconds)
 export const TEST_WAIT_MS = 2000; // 2 seconds standard wait time for tests (in milliseconds)
+export const SENSOR_STALE_THRESHOLD_MS = 60 * 60 * 1000; // 60 minutes — real PIR cycles every 30-120s
+
+/** Check if a sensor reporting "on" is stale (no state change for >threshold).
+ *  Computes elapsed time from last_changed since the global HA state cache
+ *  does not populate timeSinceChangedMs (that's only on event payloads). */
+export const isSensorStale = (
+    sensorEntityId: string,
+    thresholdMs: number = SENSOR_STALE_THRESHOLD_MS
+): boolean => {
+    const entity = getEntity(sensorEntityId);
+    if (!entity || entity.state !== "on") return false;
+    const lastChanged = entity.last_changed;
+    if (!lastChanged) return false;
+    const elapsedMs = Date.now() - new Date(lastChanged).getTime();
+    return elapsedMs > thresholdMs;
+};
 
 // States for the presence state machine
 export enum PresenceState {

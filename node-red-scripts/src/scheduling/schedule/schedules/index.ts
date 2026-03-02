@@ -51,6 +51,14 @@ for (const schedule of staticSchedules) {
     registry.schedules[schedule.name] = registrySchedule;
 }
 
+// Remove stale static schedules no longer in the source list
+const staticNames = new Set(staticSchedules.map(s => s.name));
+for (const [name, sched] of Object.entries(registry.schedules)) {
+    if (sched.source === "static" && !staticNames.has(name)) {
+        delete registry.schedules[name];
+    }
+}
+
 // Always update tag definitions and lastSeeded
 registry.tagDefinitions = tagDefinitions;
 registry.lastSeeded = now;

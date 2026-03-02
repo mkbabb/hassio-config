@@ -11,6 +11,7 @@
 import { createServiceCall } from "./utils";
 import { filterBlacklistedEntity } from "../utils/utils";
 import { shouldFilterEntity } from "../utils/static-states";
+import { formatDuration } from "../utils/datetime";
 
 // @ts-ignore - Node-RED global
 const message = msg;
@@ -104,12 +105,19 @@ if (!payload || !payload.entities || !Array.isArray(payload.entities)) {
             icon: "mdi:undo-variant",
             stack_depth: stack.length,
             max_depth: MAX_STACK_DEPTH,
+            last_scene_activated: sceneIds.length > 0
+                ? sceneIds.map(id => id.replace("scene.", "")).join(", ")
+                : null,
+            last_scene_time: sceneIds.length > 0
+                ? new Date().toISOString()
+                : null,
             entries: stack.map((e, i) => ({
                 index: i,
                 label: e.label,
                 scene_ids: e.sceneIds.join(", "),
                 entity_count: e.entityCount,
                 age_minutes: Math.round((Date.now() - e.timestamp) / 60000),
+                age_formatted: formatDuration((Date.now() - e.timestamp) / 60000),
                 timestamp: new Date(e.timestamp).toISOString()
             }))
         }

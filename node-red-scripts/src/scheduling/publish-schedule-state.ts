@@ -18,7 +18,8 @@ import {
     isTimeInRange,
     calculateScheduleTimes,
     calculateProgress,
-    dateToTimeString
+    dateToTimeString,
+    formatDuration
 } from "../utils/datetime";
 import { getEntity } from "../utils/entities";
 import { getExternalModificationSummary } from "../utils/static-states";
@@ -209,7 +210,10 @@ updates.push({
         schedules: externalModSummary.schedules.join(",") || "none",
         oldest_age_minutes: externalModSummary.oldestMs
             ? Math.round((Date.now() - externalModSummary.oldestMs) / 60000)
-            : 0
+            : 0,
+        oldest_age_formatted: externalModSummary.oldestMs
+            ? formatDuration((Date.now() - externalModSummary.oldestMs) / 60000)
+            : "<1 min"
     }
 });
 

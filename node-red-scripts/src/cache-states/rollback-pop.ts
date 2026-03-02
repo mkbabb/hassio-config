@@ -15,9 +15,10 @@
 
 import { serviceToActionCall, groupActions } from "../utils/service-calls";
 import { createServiceCall } from "./utils";
-import { getAllEntities } from "../utils/entities";
+import { getAllEntities, getEntity } from "../utils/entities";
 import { filterBlacklistedEntity } from "../utils/utils";
 import { shouldFilterEntity } from "../utils/static-states";
+import { formatDuration } from "../utils/datetime";
 
 // @ts-ignore - Node-RED global
 const message = msg;
@@ -113,6 +114,10 @@ if (stack.length === 0) {
     };
 }
 
+// Preserve last_scene attributes from existing sensor state
+const existingSensor = getEntity("sensor.scene_rollback_status");
+const existingAttrs = existingSensor?.attributes || {};
+
 // Publish rollback status sensor to HA
 const updatedStack: RollbackEntry[] = stack;
 message.rollbackSensorUpdate = {
@@ -123,12 +128,15 @@ message.rollbackSensorUpdate = {
         icon: "mdi:undo-variant",
         stack_depth: updatedStack.length,
         max_depth: MAX_STACK_DEPTH,
+        last_scene_activated: existingAttrs["last_scene_activated"] || null,
+        last_scene_time: existingAttrs["last_scene_time"] || null,
         entries: updatedStack.map((e, i) => ({
             index: i,
             label: e.label,
             scene_ids: e.sceneIds.join(", "),
             entity_count: e.entityCount,
             age_minutes: Math.round((Date.now() - e.timestamp) / 60000),
+            age_formatted: formatDuration((Date.now() - e.timestamp) / 60000),
             timestamp: new Date(e.timestamp).toISOString()
         }))
     }

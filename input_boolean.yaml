@@ -22,3 +22,11 @@ scene_rollback:
 clear_static_states:
     name: "Clear Static States"
     icon: mdi:broom
+plants_sync_sleep:
+    name: "Plants Sync Sleep"
+    icon: mdi:sleep
+    initial: true
+night_auto_lock:
+    name: "Night Auto Lock"
+    icon: mdi:lock-clock
+    initial: true

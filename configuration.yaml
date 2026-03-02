@@ -1,6 +1,15 @@
 # Configure a default setup of Home Assistant (frontend, api, etc)
 default_config:
 
+# HTTP hardening
+http:
+  ip_ban_enabled: true
+  login_attempts_threshold: 5
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 127.0.0.1
+    - ::1
+
 # Recorder configuration - extended retention for diagnostics
 recorder:
   purge_keep_days: 30
@@ -26,8 +35,8 @@ logger:
 # Entity customizations
 homeassistant:
   customize: !include customize.yaml
-  external_url: "http://192.168.1.230:8123"
-  internal_url: "http://192.168.1.230:8123"
+  external_url: !secret external_url
+  internal_url: !secret internal_url
 
 # Entity Guard - Conditional blocking of entities
 entity_guard:

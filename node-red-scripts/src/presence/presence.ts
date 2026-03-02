@@ -7,7 +7,8 @@ import {
     DEBOUNCE_TIME_MS,
     IMMEDIATE_DELAY_MS,
     PresenceState,
-    calculateCoolDown
+    calculateCoolDown,
+    isSensorStale
 } from "./utils";
 import type { PresenceAreaConfig, PresenceRegistry } from "./types";
 import { getSensorEntityId, normalizeSensorConfig, sensorMatchesEntity } from "./types";
@@ -94,19 +95,20 @@ const registryArea = presenceRegistry
 // Topic resolution: prefer msg.topic (upstream wiring), fall back to registry, then entity_id
 const topic: string = message.topic ?? registryArea?.topic ?? dataEntityId;
 
-// Cooldown: prefer msg.coolDown (upstream wiring), then registry, then default
-const coolDown = message.coolDown ?? registryArea?.coolDown ?? DEFAULT_COOL_DOWN;
+// Cooldown: registry is source of truth, then msg.coolDown (backward compat), then default
+const coolDown = registryArea?.coolDown ?? message.coolDown ?? DEFAULT_COOL_DOWN;
 
 
-// Filter entities - handle both strings and objects
-// Prefer msg.entities (backward compat with per-room wiring), fall back to registry
-let rawEntities: any[] = message.entities
-    ? (Array.isArray(message.entities) ? message.entities : [message.entities])
-    : [];
+// Filter entities - registry is source of truth when area is found
+// Registry takes priority over msg.entities (old per-room wiring may have stale entities)
+let rawEntities: any[] = [];
 
-// If no entities from msg, try registry
-if (rawEntities.length === 0 && registryArea && registryArea.entities.length > 0) {
+if (registryArea && registryArea.entities.length > 0) {
+    // Registry area found — use its entity list (authoritative)
     rawEntities = registryArea.entities.map(e => e.entity_id);
+} else if (message.entities) {
+    // No registry match — fall back to msg.entities (backward compat)
+    rawEntities = Array.isArray(message.entities) ? message.entities : [message.entities];
 }
 
 // If still no entities, try to infer from topic (e.g., guest_bathroom → light.guest_bathroom_light)
@@ -117,8 +119,9 @@ if (rawEntities.length === 0 && topic && topic !== dataEntityId) {
 }
 
 // Convert string entity IDs to objects if needed
+// Note: use state: 'off' (not 'unknown') so filterBlacklistedEntity doesn't exclude them
 const entities: Hass.State[] = rawEntities.map(e =>
-    typeof e === 'string' ? { entity_id: e, state: 'unknown' } as Hass.State : e
+    typeof e === 'string' ? { entity_id: e, state: 'off' } as Hass.State : e
 );
 
 const filteredEntities = entities.filter((e) => filterBlacklistedEntity(e));
@@ -221,12 +224,16 @@ if (
     const sensorConfigs = registryArea?.sensors.map(s => normalizeSensorConfig(s)) ?? [];
 
     // For aggregate state, only include "level" sensors (edge sensors trigger DFA but don't sustain presence)
+    // Treat stale "on" sensors as "off" — a real PIR cycles every 30-120s; >60min unchanged means stuck
     const levelSensorStates = Object.entries(presenceStates)
         .filter(([id]) => {
             const cfg = sensorConfigs.find(s => s.entity_id === id);
             return !cfg || cfg.triggerMode !== "edge";
         })
-        .map(([, state]) => state);
+        .map(([id, state]) => {
+            if (state === "on" && isSensorStale(id)) return "off";
+            return state;
+        });
 
     // Determine aggregate presence state (only from level sensors)
     const aggregateState = determinePresenceState(

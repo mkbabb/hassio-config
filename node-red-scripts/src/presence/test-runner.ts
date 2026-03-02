@@ -125,11 +125,16 @@ class PresenceTestRunner {
     }
 
     private async queryInfluxDB(query: string): Promise<any> {
+        const influxUser = process.env.INFLUXDB_USERNAME || "homeassistant";
+        const influxPass = process.env.INFLUXDB_PASSWORD;
+        if (!influxPass) {
+            throw new Error("INFLUXDB_PASSWORD not set in .env");
+        }
         const response = await fetch(
             `http://homeassistant.local:8086/query?` +
             `db=nodered&` +
-            `u=homeassistant&` +
-            `p=Wpt-yK7QdxMbap6em@hwDdkjoY-C9x&` +
+            `u=${influxUser}&` +
+            `p=${influxPass}&` +
             `q=${encodeURIComponent(query)}`,
             {
                 method: 'GET',
