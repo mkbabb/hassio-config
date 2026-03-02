@@ -1,7 +1,12 @@
 /**
- * Night Auto-Lock System
- * Fires every 5 minutes via inject node. During sleep window, attempts to
- * lock doors and close garage with safety checks and iOS notifications.
+ * Night Auto-Lock
+ * Fires every 5 minutes via inject node. During sleep window (awake_status = "asleep"),
+ * enforces locking on a 30-minute cycle with a 10-minute warning notification.
+ *
+ * Cycle (repeats every 30 min while asleep):
+ *   t=0:  Enforce — lock all doors + close garage (skip ajar/obstructed)
+ *   t=20: Warn — notify about anything still unlocked/open that WILL be locked at t=30
+ *   t=30: Enforce again (new cycle)
  *
  * Node wiring:
  *   [inject: every 5min]
@@ -12,8 +17,6 @@
  * Gate checks:
  *   - input_boolean.night_auto_lock must be "on"
  *   - input_select.awake_status must be "asleep"
- *
- * Rate limiting: 30 min per entity for lock attempts and notifications
  */
 
 import { getEntity } from "../utils/entities";
@@ -23,14 +26,20 @@ import { getEntityBasename } from "../utils/utils";
 // @ts-ignore - Node-RED global
 const message = msg;
 
-const RATE_LIMIT_MS = 30 * 60 * 1000; // 30 minutes
+const ENFORCE_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+const WARN_OFFSET_MS = 20 * 60 * 1000;      // 20 minutes into cycle
 const STATE_KEY = "nightAutoLockState";
 
 const LOCKS = ["lock.front_door", "lock.back_door", "lock.garage_door"];
 const GARAGE_COVER = "cover.ratgdov25i_4b1c3b_door";
 const GARAGE_OBSTRUCTION = "binary_sensor.ratgdov25i_4b1c3b_obstruction";
 
-// Door sensor patterns: binary_sensor.{basename}_door, _contact, _open
+interface CycleState {
+    lastEnforce: number;
+    warned: boolean;
+}
+
+/** Find the door contact/open sensor for a lock by basename convention */
 function findDoorSensor(lockEntityId: string): Hass.State | null {
     const basename = getEntityBasename(lockEntityId);
     for (const suffix of ["_door", "_contact", "_open"]) {
@@ -40,11 +49,49 @@ function findDoorSensor(lockEntityId: string): Hass.State | null {
     return null;
 }
 
+/** Check if a door/cover is ajar or obstructed (unsafe to lock/close) */
+function isAjar(entityId: string): boolean {
+    if (entityId === GARAGE_COVER) {
+        const obstruction = getEntity(GARAGE_OBSTRUCTION);
+        return obstruction?.state === "on";
+    }
+    const doorSensor = findDoorSensor(entityId);
+    return doorSensor?.state === "on";
+}
+
+/** Get friendly name for an entity */
+function friendlyName(entityId: string): string {
+    const entity = getEntity(entityId);
+    return (entity?.attributes as any)?.friendly_name || entityId;
+}
+
+/** Find all lockable items that are currently unlocked/open and not ajar */
+function findActionableItems(): { entityId: string; action: string }[] {
+    const items: { entityId: string; action: string }[] = [];
+
+    for (const lockId of LOCKS) {
+        const lock = getEntity(lockId);
+        if (!lock || lock.state === "locked") continue;
+        if (isAjar(lockId)) continue;
+        items.push({ entityId: lockId, action: "lock.lock" });
+    }
+
+    const garage = getEntity(GARAGE_COVER);
+    if (garage && garage.state !== "closed" && !isAjar(GARAGE_COVER)) {
+        items.push({ entityId: GARAGE_COVER, action: "cover.close_cover" });
+    }
+
+    return items;
+}
+
 // Gate checks
 const autoLockEnabled = getEntity("input_boolean.night_auto_lock");
 const awakeStatus = getEntity("input_select.awake_status");
 
 if (autoLockEnabled?.state !== "on" || awakeStatus?.state !== "asleep") {
+    // Not in sleep window — reset cycle state so next sleep starts fresh
+    // @ts-ignore
+    global.set(STATE_KEY, null);
     // @ts-ignore
     msg.payload = null;
     // @ts-ignore
@@ -52,97 +99,55 @@ if (autoLockEnabled?.state !== "on" || awakeStatus?.state !== "asleep") {
 } else {
     const now = Date.now();
 
-    // Rate limit state from global context
     // @ts-ignore
-    const rateState: Record<string, number> = global.get(STATE_KEY) || {};
+    let cycle: CycleState | null = global.get(STATE_KEY);
+    if (!cycle) {
+        // First tick of sleep window — enforce immediately
+        cycle = { lastEnforce: 0, warned: false };
+    }
 
+    const elapsed = now - cycle.lastEnforce;
     const actions: Partial<Hass.Action>[] = [];
-    const notifications: string[] = [];
+    let notification: any = null;
 
-    function isRateLimited(entityId: string): boolean {
-        const last = rateState[entityId];
-        return last != null && (now - last) < RATE_LIMIT_MS;
-    }
-
-    function recordAction(entityId: string): void {
-        rateState[entityId] = now;
-    }
-
-    // Check each lock
-    for (const lockId of LOCKS) {
-        const lock = getEntity(lockId);
-        if (!lock || lock.state === "locked") continue;
-
-        const doorSensor = findDoorSensor(lockId);
-        const doorOpen = doorSensor?.state === "on";
-
-        if (doorOpen) {
-            // Door is ajar — send notification (rate-limited)
-            const notifKey = `${lockId}_notification`;
-            if (!isRateLimited(notifKey)) {
-                const friendlyName = (lock.attributes as any)?.friendly_name || lockId;
-                notifications.push(`${friendlyName} is ajar and cannot be locked`);
-                recordAction(notifKey);
-            }
-        } else {
-            // Door closed — attempt lock (rate-limited)
-            if (!isRateLimited(lockId)) {
-                actions.push({
-                    action: "lock.lock",
-                    target: { entity_id: lockId }
-                });
-                recordAction(lockId);
-            }
+    if (elapsed >= ENFORCE_INTERVAL_MS) {
+        // === ENFORCE: lock everything that's unlocked and not ajar ===
+        const items = findActionableItems();
+        for (const item of items) {
+            actions.push({ action: item.action, target: { entity_id: item.entityId } });
         }
-    }
 
-    // Check garage cover
-    const garageCover = getEntity(GARAGE_COVER);
-    if (garageCover && garageCover.state !== "closed") {
-        // Check obstruction directly (basename mismatch prevents generic lookup)
-        const obstruction = getEntity(GARAGE_OBSTRUCTION);
-        const isObstructed = obstruction?.state === "on";
+        cycle.lastEnforce = now;
+        cycle.warned = false;
 
-        if (isObstructed) {
-            const notifKey = `${GARAGE_COVER}_notification`;
-            if (!isRateLimited(notifKey)) {
-                notifications.push("Garage door is obstructed and cannot be closed");
-                recordAction(notifKey);
-            }
-        } else {
-            if (!isRateLimited(GARAGE_COVER)) {
-                actions.push({
-                    action: "cover.close_cover",
-                    target: { entity_id: GARAGE_COVER }
-                });
-                recordAction(GARAGE_COVER);
-            }
+    } else if (elapsed >= WARN_OFFSET_MS && !cycle.warned) {
+        // === WARN: notify about items that will be locked in ~10 min ===
+        const items = findActionableItems();
+        if (items.length > 0) {
+            const names = items.map(i => friendlyName(i.entityId));
+            const verb = items.length === 1 ? "will be" : "will all be";
+            notification = {
+                action: "notify.mobile_app_forky",
+                data: {
+                    title: "Night Security",
+                    message: `${names.join(", ")} ${verb} locked in ~10 min`,
+                    data: {
+                        push: { category: "night-security" }
+                    }
+                }
+            };
         }
+        cycle.warned = true;
     }
 
-    // Save rate limit state
     // @ts-ignore
-    global.set(STATE_KEY, rateState);
+    global.set(STATE_KEY, cycle);
 
     // Output 1: grouped lock/cover actions
     // @ts-ignore
     msg.payload = actions.length > 0 ? groupActions(actions) : null;
 
     // Output 2: iOS notification
-    if (notifications.length > 0) {
-        // @ts-ignore
-        msg.notification = {
-            action: "notify.mobile_app_forky",
-            data: {
-                title: "Night Security Check",
-                message: notifications.join("\n"),
-                data: {
-                    push: { category: "night-security" }
-                }
-            }
-        };
-    } else {
-        // @ts-ignore
-        msg.notification = null;
-    }
+    // @ts-ignore
+    msg.notification = notification;
 }
