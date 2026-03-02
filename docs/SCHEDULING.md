@@ -68,8 +68,8 @@ Static schedules are seeded on Node-RED startup from TypeScript arrays. Dynamic 
 | `day_status` | continuous | 80 | Wakeup-Sleep | input_select.day_status | — |
 | `blinds_day_schedule` | trigger | 70 | Wakeup-Sunset | cover.* | home |
 | `blinds_night_schedule` | continuous | 71 | Sunset-Wakeup | cover.* | home |
-| `night_auto_lock` | trigger | 100 | 23:00 | lock.* | asleep |
-| `early_morning_lock` | trigger | 100 | 04:00 | lock.* | asleep |
+
+**Note**: Lock schedules removed from the schedule engine. Replaced by `night-auto-lock.ts` — a standalone function node that polls every 5min during sleep, with door-ajar safety checks, obstruction detection, rate limiting (30min/entity), and iOS notifications. Gated by `input_boolean.night_auto_lock` + `input_select.awake_status == "asleep"`.
 
 ## Precedence Resolution
 
