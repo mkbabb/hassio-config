@@ -80,3 +80,4 @@ backups/
 
 # Runtime state
 .ha_run.lock
+ip_bans.yaml
