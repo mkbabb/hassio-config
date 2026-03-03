@@ -30,6 +30,3 @@ night_auto_lock:
     name: "Night Auto Lock"
     icon: mdi:lock-clock
     initial: true
-sleeptime:
-    name: "Sleeptime"
-    icon: mdi:sleep
